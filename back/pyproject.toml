@@ -1,0 +1,57 @@
+[project]
+name = "back"
+version = "0.1.0"
+description = "주식 AI 분석 백엔드 (FastAPI · 비동기 · 멀티 에이전트)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.118",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.8",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "aiosqlite>=0.20",
+    "httpx>=0.28",
+    "anthropic>=0.40",
+    "yfinance>=0.2.50",
+    "alembic>=1.18.5",
+    "asyncpg>=0.31.0",
+    "psycopg2-binary>=2.9.12",
+    "bcrypt>=5.0.0",
+    "pyjwt>=2.13.0",
+    "python-dotenv>=1.2.2",
+    "fastapi-pagination>=0.15.16",
+    "openai>=2.50.0",
+]
+
+[project.optional-dependencies]
+postgres = ["asyncpg>=0.30"]
+
+# `fastapi dev` / `fastapi run`이 파일명 탐색 순서(main.py → app/main.py → …)에
+# 의존하지 않도록 진입점을 명시한다. 루트에 다른 main.py가 생겨도 흔들리지 않는다.
+[tool.fastapi]
+entrypoint = "main:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "ruff>=0.9",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+# _legacy/는 app/으로 이관이 끝난 원본 보관소다. 실행되지 않으므로 린트하지 않는다.
+extend-exclude = ["_legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.per-file-ignores]
+# 프롬프트 원문은 문장 중간에서 줄바꿈하면 오히려 읽기 어렵다.
+"app/agents/prompts.py" = ["E501"]

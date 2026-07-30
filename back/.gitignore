@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# 가상환경
+.venv
+
+# 시크릿 — .env에 ANTHROPIC_API_KEY가 들어간다. 템플릿(.env.example)만 커밋한다.
+.env
+.env.*
+!.env.example
+
+# 로컬 DB (개발용 SQLite — 기동 시 재생성된다)
+*.db
+*.sqlite
+*.sqlite3
+
+# 도구 캐시
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
