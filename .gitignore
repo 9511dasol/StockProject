@@ -1,0 +1,12 @@
+.claude
+.claude
+.claude_cache
+.claude_logs
+.vercel
+work/
+
+# env files
+.env
+.env.local
+.env*.local
+env

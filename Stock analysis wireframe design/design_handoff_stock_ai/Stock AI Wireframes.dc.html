@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@300;400;700&display=swap" rel="stylesheet"><style>body{margin:0;background:#f0eee9;font-family:'Gaegu',system-ui,sans-serif}a{color:#2a78d6}a:hover{color:#1b5aa6}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:700 17px/1.2 'Gaegu',system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 15px/1.3 'Gaegu',system-ui,sans-serif;color:rgba(0,0,0,.6)}.dv-card{max-width:100%;background:#fff;border:1px solid rgba(0,0,0,.08);border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:22px 0 0;font:400 15px/1.5 'Gaegu',system-ui,sans-serif;color:rgba(0,0,0,.55)}@keyframes wfpulse{0%,100%{opacity:.35}50%{opacity:1}}@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes slideIn{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}@keyframes popIn{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}@keyframes dotSpin{to{transform:rotate(360deg)}}@keyframes sheetUp{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}</style><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;500;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"></helmet>
+
+<section class="dv-turn" id="t4">
+<div class="dv-thd"><a class="dv-tid" href="#t4">4</a><span class="dv-tname">다크 검색 팔레트 + 관심종목 관리 — <a class="dv-oid" href="#3a">3a</a> 다크 변형과 새 화면</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="4a">
+<div class="dv-olabel"><a class="dv-oid" href="#4a">4a</a>다크 검색 팔레트 — <a class="dv-oid" href="#2b">2b</a> 터미널 문법 · 명령형 프리픽스(&gt; / : / @)</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+
+<div class="dv-card" style="width:1180px;position:relative;background:#0e1116;border:1px solid rgba(232,227,216,.14);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#e8e3d8;height:742px;overflow:hidden">
+<div style="opacity:.35;display:flex;flex-direction:column">
+<div style="display:flex;align-items:center;gap:16px;padding:12px 18px;border-bottom:1px solid rgba(232,227,216,.12)">
+<span style="font:600 12.5px 'IBM Plex Mono',monospace;letter-spacing:.2em">QUANT·DESK</span>
+<span style="display:flex;gap:16px;flex:1">
+<sc-for list="{{ mkt }}" as="k" hint-placeholder-count="4">
+<span style="display:flex;gap:7px;font:400 11px 'IBM Plex Mono',monospace"><span style="color:rgba(232,227,216,.5)">{{ k.n }}</span><span>{{ k.v }}</span><span style="color:{{ k.dcolD }}">{{ k.d }}</span></span>
+</sc-for>
+</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid rgba(232,227,216,.1)">
+<sc-for list="{{ hiMetrics }}" as="m" hint-placeholder-count="6">
+<span style="padding:14px 16px;display:flex;flex-direction:column;gap:5px;border-right:1px solid rgba(232,227,216,.08)"><span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(232,227,216,.4);text-transform:uppercase">{{ m.k }}</span><span style="font:500 15px 'IBM Plex Mono',monospace;color:{{ m.dcolD }}">{{ m.v }}</span></span>
+</sc-for>
+</div>
+</div>
+
+<div style="position:absolute;inset:0;background:rgba(6,8,11,.72);display:flex;justify-content:center;align-items:flex-start;padding:58px 0">
+<div style="width:788px;background:#131820;border:1px solid rgba(232,227,216,.2);box-shadow:0 30px 80px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:100%;animation:popIn .26s cubic-bezier(.2,.8,.2,1)">
+
+<div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid rgba(232,227,216,.16)">
+<span style="font:500 14px 'IBM Plex Mono',monospace;color:#e8b04b">&gt;</span>
+<span style="display:flex;align-items:center;font:400 20px 'IBM Plex Mono',monospace;flex:1;letter-spacing:.02em">삼성<span style="width:9px;height:19px;background:#e8b04b;margin-left:3px;animation:wfpulse 1s infinite;display:block"></span></span>
+<span style="display:flex;gap:5px">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;background:#e8b04b;color:#0e1116;padding:3px 7px">NAME</span>
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;border:1px solid rgba(232,227,216,.22);padding:3px 7px;color:rgba(232,227,216,.6)">:CODE</span>
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;border:1px solid rgba(232,227,216,.22);padding:3px 7px;color:rgba(232,227,216,.6)">@TICKER</span>
+</span>
+</div>
+
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+<sc-for list="{{ searchGroups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column">
+<span style="display:flex;justify-content:space-between;align-items:baseline;padding:9px 20px;background:rgba(232,227,216,.05);border-top:1px solid rgba(232,227,216,.1);border-bottom:1px solid rgba(232,227,216,.1)">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.2em;color:rgba(232,227,216,.6);text-transform:uppercase">{{ g.g }}</span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 9px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.35)">{{ g.note }}</span>
+</sc-if>
+</span>
+<sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+<span style="display:flex;align-items:center;gap:14px;padding:10px 20px;border-bottom:1px solid rgba(232,227,216,.07);cursor:pointer;transition:background .14s" style-hover="background:rgba(232,176,75,.08)">
+<span style="display:flex;flex-direction:column;gap:2px;flex:1">
+<span style="font:400 14.5px 'IBM Plex Sans KR'"><span style="color:#e8b04b">{{ it.hit }}</span>{{ it.rest }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:rgba(232,227,216,.4);text-transform:uppercase">{{ it.e }}</span>
+</span>
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;border:1px solid rgba(232,227,216,.2);padding:2px 6px;color:rgba(232,227,216,.55)">{{ it.m }}</span>
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.7);width:80px;text-align:right">{{ it.c }}</span>
+{{ it.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;width:86px;font-variant-numeric:tabular-nums">
+<span style="font:500 13.5px 'IBM Plex Mono',monospace">{{ it.p }}</span>
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;color:{{ it.col }}">{{ it.d }}</span>
+</span>
+</span>
+</sc-for>
+</div>
+</sc-for>
+<span style="display:flex;align-items:center;gap:9px;padding:11px 20px;border-top:1px solid rgba(232,227,216,.12);background:rgba(232,176,75,.06)">
+<span style="width:10px;height:10px;border:1.5px solid rgba(232,227,216,.25);border-top-color:#e8b04b;border-radius:50%;display:block;animation:dotSpin .8s linear infinite"></span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.6)">ensure_listed_companies … 2,318 / 2,614 sync</span>
+<span style="margin-left:auto;font:400 10.5px 'IBM Plex Mono',monospace;color:#7ec98a">KRX ok</span>
+</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-top:1px solid rgba(232,227,216,.16)">
+<span style="display:flex;gap:16px;font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.06em;color:rgba(232,227,216,.45)">
+<span>↑↓ MOVE</span><span>⏎ OPEN</span><span>⌥⏎ RUN AI</span><span>⇥ WATCH</span><span>ESC CLOSE</span>
+</span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.4)">8 results · 0.42s</span>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-card" style="width:390px;background:#000;border:none;border-radius:38px;padding:9px">
+<div style="background:#0e1116;border-radius:30px;overflow:hidden;position:relative;height:812px;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#e8e3d8;display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font:500 11.5px 'IBM Plex Mono',monospace"><span>15:31</span><span style="font-size:10px">▮▮▮ ⌾ ▰</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 16px 12px;border-bottom:1px solid rgba(232,227,216,.14)">
+<span style="display:flex;align-items:center;gap:8px;flex:1;border:1px solid rgba(232,227,216,.2);background:#131820;padding:9px 11px">
+<span style="font:500 12px 'IBM Plex Mono',monospace;color:#e8b04b">&gt;</span>
+<span style="display:flex;align-items:center;font:400 15px 'IBM Plex Mono',monospace">삼성<span style="width:7px;height:15px;background:#e8b04b;margin-left:3px;animation:wfpulse 1s infinite;display:block"></span></span>
+</span>
+<span style="font:400 11px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(232,227,216,.5)">ESC</span>
+</div>
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+<sc-for list="{{ searchGroups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.2em;color:rgba(232,227,216,.55);padding:9px 16px;background:rgba(232,227,216,.05);border-top:1px solid rgba(232,227,216,.1);border-bottom:1px solid rgba(232,227,216,.1);text-transform:uppercase">{{ g.g }}</span>
+<sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+<span style="display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid rgba(232,227,216,.07)">
+<span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font:400 14px 'IBM Plex Sans KR'"><span style="color:#e8b04b">{{ it.hit }}</span>{{ it.rest }}</span><span style="font:400 9px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.4)">{{ it.c }} · {{ it.m }}</span></span>
+{{ it.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums"><span style="font:500 12.5px 'IBM Plex Mono',monospace">{{ it.p }}</span><span style="font:500 10px 'IBM Plex Mono',monospace;color:{{ it.col }}">{{ it.d }}</span></span>
+</span>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<div style="border-top:1px solid rgba(232,227,216,.14);background:#131820;padding:10px 12px 22px;display:flex;flex-direction:column;gap:8px">
+<span style="display:flex;align-items:center;gap:8px;padding:0 5px"><span style="width:9px;height:9px;border:1.5px solid rgba(232,227,216,.25);border-top-color:#e8b04b;border-radius:50%;display:block;animation:dotSpin .8s linear infinite"></span><span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.5)">first call: syncing listed companies</span></span>
+<span style="border:1px dashed rgba(232,227,216,.2);height:182px;display:flex;align-items:center;justify-content:center;font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(232,227,216,.35)">KEYBOARD AREA</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="4b">
+<div class="dv-olabel"><a class="dv-oid" href="#4b">4b</a>관심종목 관리 — 그룹·순서 편집 · 알림 조건 · 일괄 AI 판단</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+
+<div class="dv-card" style="width:1180px;background:#fdfbf6;border:1px solid rgba(26,26,23,.16);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17">
+<div style="padding:26px 32px 30px;display:flex;flex-direction:column;gap:20px">
+
+<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1a1a17;padding-bottom:12px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<span style="font:700 28px/1 'Noto Serif KR',serif">관심 종목 <span style="font:400 16px 'Instrument Serif',serif;color:rgba(26,26,23,.5)">Watchlist</span></span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-transform:uppercase">18 종목 · 5 그룹 · 알림 7건 활성</span>
+</div>
+<div style="display:flex;gap:8px;align-items:center">
+<span style="font:500 12.5px 'IBM Plex Sans KR';border:1px solid rgba(26,26,23,.3);padding:8px 14px">순서 편집</span>
+<span style="font:500 12.5px 'IBM Plex Sans KR';border:1px solid rgba(26,26,23,.3);padding:8px 14px">＋ 종목 추가</span>
+<span onClick="{{ toggleA }}" style="cursor:pointer;font:500 12.5px 'IBM Plex Sans KR';background:#1a1a17;color:#fdfbf6;padding:8px 16px;display:flex;align-items:center;gap:7px"><span style="width:5px;height:5px;border-radius:50%;background:#c8352c;display:block"></span>선택 3종목 AI 분석</span>
+</div>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div style="display:flex;gap:6px">
+<sc-for list="{{ folioTabs }}" as="t" hint-placeholder-count="5">
+<span style="display:flex;align-items:baseline;gap:6px;font:500 12.5px 'IBM Plex Sans KR';border:1px solid rgba(26,26,23,.28);padding:7px 13px;cursor:pointer" style-hover="background:#f4efe4"><span>{{ t.n }}</span><span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">{{ t.c }}</span></span>
+</sc-for>
+</div>
+<div style="display:flex;gap:14px;align-items:center;font:400 11px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.55)">
+<span>정렬: 등락률 ▾</span><span style="border-left:1px solid rgba(26,26,23,.2);padding-left:14px">평가손익 합계 <span style="font-weight:500;color:#c8352c">+4.82%</span></span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:26px 1.6fr 108px 104px 116px 122px 1fr 96px;gap:0;align-items:center;border-top:1px solid rgba(26,26,23,.2);border-bottom:1px solid rgba(26,26,23,.2);padding:9px 0">
+<span></span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-transform:uppercase">종목</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-align:right;text-transform:uppercase">현재가</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-align:right;text-transform:uppercase">등락률</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-align:center;text-transform:uppercase">3개월</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-align:right;text-transform:uppercase">보유 / 평단</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-transform:uppercase;padding-left:18px">알림 조건</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-align:right;text-transform:uppercase">AI 판단</span>
+</div>
+
+<div style="display:flex;flex-direction:column">
+<sc-for list="{{ folio }}" as="f" hint-placeholder-count="6">
+<div style="display:grid;grid-template-columns:26px 1.6fr 108px 104px 116px 122px 1fr 96px;gap:0;align-items:center;padding:12px 0;border-bottom:1px dotted rgba(26,26,23,.22);transition:background .14s" style-hover="background:#f7f2e6">
+<span style="font:400 13px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.3);cursor:grab">⠿</span>
+<span style="display:flex;flex-direction:column;gap:3px">
+<span style="display:flex;align-items:baseline;gap:8px"><span style="font:500 16.5px 'Noto Serif KR',serif">{{ f.n }}</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;letter-spacing:.06em;border:1px solid rgba(26,26,23,.22);padding:2px 6px;color:rgba(26,26,23,.55)">{{ f.grp }}</span></span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">{{ f.c }} · {{ f.e }}</span>
+</span>
+<span style="font:500 14px 'IBM Plex Mono',monospace;text-align:right;font-variant-numeric:tabular-nums">{{ f.p }}</span>
+<span style="font:500 13px 'IBM Plex Mono',monospace;text-align:right;color:{{ f.col }};font-variant-numeric:tabular-nums">{{ f.d }}</span>
+<span style="display:flex;justify-content:center">{{ f.s }}</span>
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+<span style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.7)">{{ f.qty }} · {{ f.avg }}</span>
+<span style="font:500 12px 'IBM Plex Mono',monospace;color:{{ f.plcol }}">{{ f.pl }}</span>
+</span>
+<span style="display:flex;align-items:center;gap:9px;padding-left:18px">
+<span style="width:26px;height:15px;border-radius:100px;background:#1a1a17;display:flex;align-items:center;padding:2px;flex:none"><span style="width:11px;height:11px;border-radius:50%;background:#fdfbf6;margin-left:auto;display:block"></span></span>
+<span style="font:400 11.5px 'IBM Plex Sans KR';color:rgba(26,26,23,.7)">{{ f.alert }}</span>
+</span>
+<span style="font:500 11.5px 'IBM Plex Mono',monospace;text-align:right;color:{{ f.col }}">{{ f.ai }}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;background:#f4efe4;padding:14px 18px">
+<span style="display:flex;gap:22px;align-items:center">
+<span style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.1em">선택 3종목</span>
+<span style="display:flex;gap:10px;font:400 12.5px 'IBM Plex Sans KR';color:rgba(26,26,23,.7)"><span style="border-bottom:1px solid rgba(26,26,23,.35)">그룹 이동</span><span style="border-bottom:1px solid rgba(26,26,23,.35)">알림 일괄 설정</span><span style="border-bottom:1px solid rgba(26,26,23,.35)">삭제</span></span>
+</span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">generate_stock_advice ×3 (병렬) · 종목당 LLM 4회 → 지연 안내 필요</span>
+</sc-if>
+</div>
+</div>
+</div>
+
+<div class="dv-card" style="width:390px;background:#1a1a17;border:none;border-radius:38px;padding:9px">
+<div style="background:#fdfbf6;border-radius:30px;overflow:hidden;position:relative;height:812px;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17;display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font:500 11.5px 'IBM Plex Mono',monospace"><span>15:31</span><span style="font-size:10px">▮▮▮ ⌾ ▰</span></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:8px 20px 11px;border-bottom:2px solid #1a1a17">
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font:700 20px 'Noto Serif KR',serif">관심 종목</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(26,26,23,.5)">18 종목 · 합계 +4.82%</span></span>
+<span style="font:500 12px 'IBM Plex Sans KR';border-bottom:1px solid #1a1a17">편집</span>
+</div>
+<div style="display:flex;gap:6px;padding:11px 20px;border-bottom:1px dotted rgba(26,26,23,.24);overflow:hidden">
+<sc-for list="{{ folioTabs }}" as="t" hint-placeholder-count="5">
+<span style="display:flex;gap:5px;align-items:baseline;font:500 11px 'IBM Plex Mono',monospace;border:1px solid rgba(26,26,23,.25);padding:5px 9px;flex:none"><span>{{ t.n }}</span><span style="color:rgba(26,26,23,.45)">{{ t.c }}</span></span>
+</sc-for>
+</div>
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column;padding:0 20px 96px">
+<sc-for list="{{ folio }}" as="f" hint-placeholder-count="6">
+<div style="display:flex;flex-direction:column;gap:8px;padding:14px 0;border-bottom:1px dotted rgba(26,26,23,.22)">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font:400 13px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.3)">⠿</span>
+<span style="display:flex;flex-direction:column;gap:2px;flex:1">
+<span style="font:500 15.5px 'Noto Serif KR',serif">{{ f.n }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">{{ f.c }} · {{ f.grp }}</span>
+</span>
+{{ f.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums">
+<span style="font:500 13.5px 'IBM Plex Mono',monospace">{{ f.p }}</span>
+<span style="font:500 11px 'IBM Plex Mono',monospace;color:{{ f.col }}">{{ f.d }}</span>
+</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px;padding-left:23px">
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.6);flex:1">{{ f.qty }} · {{ f.avg }} <span style="color:{{ f.plcol }};font-weight:500">{{ f.pl }}</span></span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;border:1px solid rgba(26,26,23,.22);padding:2px 7px;color:rgba(26,26,23,.6)">🔔 {{ f.alert }}</span>
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;color:{{ f.col }}">{{ f.ai }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:12px 20px 22px;background:linear-gradient(180deg,rgba(253,251,246,0),#fdfbf6 30%);display:flex;gap:9px">
+<span style="flex:1;font:500 13px 'IBM Plex Sans KR';border:1px solid #1a1a17;padding:14px;text-align:center">＋ 종목 추가</span>
+<span onClick="{{ toggleA }}" style="cursor:pointer;flex:1;font:500 13px 'IBM Plex Sans KR';background:#1a1a17;color:#fdfbf6;padding:14px;text-align:center">전체 AI 분석</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">다음에 시도해볼 것: “<a class="dv-oid" href="#4b">4b</a>의 알림 설정 상세 화면” · “<a class="dv-oid" href="#4a">4a</a>를 <a class="dv-oid" href="#3b">3b</a> 홈에 붙인 다크 홈” · “<a class="dv-oid" href="#4b">4b</a> 일괄 분석 진행/결과 화면”</p>
+</section>
+
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">검색·자동완성 + 시장 개요 홈 — <a class="dv-oid" href="#2a">2a</a> 에디토리얼 스타일로 확장</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="3a">
+<div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>검색 · 자동완성 — 초성/코드/해외 티커를 한 팔레트에서 (⌘K 오버레이)</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+
+<div class="dv-card" style="width:1180px;position:relative;background:#fdfbf6;border:1px solid rgba(26,26,23,.16);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17;height:742px;overflow:hidden">
+<div style="padding:26px 32px;display:flex;flex-direction:column;gap:18px;filter:blur(1.6px);opacity:.5">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1a1a17;padding-bottom:12px">
+<span style="font:700 24px/1 'Noto Serif KR',serif">종목 원장 <span style="font:400 15px 'Instrument Serif',serif;color:rgba(26,26,23,.5)">The Stock Ledger</span></span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5)">2026. 07. 30 · 장 마감</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(26,26,23,.14)">
+<sc-for list="{{ homeIdx }}" as="i" hint-placeholder-count="4">
+<span style="background:#fdfbf6;padding:14px;display:flex;flex-direction:column;gap:8px"><span style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.1em">{{ i.n }}</span><span style="font:500 20px 'IBM Plex Mono',monospace">{{ i.v }}</span></span>
+</sc-for>
+</div>
+<div style="height:190px;border-top:1px solid rgba(26,26,23,.2);border-bottom:1px solid rgba(26,26,23,.2)"></div>
+</div>
+
+<div style="position:absolute;inset:0;background:rgba(26,26,23,.22);display:flex;justify-content:center;align-items:flex-start;padding:64px 0">
+<div style="width:772px;background:#fdfbf6;border:1px solid #1a1a17;box-shadow:0 28px 70px rgba(26,26,23,.28);display:flex;flex-direction:column;max-height:100%;animation:popIn .28s cubic-bezier(.2,.8,.2,1)">
+
+<div style="display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:2px solid #1a1a17">
+<span style="font:400 17px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">⌕</span>
+<span style="display:flex;align-items:center;font:400 25px 'Noto Serif KR',serif;flex:1">삼성<span style="width:2px;height:24px;background:#c8352c;margin-left:2px;animation:wfpulse 1.05s infinite;display:block"></span></span>
+<span style="display:flex;gap:6px">
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;border:1px solid rgba(26,26,23,.28);padding:3px 7px;color:rgba(26,26,23,.6)">한글</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;border:1px solid rgba(26,26,23,.28);padding:3px 7px;color:rgba(26,26,23,.6)">초성 ㅅㅅ</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;background:#1a1a17;color:#fdfbf6;padding:3px 7px">코드</span>
+</span>
+<span onClick="{{ closeA }}" style="cursor:pointer;font:400 16px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">✕</span>
+</div>
+
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+<sc-for list="{{ searchGroups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column">
+<span style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 22px 7px;background:#f4efe4;border-bottom:1px solid rgba(26,26,23,.14)">
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase">{{ g.g }}</span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">{{ g.note }}</span>
+</sc-if>
+</span>
+<sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+<span style="display:flex;align-items:center;gap:14px;padding:11px 22px;border-bottom:1px dotted rgba(26,26,23,.2);cursor:pointer;transition:background .14s" style-hover="background:#f7f2e6">
+<span style="display:flex;flex-direction:column;gap:3px;flex:1">
+<span style="font:500 17px 'Noto Serif KR',serif"><span style="background:rgba(200,53,44,.16);padding:0 1px">{{ it.hit }}</span>{{ it.rest }}</span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">{{ it.e }}</span>
+</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.06em;border:1px solid rgba(26,26,23,.25);padding:3px 7px;color:rgba(26,26,23,.65)">{{ it.m }}</span>
+<span style="font:500 11px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.75);width:82px;text-align:right">{{ it.c }}</span>
+{{ it.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;width:88px;font-variant-numeric:tabular-nums">
+<span style="font:500 14px 'IBM Plex Mono',monospace">{{ it.p }}</span>
+<span style="font:500 11px 'IBM Plex Mono',monospace;color:{{ it.col }}">{{ it.d }}</span>
+</span>
+</span>
+</sc-for>
+</div>
+</sc-for>
+<span style="display:flex;align-items:center;gap:10px;padding:12px 22px;background:#f4efe4;border-top:1px solid rgba(26,26,23,.14)">
+<span style="width:11px;height:11px;border:1.6px solid rgba(26,26,23,.25);border-top-color:#c8352c;border-radius:50%;display:block;animation:dotSpin .8s linear infinite"></span>
+<span style="font:400 11.5px 'IBM Plex Sans KR';color:rgba(26,26,23,.65)">상장사 목록을 처음 준비하는 중입니다 · 2,318 / 2,614 종목</span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="margin-left:auto;font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">ensure_listed_companies → fetch_krx_listed_companies</span>
+</sc-if>
+</span>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 22px;border-top:2px solid #1a1a17">
+<span style="display:flex;gap:16px;font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.55)">
+<span>↑↓ 이동</span><span>⏎ 선택</span><span>⇥ 관심 추가</span><span>esc 닫기</span>
+</span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">결과 8건 · 0.42s</span>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-card" style="width:390px;background:#1a1a17;border:none;border-radius:38px;padding:9px">
+<div style="background:#fdfbf6;border-radius:30px;overflow:hidden;position:relative;height:812px;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17;display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font:500 11.5px 'IBM Plex Mono',monospace"><span>15:31</span><span style="font-size:10px">▮▮▮ ⌾ ▰</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:10px 18px 12px;border-bottom:2px solid #1a1a17">
+<span style="display:flex;align-items:center;gap:8px;flex:1;border:1px solid rgba(26,26,23,.28);background:#fff;padding:9px 11px">
+<span style="font:400 13px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">⌕</span>
+<span style="display:flex;align-items:center;font:400 16px 'Noto Serif KR',serif">삼성<span style="width:2px;height:16px;background:#c8352c;margin-left:2px;animation:wfpulse 1.05s infinite;display:block"></span></span>
+</span>
+<span style="font:400 12.5px 'IBM Plex Sans KR';color:rgba(26,26,23,.55)">취소</span>
+</div>
+<div style="display:flex;gap:6px;padding:11px 18px;border-bottom:1px dotted rgba(26,26,23,.24);overflow:hidden">
+<span style="font:500 10px 'IBM Plex Mono',monospace;background:#1a1a17;color:#fdfbf6;padding:4px 9px;flex:none">전체</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;border:1px solid rgba(26,26,23,.25);padding:4px 9px;flex:none">코스피</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;border:1px solid rgba(26,26,23,.25);padding:4px 9px;flex:none">코스닥</span>
+<span style="font:500 10px 'IBM Plex Mono',monospace;border:1px solid rgba(26,26,23,.25);padding:4px 9px;flex:none">해외</span>
+</div>
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+<sc-for list="{{ searchGroups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column">
+<span style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;padding:10px 18px 7px;background:#f4efe4;border-bottom:1px solid rgba(26,26,23,.14)">{{ g.g }}</span>
+<sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+<span style="display:flex;align-items:center;gap:11px;padding:11px 18px;border-bottom:1px dotted rgba(26,26,23,.2)">
+<span style="display:flex;flex-direction:column;gap:3px;flex:1">
+<span style="font:500 15.5px 'Noto Serif KR',serif"><span style="background:rgba(200,53,44,.16)">{{ it.hit }}</span>{{ it.rest }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">{{ it.c }} · {{ it.m }}</span>
+</span>
+{{ it.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums">
+<span style="font:500 13px 'IBM Plex Mono',monospace">{{ it.p }}</span>
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;color:{{ it.col }}">{{ it.d }}</span>
+</span>
+</span>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<div style="border-top:1px solid rgba(26,26,23,.16);background:#eee8db;padding:10px 12px 22px;display:flex;flex-direction:column;gap:7px">
+<span style="display:flex;align-items:center;gap:8px;padding:0 6px 4px"><span style="width:10px;height:10px;border:1.5px solid rgba(26,26,23,.25);border-top-color:#c8352c;border-radius:50%;display:block;animation:dotSpin .8s linear infinite"></span><span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.55)">상장사 목록 준비 중 · 첫 검색만 느립니다</span></span>
+<span style="border:1px dashed rgba(26,26,23,.3);height:186px;display:flex;align-items:center;justify-content:center;font:400 11px 'IBM Plex Mono',monospace;letter-spacing:.12em;color:rgba(26,26,23,.4);background:repeating-linear-gradient(135deg,#f2ede2 0 7px,#e9e3d6 7px 14px)">한글 키보드 영역</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="3b">
+<div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>시장 개요 홈 — 지수 4종 · AI 아침 브리핑 · 상승/하락 상위 · 업종 등락</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+
+<div class="dv-card" style="width:1180px;background:#fdfbf6;border:1px solid rgba(26,26,23,.16);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17">
+<div style="padding:26px 32px 30px;display:flex;flex-direction:column;gap:22px">
+
+<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1a1a17;padding-bottom:12px">
+<div style="display:flex;flex-direction:column;gap:3px">
+<span style="font:700 24px/1 'Noto Serif KR',serif">종목 원장 <span style="font:400 15px 'Instrument Serif',serif;color:rgba(26,26,23,.5)">The Stock Ledger</span></span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-transform:uppercase">2026. 07. 30 목요일 · 장 마감 15:30 KST · 예시 데이터</span>
+</div>
+<div style="display:flex;gap:10px;align-items:center">
+<span style="display:flex;align-items:center;gap:8px;border:1px solid rgba(26,26,23,.28);padding:8px 12px;width:250px;background:#fff">
+<span style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.4)">⌕</span>
+<span style="font:400 13px 'IBM Plex Sans KR';color:rgba(26,26,23,.45)">종목명 · 코드 · 초성</span>
+<span style="margin-left:auto;font:500 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.35)">⌘K</span>
+</span>
+<span style="font:500 13px 'IBM Plex Sans KR';border:1px solid #1a1a17;padding:8px 16px">관심 종목</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(26,26,23,.16)">
+<sc-for list="{{ homeIdx }}" as="i" hint-placeholder-count="4">
+<div style="background:#fdfbf6;padding:16px 18px 12px;display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;justify-content:space-between;align-items:baseline">
+<span style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.12em">{{ i.n }}</span>
+<span style="font:400 11px 'IBM Plex Sans KR';color:rgba(26,26,23,.5)">{{ i.e }}</span>
+</span>
+<span style="display:flex;flex-direction:column;gap:3px">
+<span style="font:500 26px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ i.v }}</span>
+<span style="font:500 12px 'IBM Plex Mono',monospace;color:{{ i.col }};font-variant-numeric:tabular-nums">{{ i.d }}</span>
+</span>
+{{ i.s }}
+</div>
+</sc-for>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 328px;gap:26px;align-items:start">
+
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="background:#1a1a17;color:#fdfbf6;padding:22px 24px;display:flex;gap:26px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:11px;flex:1">
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(253,251,246,.55)">ai morning briefing · 07:40</span>
+<span style="font:700 27px/1.3 'Noto Serif KR',serif;text-wrap:pretty">반도체가 지수를 끌고, 2차전지가 눌렀습니다.</span>
+<span style="display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(253,251,246,.2);padding-top:11px">
+<span style="font:400 12.5px 'IBM Plex Mono',monospace;color:rgba(253,251,246,.78)">＋ HBM 수요 보도 3건 · 반도체 업종 +2.41%</span>
+<span style="font:400 12.5px 'IBM Plex Mono',monospace;color:rgba(253,251,246,.78)">＋ 외국인 5거래일 연속 순매수</span>
+<span style="font:400 12.5px 'IBM Plex Mono',monospace;color:#9dbcf5">－ 원/달러 1,381원 · 2차전지 -2.18%</span>
+</span>
+</div>
+<div style="width:196px;display:flex;flex-direction:column;gap:9px">
+<span style="font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(253,251,246,.5);text-transform:uppercase">관심 종목 판단</span>
+<span style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(253,251,246,.18);padding-bottom:6px"><span style="font:400 13px 'IBM Plex Sans KR'">삼성전자</span><span style="font:500 11.5px 'IBM Plex Mono',monospace;color:#f0a89f">비중 확대</span></span>
+<span style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(253,251,246,.18);padding-bottom:6px"><span style="font:400 13px 'IBM Plex Sans KR'">SK하이닉스</span><span style="font:500 11.5px 'IBM Plex Mono',monospace;color:#f0a89f">유지</span></span>
+<span style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:400 13px 'IBM Plex Sans KR'">에코프로</span><span style="font:500 11.5px 'IBM Plex Mono',monospace;color:#9dbcf5">관망</span></span>
+<span onClick="{{ toggleA }}" style="cursor:pointer;margin-top:4px;font:500 12px 'IBM Plex Sans KR';border:1px solid rgba(253,251,246,.55);padding:9px;text-align:center">3인 의견 자세히</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:26px">
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:8px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase">상승률 상위</span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">KOSPI+KOSDAQ</span>
+</span>
+<sc-for list="{{ moversUp }}" as="m" hint-placeholder-count="5">
+<span style="display:flex;align-items:center;gap:12px;padding-bottom:9px;border-bottom:1px dotted rgba(26,26,23,.2)">
+<span style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.35);width:14px">{{ $index }}</span>
+<span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font:500 14px 'Noto Serif KR',serif">{{ m.n }}</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">{{ m.c }} · {{ m.e }}</span></span>
+{{ m.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums"><span style="font:500 13px 'IBM Plex Mono',monospace">{{ m.p }}</span><span style="font:500 11px 'IBM Plex Mono',monospace;color:{{ m.col }}">{{ m.d }}</span></span>
+</span>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:8px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase">하락률 상위</span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">KOSPI+KOSDAQ</span>
+</span>
+<sc-for list="{{ moversDown }}" as="m" hint-placeholder-count="5">
+<span style="display:flex;align-items:center;gap:12px;padding-bottom:9px;border-bottom:1px dotted rgba(26,26,23,.2)">
+<span style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.35);width:14px">{{ $index }}</span>
+<span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font:500 14px 'Noto Serif KR',serif">{{ m.n }}</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">{{ m.c }} · {{ m.e }}</span></span>
+{{ m.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums"><span style="font:500 13px 'IBM Plex Mono',monospace">{{ m.p }}</span><span style="font:500 11px 'IBM Plex Mono',monospace;color:{{ m.col }}">{{ m.d }}</span></span>
+</span>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;flex-direction:column;gap:11px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:8px">업종 등락</span>
+<sc-for list="{{ sectors }}" as="s" hint-placeholder-count="6">
+<span style="display:flex;align-items:center;gap:10px">
+<span style="font:400 12.5px 'IBM Plex Sans KR';width:64px">{{ s.n }}</span>
+<span style="flex:1;height:8px;background:rgba(26,26,23,.08);display:block"><span style="display:block;height:8px;width:{{ s.w }};background:{{ s.col }}"></span></span>
+<span style="font:500 12px 'IBM Plex Mono',monospace;color:{{ s.col }};width:56px;text-align:right;font-variant-numeric:tabular-nums">{{ s.v }}</span>
+</span>
+</sc-for>
+</div>
+<div style="background:#f4efe4;padding:16px;display:flex;flex-direction:column;gap:11px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:8px">오늘의 뉴스</span>
+<sc-for list="{{ hiNews }}" as="n" hint-placeholder-count="3">
+<span style="display:flex;flex-direction:column;gap:4px;padding-bottom:9px;border-bottom:1px dotted rgba(26,26,23,.22)">
+<span style="font:500 14px/1.45 'Noto Serif KR',serif">{{ n.t }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">{{ n.s }} · {{ n.tm }}</span>
+</span>
+</sc-for>
+</div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 10px/1.7 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45);border-top:1px solid rgba(26,26,23,.2);padding-top:9px">fetch_market_overview_from_yfinance (카테고리별 현재값·변동률·차트) · ensure_listed_companies</span>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-card" style="width:390px;background:#1a1a17;border:none;border-radius:38px;padding:9px">
+<div style="background:#fdfbf6;border-radius:30px;overflow:hidden;position:relative;height:812px;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17;display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font:500 11.5px 'IBM Plex Mono',monospace"><span>15:31</span><span style="font-size:10px">▮▮▮ ⌾ ▰</span></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:8px 20px 11px;border-bottom:2px solid #1a1a17">
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font:700 19px 'Noto Serif KR',serif">종목 원장</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(26,26,23,.5)">07.30 · 장 마감</span></span>
+<span style="font:400 15px 'IBM Plex Mono',monospace">⌕</span>
+</div>
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:16px;padding:14px 20px 92px">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(26,26,23,.16)">
+<sc-for list="{{ homeIdx }}" as="i" hint-placeholder-count="4">
+<span style="background:#fdfbf6;padding:11px 12px;display:flex;flex-direction:column;gap:5px">
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.1em">{{ i.n }}</span>
+<span style="font:500 18px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ i.v }}</span>
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;color:{{ i.col }}">{{ i.d }}</span>
+</span>
+</sc-for>
+</div>
+<div style="background:#1a1a17;color:#fdfbf6;padding:16px;display:flex;flex-direction:column;gap:10px">
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(253,251,246,.55)">ai morning briefing</span>
+<span style="font:700 20px/1.35 'Noto Serif KR',serif">반도체가 지수를 끌고, 2차전지가 눌렀습니다.</span>
+<span style="display:flex;flex-direction:column;gap:5px;border-top:1px solid rgba(253,251,246,.2);padding-top:9px">
+<span style="font:400 11.5px 'IBM Plex Mono',monospace;color:rgba(253,251,246,.78)">＋ 반도체 +2.41% · 외국인 순매수</span>
+<span style="font:400 11.5px 'IBM Plex Mono',monospace;color:#9dbcf5">－ 2차전지 -2.18% · 환율 1,381원</span>
+</span>
+<span onClick="{{ toggleA }}" style="cursor:pointer;font:500 12.5px 'IBM Plex Sans KR';border:1px solid rgba(253,251,246,.55);padding:11px;text-align:center;margin-top:2px">3인 의견 보기</span>
+</div>
+<div style="display:flex;gap:0;border-bottom:1px solid rgba(26,26,23,.18)">
+<span style="font:500 12.5px 'IBM Plex Sans KR';padding:0 13px 7px 0;border-bottom:2px solid #1a1a17;margin-bottom:-1px">상승률</span>
+<span style="font:400 12.5px 'IBM Plex Sans KR';padding:0 13px 7px;color:rgba(26,26,23,.45)">하락률</span>
+<span style="font:400 12.5px 'IBM Plex Sans KR';padding:0 13px 7px;color:rgba(26,26,23,.45)">거래량</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ moversUp }}" as="m" hint-placeholder-count="5">
+<span style="display:flex;align-items:center;gap:11px;padding-bottom:10px;border-bottom:1px dotted rgba(26,26,23,.2)">
+<span style="font:400 11.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.35);width:12px">{{ $index }}</span>
+<span style="display:flex;flex-direction:column;gap:2px;flex:1"><span style="font:500 14px 'Noto Serif KR',serif">{{ m.n }}</span><span style="font:400 9px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">{{ m.c }}</span></span>
+{{ m.s }}
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums"><span style="font:500 12.5px 'IBM Plex Mono',monospace">{{ m.p }}</span><span style="font:500 10.5px 'IBM Plex Mono',monospace;color:{{ m.col }}">{{ m.d }}</span></span>
+</span>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:7px">업종 등락</span>
+<sc-for list="{{ sectors }}" as="s" hint-placeholder-count="6">
+<span style="display:flex;align-items:center;gap:9px">
+<span style="font:400 12px 'IBM Plex Sans KR';width:56px">{{ s.n }}</span>
+<span style="flex:1;height:7px;background:rgba(26,26,23,.08);display:block"><span style="display:block;height:7px;width:{{ s.w }};background:{{ s.col }}"></span></span>
+<span style="font:500 11px 'IBM Plex Mono',monospace;color:{{ s.col }};width:50px;text-align:right">{{ s.v }}</span>
+</span>
+</sc-for>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-around;padding:11px 12px 22px;background:#fdfbf6;border-top:1px solid rgba(26,26,23,.18)">
+<span style="display:flex;flex-direction:column;align-items:center;gap:4px;font:500 10px 'IBM Plex Mono',monospace"><span style="font-size:14px">◧</span>홈</span>
+<span style="display:flex;flex-direction:column;align-items:center;gap:4px;font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)"><span style="font-size:14px">⌕</span>검색</span>
+<span style="display:flex;flex-direction:column;align-items:center;gap:4px;font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)"><span style="font-size:14px">☆</span>관심</span>
+<span style="display:flex;flex-direction:column;align-items:center;gap:4px;font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)"><span style="font-size:14px">◔</span>AI</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">다음에 시도해볼 것: “<a class="dv-oid" href="#3a">3a</a>를 <a class="dv-oid" href="#2b">2b</a> 다크 버전으로” · “<a class="dv-oid" href="#3b">3b</a>에 관심종목 관리 화면 추가” · “<a class="dv-oid" href="#3b">3b</a>의 AI 브리핑을 별도 전체 화면 리포트로”</p>
+</section>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">하이파이 3안 — 데스크탑 + 모바일 (와이어프레임 <a class="dv-oid" href="#1b">1b</a>·<a class="dv-oid" href="#1c">1c</a> 발전형 / 차트는 커서·휠로 실제 조작, AI 버튼을 누르면 단계별로 진행됩니다)</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>에디토리얼 데일리 — 신문 지면 구조 · AI는 우측 슬라이드 드로어</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+
+<div class="dv-card" style="width:1180px;position:relative;background:#fdfbf6;border:1px solid rgba(26,26,23,.16);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17">
+<div style="padding:26px 32px 30px;display:flex;flex-direction:column;gap:20px">
+
+<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1a1a17;padding-bottom:12px">
+<div style="display:flex;flex-direction:column;gap:3px">
+<span style="font:700 24px/1 'Noto Serif KR',serif;letter-spacing:-.01em">종목 원장 <span style="font:400 15px 'Instrument Serif',serif;letter-spacing:.02em;color:rgba(26,26,23,.5)">The Stock Ledger</span></span>
+<span style="font:400 10.5px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(26,26,23,.5);text-transform:uppercase">2026. 07. 30 목요일 · 장 마감 15:30 KST · 예시 데이터</span>
+</div>
+<div style="display:flex;gap:10px;align-items:center">
+<span style="display:flex;align-items:center;gap:8px;border:1px solid rgba(26,26,23,.28);border-radius:2px;padding:8px 12px;width:250px;background:#fff">
+<span style="font:400 12px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.4)">⌕</span>
+<span style="font:400 13px 'IBM Plex Sans KR';color:rgba(26,26,23,.45)">종목명 · 코드 · 초성</span>
+<span style="margin-left:auto;font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:rgba(26,26,23,.35)">⌘K</span>
+</span>
+<span onClick="{{ toggleA }}" style="cursor:pointer;font:500 13px 'IBM Plex Sans KR';background:#1a1a17;color:#fdfbf6;padding:9px 18px;border-radius:2px;display:flex;align-items:center;gap:7px;transition:transform .15s" style-hover="transform:translateY(-1px)"><span style="width:5px;height:5px;border-radius:50%;background:#c8352c;display:block"></span>AI 판단 열기</span>
+</div>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:700 46px/1 'Noto Serif KR',serif;letter-spacing:-.02em">삼성전자</span>
+<sc-if value="{{ showEn }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 15px/1 'Instrument Serif',serif;letter-spacing:.03em;color:rgba(26,26,23,.55)">Samsung Electronics Co., Ltd.</span>
+</sc-if>
+<div style="display:flex;gap:6px;margin-top:2px">
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.06em;border:1px solid rgba(26,26,23,.25);padding:3px 8px">005930.KS</span>
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.06em;border:1px solid rgba(26,26,23,.25);padding:3px 8px">KOSPI</span>
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.06em;background:#1a1a17;color:#fdfbf6;padding:3px 8px">반도체</span>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+<span style="font:500 44px/1 'IBM Plex Mono',monospace;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ price }}<span style="font:400 17px 'IBM Plex Sans KR';color:rgba(26,26,23,.5);margin-left:4px">원</span></span>
+<span style="display:flex;gap:10px;align-items:center;font:500 15px 'IBM Plex Mono',monospace;color:#c8352c;font-variant-numeric:tabular-nums">▲ {{ chg }}<span>{{ pctTxt }}</span></span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(26,26,23,.45);text-transform:uppercase">상승 빨강 / 하락 파랑 · 국내 관례</span>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 292px;gap:28px;align-items:start">
+
+<div style="display:flex;flex-direction:column;gap:14px">
+<div style="border-top:1px solid rgba(26,26,23,.2);padding-top:12px;display:flex;justify-content:space-between;align-items:baseline">
+<span style="font:500 12px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase">가격 · 이동평균 · 볼린저밴드</span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">휠 = 기간 확대/축소 · 커서 = 시세 확인</span>
+</div>
+<div style="display:flex;gap:16px;font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.6)">
+<span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:2px;background:#1a1a17;display:block"></span>MA20</span>
+<span style="display:flex;align-items:center;gap:5px"><span style="width:14px;height:2px;background:#b8a98a;display:block"></span>MA60</span>
+<span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:9px;background:rgba(26,26,23,.09);display:block"></span>BB(20,2)</span>
+<span style="display:flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:50%;border:1.5px solid #c8352c;display:block"></span>골든/데드크로스</span>
+</div>
+{{ chartDeskA }}
+<div style="border-top:1px solid rgba(26,26,23,.2);margin-top:6px;padding-top:12px;display:flex;gap:0">
+<span style="font:500 12.5px 'IBM Plex Sans KR';padding:0 14px 8px 0;border-bottom:2px solid #1a1a17;margin-bottom:-13px">뉴스 3</span>
+<span style="font:400 12.5px 'IBM Plex Sans KR';padding:0 14px 8px;color:rgba(26,26,23,.45)">애널리스트 리포트 3</span>
+<span style="font:400 12.5px 'IBM Plex Sans KR';padding:0 14px 8px;color:rgba(26,26,23,.45)">재무</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ hiNews }}" as="n" hint-placeholder-count="3">
+<div style="display:flex;gap:14px;align-items:flex-start;padding-bottom:12px;border-bottom:1px dotted rgba(26,26,23,.25)">
+<span style="font:400 13px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.35);width:16px;flex:none">0{{ $index }}</span>
+<span style="display:flex;flex-direction:column;gap:5px;flex:1">
+<span style="font:500 16.5px/1.4 'Noto Serif KR',serif;text-wrap:pretty">{{ n.t }}</span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.06em;color:rgba(26,26,23,.5)">{{ n.s }} · {{ n.tm }}</span>
+</span>
+<span style="width:84px;height:58px;border:1px solid rgba(26,26,23,.2);background:repeating-linear-gradient(135deg,#f2ede2 0 6px,#e9e3d6 6px 12px);display:flex;align-items:center;justify-content:center;font:400 8.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.4);flex:none">이미지</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:18px">
+<div style="background:#f4efe4;padding:16px 16px 18px;display:flex;flex-direction:column;gap:11px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:8px">투자 지표</span>
+<sc-for list="{{ hiMetrics }}" as="m" hint-placeholder-count="6">
+<span style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+<span style="font:400 12.5px 'IBM Plex Sans KR';color:rgba(26,26,23,.6)">{{ m.k }}</span>
+<span style="font:500 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums;color:{{ m.dcol }}">{{ m.v }}</span>
+</span>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:8px">시장 개요</span>
+<sc-for list="{{ mkt }}" as="k" hint-placeholder-count="4">
+<span style="display:flex;justify-content:space-between;align-items:baseline">
+<span style="font:400 12.5px 'IBM Plex Sans KR'">{{ k.n }}</span>
+<span style="display:flex;gap:9px;font:500 12.5px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span>{{ k.v }}</span><span style="color:{{ k.dcol }}">{{ k.d }}</span></span>
+</span>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid rgba(26,26,23,.2);padding-bottom:8px">리포트 요약</span>
+<sc-for list="{{ hiReports }}" as="r" hint-placeholder-count="3">
+<span style="display:flex;flex-direction:column;gap:3px;padding-bottom:9px;border-bottom:1px dotted rgba(26,26,23,.22)">
+<span style="display:flex;justify-content:space-between"><span style="font:500 12.5px 'IBM Plex Sans KR'">{{ r.f }}</span><span style="font:500 11px 'IBM Plex Mono',monospace;color:{{ r.ocol }}">{{ r.o }}</span></span>
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.55)">{{ r.act }} · {{ r.from }} → {{ r.to }}</span>
+</span>
+</sc-for>
+</div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45);border-top:1px solid rgba(26,26,23,.2);padding-top:9px">build_stock_metrics · fetch_market_overview_from_yfinance · fetch_analyst_reports</span>
+</sc-if>
+</div>
+</div>
+</div>
+
+<sc-if value="{{ openA }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:0;right:0;bottom:0;width:438px;background:#f4efe4;border-left:2px solid #1a1a17;box-shadow:-24px 0 60px rgba(26,26,23,.14);display:flex;flex-direction:column;animation:slideIn .32s cubic-bezier(.2,.8,.2,1);z-index:5">
+<div style="padding:20px 22px 14px;border-bottom:1px solid rgba(26,26,23,.2);display:flex;justify-content:space-between;align-items:flex-start">
+<span style="display:flex;flex-direction:column;gap:4px">
+<span style="font:700 22px/1 'Noto Serif KR',serif">AI 종합 판단</span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(26,26,23,.5);text-transform:uppercase">3 agents → 1 decision</span>
+</span>
+<span onClick="{{ closeA }}" style="cursor:pointer;font:400 18px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5);padding:0 2px">✕</span>
+</div>
+<div style="padding:14px 22px;border-bottom:1px dotted rgba(26,26,23,.28);display:flex;flex-direction:column;gap:8px">
+<span style="display:flex;justify-content:space-between;align-items:center">
+<span style="font:400 12px 'IBM Plex Sans KR';color:rgba(26,26,23,.7)">{{ labelA }}</span>
+<sc-if value="{{ pendA }}" hint-placeholder-val="{{ true }}">
+<span style="width:11px;height:11px;border:1.6px solid rgba(26,26,23,.25);border-top-color:#c8352c;border-radius:50%;display:block;animation:dotSpin .8s linear infinite"></span>
+</sc-if>
+</span>
+<span style="height:3px;background:rgba(26,26,23,.14);display:block"><span style="display:block;height:3px;background:#1a1a17;width:{{ pctA }};transition:width .4s ease"></span></span>
+</div>
+<div style="flex:1;overflow:auto;padding:16px 22px;display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ agentsA }}" as="a" hint-placeholder-count="0">
+<div style="background:#fdfbf6;border:1px solid rgba(26,26,23,.18);padding:14px;display:flex;flex-direction:column;gap:8px;animation:fadeUp .34s ease both">
+<span style="display:flex;justify-content:space-between;align-items:baseline">
+<span style="display:flex;align-items:baseline;gap:8px">
+<span style="font:500 11px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.4)">{{ a.i }}</span>
+<span style="font:700 16px 'Noto Serif KR',serif">{{ a.role }}</span>
+<span style="font:400 11px 'Instrument Serif',serif;color:rgba(26,26,23,.45)">{{ a.en }}</span>
+</span>
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.06em;border:1px solid rgba(26,26,23,.25);padding:2px 6px;white-space:nowrap">{{ a.tag }}</span>
+</span>
+<span style="font:400 13.5px/1.7 'Noto Serif KR',serif;color:#2b2a25;text-wrap:pretty">{{ a.line }}</span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.45)">근거: {{ a.src }}</span>
+</div>
+</sc-for>
+<sc-if value="{{ pendA }}" hint-placeholder-val="{{ true }}">
+<div style="border:1px dashed rgba(26,26,23,.3);padding:14px;display:flex;flex-direction:column;gap:8px;background:rgba(253,251,246,.6)">
+<span style="height:9px;width:70%;background:rgba(26,26,23,.12);display:block;animation:wfpulse 1.2s infinite"></span>
+<span style="height:9px;width:92%;background:rgba(26,26,23,.1);display:block;animation:wfpulse 1.2s .2s infinite"></span>
+<span style="height:9px;width:54%;background:rgba(26,26,23,.08);display:block;animation:wfpulse 1.2s .4s infinite"></span>
+</div>
+</sc-if>
+<sc-if value="{{ readyA }}" hint-placeholder-val="{{ false }}">
+<div style="background:#1a1a17;color:#fdfbf6;padding:18px;display:flex;flex-direction:column;gap:12px;animation:fadeUp .4s ease both">
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(253,251,246,.55)">final decision</span>
+<span style="display:flex;align-items:baseline;gap:12px">
+<span style="font:700 34px/1 'Noto Serif KR',serif">비중 확대</span>
+<span style="font:400 12px 'IBM Plex Mono',monospace;color:#f0a89f">신뢰도 72%</span>
+</span>
+<span style="display:flex;gap:3px">
+<span style="height:4px;flex:1;background:#c8352c;display:block"></span><span style="height:4px;flex:1;background:#c8352c;display:block"></span><span style="height:4px;flex:1;background:#c8352c;display:block"></span><span style="height:4px;flex:1;background:rgba(253,251,246,.2);display:block"></span><span style="height:4px;flex:1;background:rgba(253,251,246,.2);display:block"></span>
+</span>
+<span style="font:400 13.5px/1.75 'Noto Serif KR',serif;color:rgba(253,251,246,.9);text-wrap:pretty">세 에이전트 모두 업황 회복을 전제로 하며, 기술적 신호(골든크로스·거래량 1.8배)가 뉴스 톤과 같은 방향입니다. 다만 환율·금리 변수로 단기 조정 가능성이 있어 분할 매수를 권합니다.</span>
+<span style="display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(253,251,246,.2);padding-top:11px">
+<span style="font:400 11.5px 'IBM Plex Mono',monospace;color:rgba(253,251,246,.75)">＋ 20일선 상향 돌파 · 거래량 1.82x</span>
+<span style="font:400 11.5px 'IBM Plex Mono',monospace;color:rgba(253,251,246,.75)">＋ 목표가 컨센서스 +12%</span>
+<span style="font:400 11.5px 'IBM Plex Mono',monospace;color:#9dbcf5">－ 원/달러 1,381원 · 미 금리 경로</span>
+</span>
+<span style="font:400 10px/1.6 'IBM Plex Mono',monospace;color:rgba(253,251,246,.45);border-top:1px solid rgba(253,251,246,.15);padding-top:9px">투자 판단의 참고 자료이며 투자 권유가 아닙니다. 예시 데이터.</span>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div class="dv-card" style="width:390px;background:#1a1a17;border:none;border-radius:38px;padding:9px;position:relative">
+<div style="background:#fdfbf6;border-radius:30px;overflow:hidden;position:relative;height:812px;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#1a1a17;display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font:500 11.5px 'IBM Plex Mono',monospace"><span>15:30</span><span style="display:flex;gap:5px;align-items:center;font-size:10px">▮▮▮ ⌾ ▰</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 20px 12px;border-bottom:1px solid rgba(26,26,23,.14)">
+<span style="font:400 17px 'IBM Plex Mono',monospace">←</span>
+<span style="display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font:700 15px 'Noto Serif KR',serif">삼성전자</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">005930.KS · Samsung Elec</span></span>
+<span style="font:400 15px 'IBM Plex Mono',monospace">☆</span>
+</div>
+<div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:16px;padding:16px 20px 96px">
+<div style="display:flex;flex-direction:column;gap:5px">
+<span style="font:500 34px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ price }}<span style="font:400 14px 'IBM Plex Sans KR';color:rgba(26,26,23,.5);margin-left:3px">원</span></span>
+<span style="font:500 13.5px 'IBM Plex Mono',monospace;color:#c8352c">▲ {{ chg }} {{ pctTxt }}</span>
+</div>
+{{ chartPhoneA }}
+<div style="display:flex;gap:0;border-bottom:1px solid rgba(26,26,23,.16)">
+<span style="font:500 12.5px 'IBM Plex Sans KR';padding:0 12px 7px 0;border-bottom:2px solid #1a1a17;margin-bottom:-1px">지표</span>
+<span style="font:400 12.5px 'IBM Plex Sans KR';padding:0 12px 7px;color:rgba(26,26,23,.45)">뉴스</span>
+<span style="font:400 12.5px 'IBM Plex Sans KR';padding:0 12px 7px;color:rgba(26,26,23,.45)">리포트</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<sc-for list="{{ hiMetrics }}" as="m" hint-placeholder-count="6">
+<span style="background:#f4efe4;padding:10px 11px;display:flex;flex-direction:column;gap:4px">
+<span style="font:400 11px 'IBM Plex Sans KR';color:rgba(26,26,23,.55)">{{ m.k }}</span>
+<span style="font:500 14px 'IBM Plex Mono',monospace;color:{{ m.dcol }};font-variant-numeric:tabular-nums">{{ m.v }}</span>
+</span>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:11px">
+<sc-for list="{{ hiNews }}" as="n" hint-placeholder-count="3">
+<span style="display:flex;gap:11px;align-items:flex-start;padding-bottom:11px;border-bottom:1px dotted rgba(26,26,23,.24)">
+<span style="display:flex;flex-direction:column;gap:4px;flex:1"><span style="font:500 14px/1.45 'Noto Serif KR',serif">{{ n.t }}</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">{{ n.s }} · {{ n.tm }}</span></span>
+<span style="width:56px;height:44px;border:1px solid rgba(26,26,23,.18);background:repeating-linear-gradient(135deg,#f2ede2 0 5px,#e9e3d6 5px 10px);flex:none"></span>
+</span>
+</sc-for>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:14px 20px 22px;background:linear-gradient(180deg,rgba(253,251,246,0),#fdfbf6 32%)">
+<span onClick="{{ toggleA }}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:#1a1a17;color:#fdfbf6;padding:15px;border-radius:2px;font:500 14.5px 'IBM Plex Sans KR'"><span style="width:5px;height:5px;border-radius:50%;background:#c8352c;display:block"></span>AI 판단 보기</span>
+</div>
+<sc-if value="{{ openA }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(26,26,23,.35);display:flex;align-items:flex-end">
+<div style="background:#f4efe4;border-top:2px solid #1a1a17;border-radius:16px 16px 30px 30px;max-height:88%;display:flex;flex-direction:column;width:100%;animation:sheetUp .34s cubic-bezier(.2,.8,.2,1)">
+<div style="padding:14px 20px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px dotted rgba(26,26,23,.28)">
+<span style="font:700 18px 'Noto Serif KR',serif">AI 종합 판단</span>
+<span onClick="{{ closeA }}" style="cursor:pointer;font:400 17px 'IBM Plex Mono',monospace;color:rgba(26,26,23,.5)">✕</span>
+</div>
+<div style="padding:11px 20px;display:flex;flex-direction:column;gap:7px;border-bottom:1px dotted rgba(26,26,23,.28)">
+<span style="font:400 11.5px 'IBM Plex Sans KR';color:rgba(26,26,23,.7)">{{ labelA }}</span>
+<span style="height:3px;background:rgba(26,26,23,.14);display:block"><span style="display:block;height:3px;background:#1a1a17;width:{{ pctA }};transition:width .4s ease"></span></span>
+</div>
+<div style="flex:1;overflow:auto;padding:14px 20px 24px;display:flex;flex-direction:column;gap:11px">
+<sc-for list="{{ agentsA }}" as="a" hint-placeholder-count="0">
+<span style="background:#fdfbf6;border:1px solid rgba(26,26,23,.18);padding:12px;display:flex;flex-direction:column;gap:6px;animation:fadeUp .3s ease both">
+<span style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 14.5px 'Noto Serif KR',serif">{{ a.role }}</span><span style="font:500 9px 'IBM Plex Mono',monospace;border:1px solid rgba(26,26,23,.25);padding:2px 5px;white-space:nowrap">{{ a.tag }}</span></span>
+<span style="font:400 12.5px/1.65 'Noto Serif KR',serif;color:#2b2a25">{{ a.line }}</span>
+</span>
+</sc-for>
+<sc-if value="{{ readyA }}" hint-placeholder-val="{{ false }}">
+<span style="background:#1a1a17;color:#fdfbf6;padding:15px;display:flex;flex-direction:column;gap:9px;animation:fadeUp .34s ease both">
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(253,251,246,.5)">final decision</span>
+<span style="display:flex;align-items:baseline;gap:10px"><span style="font:700 26px/1 'Noto Serif KR',serif">비중 확대</span><span style="font:400 11px 'IBM Plex Mono',monospace;color:#f0a89f">72%</span></span>
+<span style="font:400 12.5px/1.7 'Noto Serif KR',serif;color:rgba(253,251,246,.9)">기술적 신호와 뉴스 톤이 같은 방향입니다. 환율 변수로 분할 매수를 권합니다.</span>
+</span>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>다크 터미널 — 밀도 높은 3분할 콘솔 · AI는 우측 레일에 로그처럼 흐름</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+
+<div class="dv-card" style="width:1180px;position:relative;background:#0e1116;border:1px solid rgba(232,227,216,.14);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#e8e3d8">
+<div style="display:flex;flex-direction:column">
+
+<div style="display:flex;align-items:center;gap:16px;padding:12px 18px;border-bottom:1px solid rgba(232,227,216,.12)">
+<span style="font:600 12.5px 'IBM Plex Mono',monospace;letter-spacing:.2em">QUANT·DESK</span>
+<span style="display:flex;gap:16px;flex:1;overflow:hidden">
+<sc-for list="{{ mkt }}" as="k" hint-placeholder-count="4">
+<span style="display:flex;gap:7px;align-items:baseline;font:400 11px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span style="color:rgba(232,227,216,.5);letter-spacing:.08em">{{ k.n }}</span><span>{{ k.v }}</span><span style="color:{{ k.dcolD }}">{{ k.d }}</span></span>
+</sc-for>
+</span>
+<span style="display:flex;align-items:center;gap:7px;border:1px solid rgba(232,227,216,.18);background:#141a22;padding:6px 10px;width:196px;font:400 11px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.45)"><span>&gt;</span><span>005930 / 삼성전자 / ㅅㅅㅈㅈ</span></span>
+<span onClick="{{ toggleB }}" style="cursor:pointer;font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.14em;background:#e8b04b;color:#0e1116;padding:7px 14px">RUN AI ⏎</span>
+</div>
+
+<div style="display:flex;align-items:stretch;min-height:600px">
+
+<div style="width:214px;border-right:1px solid rgba(232,227,216,.12);display:flex;flex-direction:column">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.18em;color:rgba(232,227,216,.4);padding:11px 14px 8px">WATCHLIST</span>
+<sc-for list="{{ watch }}" as="w" hint-placeholder-count="5">
+<span style="display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-top:1px solid rgba(232,227,216,.08);background:{{ w.rowBg }}">
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font:400 12.5px 'IBM Plex Sans KR'">{{ w.n }}</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.4)">{{ w.c }} · {{ w.e }}</span></span>
+<span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-variant-numeric:tabular-nums"><span style="font:500 11.5px 'IBM Plex Mono',monospace">{{ w.p }}</span><span style="font:500 10px 'IBM Plex Mono',monospace;color:{{ w.dcolD }}">{{ w.d }}</span></span>
+</span>
+</sc-for>
+<span style="margin-top:auto;padding:12px 14px;border-top:1px solid rgba(232,227,216,.12);display:flex;flex-direction:column;gap:5px">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;color:rgba(232,227,216,.4)">UNIVERSE</span>
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.75)">2,614 종목 동기화</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:#7ec98a">KRX 목록 최신 · 08:32 갱신</span>
+</span>
+</div>
+
+<div style="flex:1;display:flex;flex-direction:column;border-right:1px solid rgba(232,227,216,.12)">
+<div style="padding:14px 18px;border-bottom:1px solid rgba(232,227,216,.12);display:flex;justify-content:space-between;align-items:flex-end">
+<span style="display:flex;flex-direction:column;gap:4px">
+<span style="display:flex;align-items:baseline;gap:9px"><span style="font:600 20px 'IBM Plex Sans KR';letter-spacing:-.01em">삼성전자</span><span style="font:400 11px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(232,227,216,.45)">005930.KS · KOSPI</span></span>
+<sc-if value="{{ showEn }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.12em;color:rgba(232,227,216,.35);text-transform:uppercase">samsung electronics</span>
+</sc-if>
+</span>
+<span style="display:flex;align-items:baseline;gap:12px;font-variant-numeric:tabular-nums">
+<span style="font:500 30px/1 'IBM Plex Mono',monospace">{{ price }}</span>
+<span style="font:500 13px 'IBM Plex Mono',monospace;color:#ff5449">▲{{ chg }} {{ pctTxt }}</span>
+</span>
+</div>
+<div style="padding:14px 18px 10px;display:flex;justify-content:space-between;font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(232,227,216,.45)">
+<span style="display:flex;gap:14px"><span style="color:#e8e3d8">MA20</span><span>MA60</span><span>BB(20,2)</span><span>VOL</span></span>
+<span>SCROLL=ZOOM · HOVER=OHLCV</span>
+</div>
+<div style="padding:0 18px 14px">{{ chartDeskB }}</div>
+<div style="border-top:1px solid rgba(232,227,216,.12);display:grid;grid-template-columns:repeat(3,1fr)">
+<sc-for list="{{ hiMetrics }}" as="m" hint-placeholder-count="6">
+<span style="display:flex;flex-direction:column;gap:5px;padding:11px 16px;border-right:1px solid rgba(232,227,216,.08);border-bottom:1px solid rgba(232,227,216,.08)">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(232,227,216,.4);text-transform:uppercase">{{ m.k }}</span>
+<span style="font:500 15px 'IBM Plex Mono',monospace;color:{{ m.dcolD }};font-variant-numeric:tabular-nums">{{ m.v }}</span>
+</span>
+</sc-for>
+</div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="padding:10px 18px;font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.35)">fetch_stock_history_from_yfinance → OHLCV · MA · BB · CROSS / build_stock_metrics</span>
+</sc-if>
+</div>
+
+<div style="width:252px;display:flex;flex-direction:column">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.18em;color:rgba(232,227,216,.4);padding:11px 14px 8px">NEWS · 3</span>
+<sc-for list="{{ hiNews }}" as="n" hint-placeholder-count="3">
+<span style="display:flex;flex-direction:column;gap:5px;padding:10px 14px;border-top:1px solid rgba(232,227,216,.08)">
+<span style="font:400 12.5px/1.5 'IBM Plex Sans KR'">{{ n.t }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.4)">{{ n.s }} · {{ n.tm }}</span>
+</span>
+</sc-for>
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.18em;color:rgba(232,227,216,.4);padding:16px 14px 8px;border-top:1px solid rgba(232,227,216,.12)">REPORTS · 3</span>
+<sc-for list="{{ hiReports }}" as="r" hint-placeholder-count="3">
+<span style="display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-top:1px solid rgba(232,227,216,.08)">
+<span style="display:flex;justify-content:space-between"><span style="font:400 12px 'IBM Plex Sans KR'">{{ r.f }}</span><span style="font:500 10px 'IBM Plex Mono',monospace;color:{{ r.ocolD }}">{{ r.o }}</span></span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.45)">{{ r.act }} {{ r.from }}→{{ r.to }}</span>
+</span>
+</sc-for>
+</div>
+</div>
+</div>
+
+<sc-if value="{{ openB }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:0;right:0;bottom:0;width:452px;background:#131820;border-left:1px solid #e8b04b;box-shadow:-30px 0 70px rgba(0,0,0,.5);display:flex;flex-direction:column;animation:slideIn .3s cubic-bezier(.2,.8,.2,1);z-index:5">
+<div style="padding:14px 18px;border-bottom:1px solid rgba(232,227,216,.12);display:flex;justify-content:space-between;align-items:center">
+<span style="font:600 12px 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#e8b04b">AI DECISION ENGINE</span>
+<span onClick="{{ closeB }}" style="cursor:pointer;font:400 13px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.5)">ESC ✕</span>
+</div>
+<div style="padding:12px 18px;border-bottom:1px solid rgba(232,227,216,.12);display:flex;flex-direction:column;gap:8px">
+<span style="display:flex;justify-content:space-between;align-items:center"><span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.7)">{{ labelB }}</span><span style="font:400 10px 'IBM Plex Mono',monospace;color:#e8b04b">{{ pctB }}</span></span>
+<span style="height:2px;background:rgba(232,227,216,.14);display:block"><span style="display:block;height:2px;background:#e8b04b;width:{{ pctB }};transition:width .4s ease"></span></span>
+<span style="font:400 10px/1.9 'IBM Plex Mono',monospace;color:rgba(232,227,216,.5);display:flex;flex-direction:column">
+<span>15:31:02  fetch_stock_history … 240 bars ok</span>
+<span>15:31:03  fetch_stock_news … 3 items</span>
+<span>15:31:04  fetch_analyst_reports … 3 items</span>
+<span style="color:#e8b04b">15:31:05  invoke_stock_agent ×3 …</span>
+</span>
+</div>
+<div style="flex:1;overflow:auto;padding:14px 18px;display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ agentsB }}" as="a" hint-placeholder-count="0">
+<span style="border:1px solid rgba(232,227,216,.16);background:#0e1116;display:flex;flex-direction:column;animation:fadeUp .3s ease both">
+<span style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(232,227,216,.1);background:rgba(232,227,216,.04)">
+<span style="font:600 10.5px 'IBM Plex Mono',monospace;letter-spacing:.14em">[{{ a.i }}] {{ a.role }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:#e8b04b">{{ a.tag }}</span>
+</span>
+<span style="padding:11px 12px;display:flex;flex-direction:column;gap:7px">
+<span style="font:400 12.5px/1.7 'IBM Plex Sans KR';color:rgba(232,227,216,.9)">{{ a.line }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.4)">source: {{ a.src }}</span>
+</span>
+</span>
+</sc-for>
+<sc-if value="{{ pendB }}" hint-placeholder-val="{{ true }}">
+<span style="border:1px dashed rgba(232,227,216,.2);padding:12px;display:flex;flex-direction:column;gap:7px">
+<span style="height:8px;width:64%;background:rgba(232,227,216,.12);display:block;animation:wfpulse 1.1s infinite"></span>
+<span style="height:8px;width:88%;background:rgba(232,227,216,.1);display:block;animation:wfpulse 1.1s .2s infinite"></span>
+<span style="height:8px;width:44%;background:rgba(232,227,216,.08);display:block;animation:wfpulse 1.1s .4s infinite"></span>
+</span>
+</sc-if>
+<sc-if value="{{ readyB }}" hint-placeholder-val="{{ false }}">
+<span style="border:1px solid #e8b04b;background:rgba(232,176,75,.07);padding:15px;display:flex;flex-direction:column;gap:11px;animation:fadeUp .34s ease both">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#e8b04b">FINAL / invoke_decision_agent</span>
+<span style="display:flex;align-items:baseline;gap:12px"><span style="font:600 26px 'IBM Plex Sans KR';letter-spacing:-.01em">비중 확대</span><span style="font:500 12px 'IBM Plex Mono',monospace;color:#ff5449">CONF 0.72</span></span>
+<span style="display:flex;flex-direction:column;gap:6px;font:400 10px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.6)">
+<span style="display:flex;justify-content:space-between"><span>기술적</span><span style="flex:1;margin:0 8px;align-self:center;height:2px;background:rgba(232,227,216,.14);display:block"><span style="display:block;height:2px;width:82%;background:#ff5449"></span></span><span style="color:#ff5449">0.82</span></span>
+<span style="display:flex;justify-content:space-between"><span>뉴스 톤</span><span style="flex:1;margin:0 8px;align-self:center;height:2px;background:rgba(232,227,216,.14);display:block"><span style="display:block;height:2px;width:68%;background:#ff5449"></span></span><span style="color:#ff5449">0.68</span></span>
+<span style="display:flex;justify-content:space-between"><span>거시</span><span style="flex:1;margin:0 8px;align-self:center;height:2px;background:rgba(232,227,216,.14);display:block"><span style="display:block;height:2px;width:48%;background:#4d8dff"></span></span><span style="color:#4d8dff">0.48</span></span>
+</span>
+<span style="font:400 12.5px/1.75 'IBM Plex Sans KR';color:rgba(232,227,216,.88)">단기 조정 리스크를 감수할 수 있다면 3회 분할 매수. 손절 기준 68,000원, 1차 목표 79,000원.</span>
+<span style="font:400 9.5px/1.6 'IBM Plex Mono',monospace;color:rgba(232,227,216,.35);border-top:1px solid rgba(232,227,216,.12);padding-top:8px">LLM 실패 시 fallback_decision(규칙 기반)으로 자동 대체 · 예시 데이터</span>
+</span>
+</sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div class="dv-card" style="width:390px;background:#000;border:none;border-radius:38px;padding:9px">
+<div style="background:#0e1116;border-radius:30px;overflow:hidden;position:relative;height:812px;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#e8e3d8;display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font:500 11.5px 'IBM Plex Mono',monospace"><span>15:31</span><span style="font-size:10px">▮▮▮ ⌾ ▰</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 18px 12px;border-bottom:1px solid rgba(232,227,216,.12)">
+<span style="font:400 16px 'IBM Plex Mono',monospace">←</span>
+<span style="font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.2em">005930.KS</span>
+<span style="font:400 14px 'IBM Plex Mono',monospace;color:#e8b04b">☆</span>
+</div>
+<div style="flex:1;overflow:auto;padding:16px 18px 100px;display:flex;flex-direction:column;gap:15px">
+<div style="display:flex;flex-direction:column;gap:5px">
+<span style="font:600 17px 'IBM Plex Sans KR'">삼성전자 <span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.4);letter-spacing:.1em">SAMSUNG ELEC</span></span>
+<span style="display:flex;align-items:baseline;gap:10px;font-variant-numeric:tabular-nums"><span style="font:500 30px/1 'IBM Plex Mono',monospace">{{ price }}</span><span style="font:500 12.5px 'IBM Plex Mono',monospace;color:#ff5449">▲{{ pctTxt }}</span></span>
+</div>
+{{ chartPhoneB }}
+<div style="display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(232,227,216,.1);border-left:1px solid rgba(232,227,216,.1)">
+<sc-for list="{{ hiMetrics }}" as="m" hint-placeholder-count="6">
+<span style="display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-right:1px solid rgba(232,227,216,.1);border-bottom:1px solid rgba(232,227,216,.1)">
+<span style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.13em;color:rgba(232,227,216,.4);text-transform:uppercase">{{ m.k }}</span>
+<span style="font:500 13.5px 'IBM Plex Mono',monospace;color:{{ m.dcolD }};font-variant-numeric:tabular-nums">{{ m.v }}</span>
+</span>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.18em;color:rgba(232,227,216,.4);padding-bottom:8px">NEWS · 3</span>
+<sc-for list="{{ hiNews }}" as="n" hint-placeholder-count="3">
+<span style="display:flex;flex-direction:column;gap:4px;padding:10px 0;border-top:1px solid rgba(232,227,216,.1)">
+<span style="font:400 12.5px/1.5 'IBM Plex Sans KR'">{{ n.t }}</span>
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.4)">{{ n.s }} · {{ n.tm }}</span>
+</span>
+</sc-for>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:14px 18px 22px;background:linear-gradient(180deg,rgba(14,17,22,0),#0e1116 34%)">
+<span onClick="{{ toggleB }}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;background:#e8b04b;color:#0e1116;padding:15px;font:600 12.5px 'IBM Plex Mono',monospace;letter-spacing:.16em">RUN AI ANALYSIS</span>
+</div>
+<sc-if value="{{ openB }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:#0e1116;display:flex;flex-direction:column;animation:fadeUp .28s ease both">
+<div style="padding:16px 18px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(232,227,216,.12)">
+<span style="font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#e8b04b">AI DECISION</span>
+<span onClick="{{ closeB }}" style="cursor:pointer;font:400 15px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.5)">✕</span>
+</div>
+<div style="padding:12px 18px;border-bottom:1px solid rgba(232,227,216,.12);display:flex;flex-direction:column;gap:7px">
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(232,227,216,.7)">{{ labelB }}</span>
+<span style="height:2px;background:rgba(232,227,216,.14);display:block"><span style="display:block;height:2px;background:#e8b04b;width:{{ pctB }};transition:width .4s ease"></span></span>
+</div>
+<div style="flex:1;overflow:auto;padding:14px 18px 24px;display:flex;flex-direction:column;gap:11px">
+<sc-for list="{{ agentsB }}" as="a" hint-placeholder-count="0">
+<span style="border:1px solid rgba(232,227,216,.16);display:flex;flex-direction:column;animation:fadeUp .3s ease both">
+<span style="display:flex;justify-content:space-between;padding:8px 11px;background:rgba(232,227,216,.04);border-bottom:1px solid rgba(232,227,216,.1)"><span style="font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.14em">[{{ a.i }}] {{ a.role }}</span><span style="font:400 9px 'IBM Plex Mono',monospace;color:#e8b04b">{{ a.tag }}</span></span>
+<span style="padding:10px 11px;font:400 12px/1.7 'IBM Plex Sans KR';color:rgba(232,227,216,.88)">{{ a.line }}</span>
+</span>
+</sc-for>
+<sc-if value="{{ readyB }}" hint-placeholder-val="{{ false }}">
+<span style="border:1px solid #e8b04b;background:rgba(232,176,75,.07);padding:14px;display:flex;flex-direction:column;gap:9px;animation:fadeUp .3s ease both">
+<span style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.2em;color:#e8b04b">FINAL</span>
+<span style="display:flex;align-items:baseline;gap:10px"><span style="font:600 23px 'IBM Plex Sans KR'">비중 확대</span><span style="font:500 11px 'IBM Plex Mono',monospace;color:#ff5449">CONF 0.72</span></span>
+<span style="font:400 12px/1.7 'IBM Plex Sans KR';color:rgba(232,227,216,.88)">3회 분할 매수 · 손절 68,000 · 1차 목표 79,000</span>
+</span>
+</sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>매거진 스프레드 — 오버사이즈 타입 · AI는 중앙 모달에 3열 의견 대조</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+
+<div class="dv-card" style="width:1180px;position:relative;background:#fffdf8;border:1px solid rgba(18,16,14,.14);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#12100e">
+<div style="padding:0">
+
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 34px;border-bottom:1px solid rgba(18,16,14,.14)">
+<span style="font:400 13px 'Instrument Serif',serif;letter-spacing:.22em;text-transform:uppercase">ledger / 종목 브리핑</span>
+<span style="display:flex;gap:22px;font:400 11px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.5)">
+<sc-for list="{{ mkt }}" as="k" hint-placeholder-count="4">
+<span style="display:flex;gap:6px"><span>{{ k.n }}</span><span style="color:{{ k.dcolM }}">{{ k.d }}</span></span>
+</sc-for>
+</span>
+<span onClick="{{ toggleC }}" style="cursor:pointer;font:500 12px 'IBM Plex Sans KR';border:1px solid #12100e;border-radius:100px;padding:8px 18px;display:flex;gap:8px;align-items:center;transition:background .18s,color .18s" style-hover="background:#12100e;color:#fffdf8">AI 의견 3인 <span style="font:400 12px 'IBM Plex Mono',monospace">→</span></span>
+</div>
+
+<div style="display:grid;grid-template-columns:404px 1fr;align-items:stretch">
+<div style="padding:34px;display:flex;flex-direction:column;gap:20px;border-right:1px solid rgba(18,16,14,.14)">
+<span style="font:400 11px 'IBM Plex Mono',monospace;letter-spacing:.18em;color:rgba(18,16,14,.45);text-transform:uppercase">kospi · 반도체 · 2026.07.30</span>
+<span style="display:flex;flex-direction:column;gap:2px">
+<span style="font:700 62px/.92 'Noto Serif KR',serif;letter-spacing:-.03em">삼성<br>전자</span>
+<sc-if value="{{ showEn }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 20px 'Instrument Serif',serif;font-style:italic;color:rgba(18,16,14,.5);margin-top:6px">Samsung Electronics</span>
+</sc-if>
+</span>
+<span style="display:flex;flex-direction:column;gap:6px;border-top:2px solid #12100e;padding-top:14px">
+<span style="font:500 54px/1 'IBM Plex Mono',monospace;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:#d13b2e">{{ pctTxt }}</span>
+<span style="display:flex;align-items:baseline;gap:10px;font:500 20px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums"><span>{{ price }}</span><span style="font:400 13px 'IBM Plex Sans KR';color:rgba(18,16,14,.55)">원 · {{ chg }}</span></span>
+</span>
+<span style="font:400 15px/1.85 'Noto Serif KR',serif;color:#3a352c;text-wrap:pretty">20일 이동평균선이 60일선을 상향 돌파했고, 거래량은 20일 평균의 1.8배로 늘었다. 뉴스 3건 중 2건이 우호적이며 목표가 컨센서스는 현재가보다 12% 높다.</span>
+<span style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(18,16,14,.14)">
+<sc-for list="{{ hiMetrics }}" as="m" hint-placeholder-count="6">
+<span style="background:#fffdf8;padding:12px 13px;display:flex;flex-direction:column;gap:5px">
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(18,16,14,.5);text-transform:uppercase">{{ m.k }}</span>
+<span style="font:500 17px 'IBM Plex Mono',monospace;color:{{ m.dcolM }};font-variant-numeric:tabular-nums">{{ m.v }}</span>
+</span>
+</sc-for>
+</span>
+</div>
+
+<div style="display:flex;flex-direction:column">
+<div style="padding:26px 34px 16px;display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1px solid rgba(18,16,14,.14)">
+<span style="font:400 12px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(18,16,14,.5)">3개월 종가 추이</span>
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.4)">휠로 기간 조절 · 커서로 시세</span>
+</div>
+<div style="padding:22px 34px 10px">{{ chartDeskC }}</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(18,16,14,.14)">
+<sc-for list="{{ hiNews }}" as="n" hint-placeholder-count="3">
+<span style="padding:18px 20px;display:flex;flex-direction:column;gap:9px;border-right:1px solid rgba(18,16,14,.1)">
+<span style="font:400 26px/1 'Instrument Serif',serif;color:rgba(18,16,14,.28)">0{{ $index }}</span>
+<span style="font:500 15px/1.5 'Noto Serif KR',serif;text-wrap:pretty">{{ n.t }}</span>
+<span style="font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.08em;color:rgba(18,16,14,.45);text-transform:uppercase">{{ n.s }} · {{ n.tm }}</span>
+</span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 34px;border-top:1px solid rgba(18,16,14,.14);background:#f7f2e8">
+<span style="display:flex;gap:26px">
+<sc-for list="{{ hiReports }}" as="r" hint-placeholder-count="3">
+<span style="display:flex;flex-direction:column;gap:3px"><span style="font:500 11.5px 'IBM Plex Sans KR'">{{ r.f }} <span style="color:{{ r.ocolM }}">{{ r.o }}</span></span><span style="font:400 10px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.5)">{{ r.act }} {{ r.from }}→{{ r.to }}</span></span>
+</sc-for>
+</span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.4)">generate_stock_advice</span>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+
+<sc-if value="{{ openC }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(18,16,14,.34);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:34px;z-index:5">
+<div style="width:100%;max-height:100%;background:#fffdf8;border:1px solid #12100e;box-shadow:0 30px 80px rgba(18,16,14,.3);display:flex;flex-direction:column;animation:popIn .3s cubic-bezier(.2,.8,.2,1)">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:18px 26px;border-bottom:1px solid rgba(18,16,14,.14)">
+<span style="display:flex;align-items:baseline;gap:12px"><span style="font:700 24px 'Noto Serif KR',serif">세 사람의 의견</span><span style="font:400 14px 'Instrument Serif',serif;font-style:italic;color:rgba(18,16,14,.5)">Three views, one call</span></span>
+<span style="display:flex;align-items:center;gap:16px">
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.55)">{{ labelC }}</span>
+<span style="width:120px;height:3px;background:rgba(18,16,14,.14);display:block"><span style="display:block;height:3px;background:#d13b2e;width:{{ pctC }};transition:width .4s ease"></span></span>
+<span onClick="{{ closeC }}" style="cursor:pointer;font:400 17px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.5)">✕</span>
+</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid rgba(18,16,14,.14);min-height:214px">
+<sc-for list="{{ agentsC }}" as="a" hint-placeholder-count="0">
+<span style="padding:20px 22px;display:flex;flex-direction:column;gap:11px;border-right:1px solid rgba(18,16,14,.1);animation:fadeUp .34s ease both">
+<span style="display:flex;justify-content:space-between;align-items:baseline">
+<span style="font:400 30px/1 'Instrument Serif',serif;color:rgba(18,16,14,.25)">{{ a.i }}</span>
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.08em;border:1px solid rgba(18,16,14,.25);border-radius:100px;padding:3px 9px">{{ a.tag }}</span>
+</span>
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font:700 19px 'Noto Serif KR',serif">{{ a.role }}</span><span style="font:400 12px 'Instrument Serif',serif;font-style:italic;color:rgba(18,16,14,.5)">{{ a.en }}</span></span>
+<span style="font:400 13.5px/1.8 'Noto Serif KR',serif;color:#3a352c;text-wrap:pretty">{{ a.line }}</span>
+<span style="margin-top:auto;font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.06em;color:rgba(18,16,14,.45);text-transform:uppercase">{{ a.src }}</span>
+</span>
+</sc-for>
+<sc-if value="{{ pendC }}" hint-placeholder-val="{{ true }}">
+<span style="padding:20px 22px;display:flex;flex-direction:column;gap:10px;border-right:1px solid rgba(18,16,14,.1)">
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.45)">의견 생성 중…</span>
+<span style="height:10px;width:80%;background:rgba(18,16,14,.1);display:block;animation:wfpulse 1.2s infinite"></span>
+<span style="height:10px;width:96%;background:rgba(18,16,14,.08);display:block;animation:wfpulse 1.2s .2s infinite"></span>
+<span style="height:10px;width:62%;background:rgba(18,16,14,.06);display:block;animation:wfpulse 1.2s .4s infinite"></span>
+</span>
+</sc-if>
+</div>
+<sc-if value="{{ readyC }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:1fr 380px;animation:fadeUp .36s ease both">
+<div style="padding:24px 26px;display:flex;flex-direction:column;gap:12px">
+<span style="font:400 11px 'IBM Plex Mono',monospace;letter-spacing:.2em;text-transform:uppercase;color:rgba(18,16,14,.45)">최종 판단 · decision agent</span>
+<span style="display:flex;align-items:baseline;gap:16px"><span style="font:700 46px/1 'Noto Serif KR',serif;letter-spacing:-.02em">비중 확대</span><span style="font:400 15px 'IBM Plex Mono',monospace;color:#d13b2e">신뢰도 72%</span></span>
+<span style="font:400 15px/1.85 'Noto Serif KR',serif;color:#3a352c;max-width:620px;text-wrap:pretty">세 관점이 모두 회복 국면을 지지하지만 속도에는 이견이 있다. 기술적 신호가 앞서 있으므로 3회 분할 매수로 진입하고, 손절선 68,000원을 함께 설정하는 편이 안전하다.</span>
+</div>
+<div style="border-left:1px solid rgba(18,16,14,.14);padding:24px 26px;display:flex;flex-direction:column;gap:10px;background:#f7f2e8">
+<span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(18,16,14,.5)">합의 / 이견</span>
+<span style="display:flex;justify-content:space-between;font:400 12.5px 'IBM Plex Sans KR'"><span>업황 회복</span><span style="font:500 12px 'IBM Plex Mono',monospace;color:#d13b2e">3 / 3 동의</span></span>
+<span style="display:flex;justify-content:space-between;font:400 12.5px 'IBM Plex Sans KR'"><span>단기 진입 타이밍</span><span style="font:500 12px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.6)">2 / 3</span></span>
+<span style="display:flex;justify-content:space-between;font:400 12.5px 'IBM Plex Sans KR'"><span>환율 리스크</span><span style="font:500 12px 'IBM Plex Mono',monospace;color:#2b4fd6">이견 1</span></span>
+<span style="margin-top:8px;font:400 10px/1.7 'IBM Plex Mono',monospace;color:rgba(18,16,14,.45);border-top:1px solid rgba(18,16,14,.16);padding-top:10px">투자 권유가 아닌 참고 자료 · 예시 데이터</span>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div class="dv-card" style="width:390px;background:#12100e;border:none;border-radius:38px;padding:9px">
+<div style="background:#fffdf8;border-radius:30px;overflow:hidden;position:relative;height:812px;font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:#12100e;display:flex;flex-direction:column">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px 6px;font:500 11.5px 'IBM Plex Mono',monospace"><span>15:31</span><span style="font-size:10px">▮▮▮ ⌾ ▰</span></div>
+<div style="flex:1;overflow:auto;padding:14px 22px 100px;display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font:400 16px 'IBM Plex Mono',monospace">←</span><span style="font:400 10.5px 'IBM Plex Mono',monospace;letter-spacing:.18em;color:rgba(18,16,14,.5)">KOSPI · 005930</span><span style="font:400 15px 'IBM Plex Mono',monospace">⋯</span></div>
+<span style="font:700 42px/.95 'Noto Serif KR',serif;letter-spacing:-.02em">삼성전자</span>
+<sc-if value="{{ showEn }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 15px 'Instrument Serif',serif;font-style:italic;color:rgba(18,16,14,.5);margin-top:-10px">Samsung Electronics</span>
+</sc-if>
+<span style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #12100e;padding-top:12px">
+<span style="font:500 40px/1 'IBM Plex Mono',monospace;color:#d13b2e;font-variant-numeric:tabular-nums">{{ pctTxt }}</span>
+<span style="font:500 16px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ price }} <span style="font:400 12px 'IBM Plex Sans KR';color:rgba(18,16,14,.55)">원 · {{ chg }}</span></span>
+</span>
+{{ chartPhoneC }}
+<span style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(18,16,14,.14)">
+<sc-for list="{{ hiMetrics }}" as="m" hint-placeholder-count="6">
+<span style="background:#fffdf8;padding:11px 12px;display:flex;flex-direction:column;gap:4px"><span style="font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.1em;color:rgba(18,16,14,.5);text-transform:uppercase">{{ m.k }}</span><span style="font:500 15px 'IBM Plex Mono',monospace;color:{{ m.dcolM }};font-variant-numeric:tabular-nums">{{ m.v }}</span></span>
+</sc-for>
+</span>
+<div style="display:flex;flex-direction:column">
+<sc-for list="{{ hiNews }}" as="n" hint-placeholder-count="3">
+<span style="display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-top:1px solid rgba(18,16,14,.14)">
+<span style="font:400 22px/1 'Instrument Serif',serif;color:rgba(18,16,14,.28)">0{{ $index }}</span>
+<span style="display:flex;flex-direction:column;gap:5px"><span style="font:500 14.5px/1.5 'Noto Serif KR',serif">{{ n.t }}</span><span style="font:400 9.5px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.45)">{{ n.s }} · {{ n.tm }}</span></span>
+</span>
+</sc-for>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:14px 22px 22px;background:linear-gradient(180deg,rgba(255,253,248,0),#fffdf8 34%)">
+<span onClick="{{ toggleC }}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid #12100e;border-radius:100px;padding:15px;font:500 14px 'IBM Plex Sans KR';background:#12100e;color:#fffdf8">세 사람의 의견 보기 <span style="font:400 13px 'IBM Plex Mono',monospace">→</span></span>
+</div>
+<sc-if value="{{ openC }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(18,16,14,.32);display:flex;align-items:flex-end">
+<div style="width:100%;max-height:90%;background:#fffdf8;border-top:2px solid #12100e;border-radius:14px 14px 30px 30px;display:flex;flex-direction:column;animation:sheetUp .32s cubic-bezier(.2,.8,.2,1)">
+<div style="padding:16px 22px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(18,16,14,.14)">
+<span style="font:700 19px 'Noto Serif KR',serif">세 사람의 의견</span>
+<span onClick="{{ closeC }}" style="cursor:pointer;font:400 16px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.5)">✕</span>
+</div>
+<div style="padding:10px 22px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(18,16,14,.14)">
+<span style="font:400 11px 'IBM Plex Mono',monospace;color:rgba(18,16,14,.55);flex:1">{{ labelC }}</span>
+<span style="width:80px;height:3px;background:rgba(18,16,14,.14);display:block"><span style="display:block;height:3px;background:#d13b2e;width:{{ pctC }};transition:width .4s ease"></span></span>
+</div>
+<div style="flex:1;overflow:auto;padding:14px 22px 26px;display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ agentsC }}" as="a" hint-placeholder-count="0">
+<span style="display:flex;flex-direction:column;gap:7px;padding-bottom:13px;border-bottom:1px solid rgba(18,16,14,.12);animation:fadeUp .3s ease both">
+<span style="display:flex;justify-content:space-between;align-items:baseline"><span style="font:700 16.5px 'Noto Serif KR',serif">{{ a.role }}</span><span style="font:500 9.5px 'IBM Plex Mono',monospace;border:1px solid rgba(18,16,14,.25);border-radius:100px;padding:2px 8px">{{ a.tag }}</span></span>
+<span style="font:400 13px/1.75 'Noto Serif KR',serif;color:#3a352c">{{ a.line }}</span>
+</span>
+</sc-for>
+<sc-if value="{{ readyC }}" hint-placeholder-val="{{ false }}">
+<span style="display:flex;flex-direction:column;gap:9px;animation:fadeUp .32s ease both">
+<span style="font:400 10px 'IBM Plex Mono',monospace;letter-spacing:.18em;text-transform:uppercase;color:rgba(18,16,14,.45)">최종 판단</span>
+<span style="display:flex;align-items:baseline;gap:12px"><span style="font:700 32px/1 'Noto Serif KR',serif">비중 확대</span><span style="font:400 12px 'IBM Plex Mono',monospace;color:#d13b2e">72%</span></span>
+<span style="font:400 13.5px/1.8 'Noto Serif KR',serif;color:#3a352c">3회 분할 매수, 손절선 68,000원. 환율 변수는 이견이 남아 있다.</span>
+</span>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">다음에 시도해볼 것: “<a class="dv-oid" href="#2a">2a</a>의 드로어를 <a class="dv-oid" href="#2c">2c</a>처럼 3열 대조로” · “<a class="dv-oid" href="#2b">2b</a>를 라이트 테마로도” · “<a class="dv-oid" href="#2c">2c</a>에 관심종목·검색 화면 추가”</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">주식 AI 분석 · 화면 구조 4안 (백엔드 명세 6.1–6.4 매핑)</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>모바일 · 검색 → 상세 → AI 판단 단일 흐름</div>
+<div class="dv-card" style="width:1000px;padding:22px;display:flex;gap:20px;align-items:flex-start;background:#fbfaf7">
+
+<div style="width:296px;border:2px solid #1a1a1a;border-radius:22px;background:#fff;padding:12px;display:flex;flex-direction:column;gap:10px">
+<div style="font:700 15px 'Gaegu';color:#1a1a1a;display:flex;justify-content:space-between;align-items:center"><span>① 종목 검색</span><span style="font:400 11px ui-monospace;color:#999">6.1 / 6.2</span></div>
+<div style="border:1.5px solid #1a1a1a;border-radius:9px 7px 10px 6px;padding:9px 10px;display:flex;justify-content:space-between;align-items:center"><span style="font:400 16px 'Gaegu';color:#333">삼성전</span><span style="width:1px;height:16px;background:#1a1a1a;animation:wfpulse 1.1s infinite"></span></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<span style="font:400 13px 'Gaegu';border:1px dashed #b9b4aa;border-radius:20px;padding:2px 9px;color:#555">ㅅㅅㅈㅈ 초성</span>
+<span style="font:400 13px 'Gaegu';border:1px dashed #b9b4aa;border-radius:20px;padding:2px 9px;color:#555">005930</span>
+<span style="font:400 13px 'Gaegu';border:1px dashed #b9b4aa;border-radius:20px;padding:2px 9px;color:#555">AAPL</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:0;border:1.5px solid #1a1a1a;border-radius:8px;overflow:hidden">
+<sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="5">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px dashed #ddd8cf">
+<span style="display:flex;flex-direction:column"><span style="font:700 15px 'Gaegu';color:#1a1a1a">{{ s.name }}</span><span style="font:400 11px ui-monospace;color:#8a857c">{{ s.y }}</span></span>
+<span style="font:400 12px 'Gaegu';color:#777;border:1px solid #e0dcd4;border-radius:4px;padding:1px 6px">{{ s.mkt }}</span>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<div style="font:400 12px/1.4 ui-monospace,Menlo,monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:6px;padding:6px 8px">normalize_stock_candidates · get_initial_consonants · get_common_stock_name → 표시명/후보 심볼</div>
+</sc-if>
+<div style="font:400 13px/1.35 'Gaegu';color:#555;background:#f3f1ec;border-left:3px solid #1a1a1a;padding:6px 8px">첫 호출 시 상장사 목록 수집으로 응답이 느릴 수 있음 → 스켈레톤 + “목록 준비 중” 안내</div>
+</div>
+
+<div style="align-self:center;font:700 22px 'Gaegu';color:#1a1a1a">→</div>
+
+<div style="width:296px;border:2px solid #1a1a1a;border-radius:22px;background:#fff;padding:12px;display:flex;flex-direction:column;gap:10px">
+<div style="font:700 15px 'Gaegu';color:#1a1a1a;display:flex;justify-content:space-between;align-items:center"><span>② 종목 상세</span><span style="font:400 11px ui-monospace;color:#999">6.3 / 6.4</span></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #1a1a1a;padding-bottom:8px">
+<span style="display:flex;flex-direction:column"><span style="font:700 18px 'Gaegu'">삼성전자</span><span style="font:400 11px ui-monospace;color:#8a857c">005930.KS</span></span>
+<span style="display:flex;flex-direction:column;align-items:flex-end"><span style="height:14px;width:74px;border-radius:4px;background:#dcd8d0"></span><span style="height:9px;width:52px;border-radius:4px;background:#e8e5df;margin-top:5px"></span></span>
+</div>
+<div style="height:132px;border:1.5px dashed #b9b4aa;border-radius:8px;background:repeating-linear-gradient(45deg,#f5f3ef 0 6px,#eae7e1 6px 12px);display:flex;align-items:flex-end;justify-content:space-between;padding:8px">
+<span style="font:400 12px ui-monospace;color:#7d786f">OHLCV 캔들</span><span style="font:400 12px ui-monospace;color:#7d786f">MA20/60 · BB</span>
+</div>
+<div style="display:flex;gap:5px;flex-wrap:wrap">
+<span style="font:400 12px 'Gaegu';border:1px solid #1a1a1a;border-radius:4px;padding:1px 7px">1M</span>
+<span style="font:400 12px 'Gaegu';border:1px solid #e0dcd4;border-radius:4px;padding:1px 7px;color:#888">3M</span>
+<span style="font:400 12px 'Gaegu';border:1px solid #e0dcd4;border-radius:4px;padding:1px 7px;color:#888">1Y</span>
+<span style="font:400 12px 'Gaegu';border:1px dashed #d9b98a;border-radius:4px;padding:1px 7px;color:#8a5a2b">▲ 골든크로스 마커</span>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+<sc-for list="{{ metrics }}" as="m" hint-placeholder-count="6">
+<div style="border:1px solid #e0dcd4;border-radius:6px;padding:5px 7px;display:flex;flex-direction:column;gap:3px"><span style="font:400 12px 'Gaegu';color:#8a857c">{{ m.k }}</span><span style="height:10px;width:60%;border-radius:4px;background:#e2ded6"></span></div>
+</sc-for>
+</div>
+<div style="font:700 14px 'Gaegu';margin-top:2px">뉴스 · 최대 3건</div>
+<sc-for list="{{ news }}" as="n" hint-placeholder-count="3">
+<div style="display:flex;gap:8px;align-items:center"><span style="width:34px;height:26px;border:1px dashed #b9b4aa;border-radius:4px;background:repeating-linear-gradient(45deg,#f5f3ef 0 4px,#eae7e1 4px 8px);flex:none"></span><span style="display:flex;flex-direction:column;gap:4px;flex:1"><span style="height:9px;width:92%;border-radius:4px;background:#e2ded6"></span><span style="font:400 11px ui-monospace;color:#a5a097">{{ n.s }}</span></span></div>
+</sc-for>
+<div style="font:700 14px 'Gaegu';margin-top:2px">애널리스트 리포트 · 최대 3건</div>
+<sc-for list="{{ reports }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed #ddd8cf;padding-bottom:4px"><span style="font:400 13px 'Gaegu';color:#444">{{ r.t }}</span><span style="height:9px;width:56px;border-radius:4px;background:#e2ded6"></span></div>
+</sc-for>
+<div style="border:1.5px solid #1a1a1a;border-radius:8px;padding:9px;text-align:center;font:700 15px 'Gaegu';background:#1a1a1a;color:#fff">AI 분석 요청</div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<div style="font:400 12px/1.4 ui-monospace,Menlo,monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:6px;padding:6px 8px">fetch_stock_history_from_yfinance · fetch_stock_news · fetch_analyst_reports · build_stock_metrics</div>
+</sc-if>
+</div>
+
+<div style="align-self:center;font:700 22px 'Gaegu';color:#1a1a1a">→</div>
+
+<div style="width:296px;border:2px solid #1a1a1a;border-radius:22px;background:#fff;padding:12px;display:flex;flex-direction:column;gap:10px">
+<div style="font:700 15px 'Gaegu';color:#1a1a1a;display:flex;justify-content:space-between;align-items:center"><span>③ AI 판단</span><span style="font:400 11px ui-monospace;color:#999">6.4</span></div>
+<div style="border:1.5px dashed #b9b4aa;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px">
+<span style="font:400 13px 'Gaegu';color:#666">진행 상황 (오래 걸릴 수 있음)</span>
+<sc-for list="{{ steps }}" as="st" hint-placeholder-count="4">
+<span style="display:flex;align-items:center;gap:7px;font:400 14px 'Gaegu';color:#333"><span style="width:12px;height:12px;border-radius:50%;border:1.5px solid #1a1a1a;background:{{ st.fill }};flex:none"></span>{{ st.t }}</span>
+</sc-for>
+</div>
+<sc-for list="{{ agents }}" as="a" hint-placeholder-count="3">
+<div style="border:1.5px solid #1a1a1a;border-radius:10px 7px 11px 8px;padding:9px;display:flex;flex-direction:column;gap:6px">
+<span style="display:flex;justify-content:space-between;align-items:center"><span style="font:700 15px 'Gaegu'">{{ a.role }}</span><span style="font:400 11px ui-monospace;color:#a5a097">{{ a.src }}</span></span>
+<span style="height:9px;width:100%;border-radius:4px;background:#e2ded6"></span>
+<span style="height:9px;width:78%;border-radius:4px;background:#e8e5df"></span>
+</div>
+</sc-for>
+<div style="border:2px solid #1a1a1a;border-radius:10px;padding:11px;display:flex;flex-direction:column;gap:8px;background:#faf8f3">
+<span style="font:700 16px 'Gaegu'">최종 판단</span>
+<span style="display:flex;gap:6px;align-items:center"><span style="font:700 18px 'Gaegu';border:2px solid #1a1a1a;border-radius:6px;padding:2px 12px">보유</span><span style="font:400 13px 'Gaegu';color:#666">신뢰도 ●●●○○</span></span>
+<span style="height:9px;width:96%;border-radius:4px;background:#e2ded6"></span>
+<span style="height:9px;width:84%;border-radius:4px;background:#e8e5df"></span>
+<span style="font:400 12px 'Gaegu';color:#8a5a2b;border-top:1px dashed #d9b98a;padding-top:6px">근거: 3개 에이전트 의견 · 지표 요약</span>
+</div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<div style="font:400 12px/1.4 ui-monospace,Menlo,monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:6px;padding:6px 8px">generate_stock_advice → invoke_stock_agent ×3 → invoke_decision_agent (실패 시 fallback_decision)</div>
+</sc-if>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>데스크탑 대시보드 · 시장 개요 + 3분할 작업 화면</div>
+<div class="dv-card" style="width:1140px;padding:20px;display:flex;flex-direction:column;gap:14px;background:#fbfaf7">
+<div style="display:flex;gap:12px;align-items:center">
+<span style="font:700 17px 'Gaegu'">로고</span>
+<span style="flex:1;border:1.5px solid #1a1a1a;border-radius:8px;padding:7px 10px;font:400 15px 'Gaegu';color:#8a857c;display:flex;justify-content:space-between"><span>종목명 · 코드 · 초성 검색</span><span style="font:400 11px ui-monospace;color:#b0aba2">005930 / 005930.KS / AAPL</span></span>
+<span style="border:1.5px solid #1a1a1a;border-radius:8px;padding:7px 14px;font:700 15px 'Gaegu';background:#1a1a1a;color:#fff">AI 분석</span>
+</div>
+<div style="display:flex;gap:8px">
+<sc-for list="{{ marketCats }}" as="c" hint-placeholder-count="5">
+<div style="flex:1;border:1.5px solid #1a1a1a;border-radius:8px 6px 9px 7px;padding:8px 10px;display:flex;flex-direction:column;gap:5px">
+<span style="font:700 14px 'Gaegu'">{{ c.label }}</span>
+<span style="height:11px;width:70%;border-radius:4px;background:#dcd8d0"></span>
+<span style="height:26px;border:1px dashed #b9b4aa;border-radius:4px;background:repeating-linear-gradient(45deg,#f5f3ef 0 5px,#eae7e1 5px 10px)"></span>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<div style="font:400 12px ui-monospace,Menlo,monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:6px;padding:6px 8px">fetch_market_overview_from_yfinance → 카테고리별 현재값 · 변동률 · 스파크라인</div>
+</sc-if>
+<div style="display:flex;gap:14px;align-items:stretch">
+
+<div style="width:236px;display:flex;flex-direction:column;gap:10px">
+<div style="border:1.5px solid #1a1a1a;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px">
+<span style="font:700 16px 'Gaegu'">삼성전자 <span style="font:400 11px ui-monospace;color:#8a857c">005930.KS</span></span>
+<span style="height:16px;width:80%;border-radius:4px;background:#dcd8d0"></span>
+<sc-for list="{{ metrics }}" as="m" hint-placeholder-count="6">
+<span style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed #e2ded6;padding-bottom:3px"><span style="font:400 14px 'Gaegu';color:#666">{{ m.k }}</span><span style="height:9px;width:52px;border-radius:4px;background:#e2ded6"></span></span>
+</sc-for>
+</div>
+<div style="border:1.5px dashed #b9b4aa;border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px">
+<span style="font:700 15px 'Gaegu'">최근 검색 · 관심</span>
+<sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="4">
+<span style="display:flex;justify-content:space-between;font:400 14px 'Gaegu';color:#444"><span>{{ s.name }}</span><span style="font:400 11px ui-monospace;color:#a5a097">{{ s.code }}</span></span>
+</sc-for>
+</div>
+</div>
+
+<div style="flex:1;display:flex;flex-direction:column;gap:10px">
+<div style="height:250px;border:1.5px dashed #b9b4aa;border-radius:10px;background:repeating-linear-gradient(45deg,#f5f3ef 0 6px,#eae7e1 6px 12px);padding:10px;display:flex;flex-direction:column;justify-content:space-between">
+<span style="display:flex;gap:6px;flex-wrap:wrap">
+<span style="font:400 12px 'Gaegu';background:#fff;border:1px solid #1a1a1a;border-radius:4px;padding:1px 7px">캔들</span>
+<span style="font:400 12px 'Gaegu';background:#fff;border:1px solid #e0dcd4;border-radius:4px;padding:1px 7px;color:#777">MA20</span>
+<span style="font:400 12px 'Gaegu';background:#fff;border:1px solid #e0dcd4;border-radius:4px;padding:1px 7px;color:#777">MA60</span>
+<span style="font:400 12px 'Gaegu';background:#fff;border:1px solid #e0dcd4;border-radius:4px;padding:1px 7px;color:#777">볼린저밴드</span>
+<span style="font:400 12px 'Gaegu';background:#fff;border:1px dashed #d9b98a;border-radius:4px;padding:1px 7px;color:#8a5a2b">교차 신호</span>
+</span>
+<span style="font:400 13px ui-monospace;color:#7d786f;align-self:center">가격 차트 영역</span>
+<span style="height:44px;border:1px dashed #cfc9be;border-radius:4px;background:#fff9;display:flex;align-items:center;justify-content:center;font:400 12px ui-monospace;color:#8a857c">거래량 서브차트</span>
+</div>
+<div style="display:flex;gap:0;border-bottom:1.5px solid #1a1a1a">
+<span style="font:700 15px 'Gaegu';border:1.5px solid #1a1a1a;border-bottom:none;border-radius:7px 7px 0 0;padding:5px 14px;background:#fff">뉴스</span>
+<span style="font:400 15px 'Gaegu';padding:5px 14px;color:#888">리포트</span>
+<span style="font:400 15px 'Gaegu';padding:5px 14px;color:#888">지표 상세</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<sc-for list="{{ news }}" as="n" hint-placeholder-count="3">
+<span style="display:flex;gap:10px;align-items:center"><span style="width:56px;height:40px;border:1px dashed #b9b4aa;border-radius:4px;background:repeating-linear-gradient(45deg,#f5f3ef 0 4px,#eae7e1 4px 8px);flex:none"></span><span style="flex:1;display:flex;flex-direction:column;gap:5px"><span style="height:10px;width:88%;border-radius:4px;background:#e2ded6"></span><span style="height:9px;width:60%;border-radius:4px;background:#eae7e1"></span><span style="font:400 11px ui-monospace;color:#a5a097">{{ n.s }}</span></span></span>
+</sc-for>
+</div>
+</div>
+
+<div style="width:266px;border:2px solid #1a1a1a;border-radius:10px;padding:11px;display:flex;flex-direction:column;gap:9px;background:#faf8f3">
+<span style="font:700 16px 'Gaegu';display:flex;justify-content:space-between;align-items:center">AI 멀티 에이전트<span style="font:400 11px ui-monospace;color:#999">6.4</span></span>
+<span style="height:5px;border-radius:3px;background:#e2ded6;overflow:hidden;display:block"><span style="display:block;height:5px;width:64%;background:{{ accent }}"></span></span>
+<span style="font:400 13px 'Gaegu';color:#666">3/4 단계 · 종합 판단 생성 중</span>
+<sc-for list="{{ agents }}" as="a" hint-placeholder-count="3">
+<span style="border:1.5px solid #1a1a1a;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:5px">
+<span style="font:700 14px 'Gaegu';display:flex;justify-content:space-between"><span>{{ a.role }}</span><span style="font:400 11px ui-monospace;color:#a5a097">{{ a.src }}</span></span>
+<span style="height:9px;width:100%;border-radius:4px;background:#e2ded6"></span>
+<span style="height:9px;width:72%;border-radius:4px;background:#eae7e1"></span>
+</span>
+</sc-for>
+<span style="border:2px dashed #1a1a1a;border-radius:8px;padding:9px;display:flex;flex-direction:column;gap:6px;background:#fff">
+<span style="font:700 15px 'Gaegu'">최종 판단</span>
+<span style="display:flex;gap:6px;align-items:center"><span style="font:700 17px 'Gaegu';border:2px solid #1a1a1a;border-radius:5px;padding:1px 10px">매수 검토</span><span style="font:400 12px 'Gaegu';color:#666">신뢰도 中</span></span>
+<span style="height:9px;width:94%;border-radius:4px;background:#e2ded6"></span>
+<span style="height:9px;width:80%;border-radius:4px;background:#eae7e1"></span>
+</span>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>대화형 · 에이전트 진행을 그대로 보여주는 타임라인</div>
+<div class="dv-card" style="width:520px;padding:20px;display:flex;flex-direction:column;gap:12px;background:#fbfaf7">
+<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #1a1a1a;padding-bottom:8px">
+<span style="font:700 17px 'Gaegu'">삼성전자 AI 분석</span><span style="font:400 12px ui-monospace;color:#999">005930.KS · 진행 중</span>
+</div>
+<div style="align-self:flex-end;max-width:74%;border:1.5px solid #1a1a1a;border-radius:12px 12px 4px 12px;padding:8px 11px;font:400 16px 'Gaegu';background:#1a1a1a;color:#fff">삼성전자 지금 살까?</div>
+<div style="display:flex;gap:9px;align-items:flex-start">
+<span style="width:26px;height:26px;border:1.5px solid #1a1a1a;border-radius:50%;flex:none"></span>
+<span style="flex:1;border:1.5px dashed #b9b4aa;border-radius:4px 12px 12px 12px;padding:9px 11px;display:flex;flex-direction:column;gap:6px;background:#fff">
+<span style="font:400 15px 'Gaegu';color:#444">주가 · 뉴스 · 리포트 수집 완료</span>
+<span style="display:flex;gap:6px;flex-wrap:wrap">
+<span style="font:400 12px ui-monospace;color:#7d786f;border:1px solid #e0dcd4;border-radius:4px;padding:1px 6px">OHLCV 1Y</span>
+<span style="font:400 12px ui-monospace;color:#7d786f;border:1px solid #e0dcd4;border-radius:4px;padding:1px 6px">뉴스 3</span>
+<span style="font:400 12px ui-monospace;color:#7d786f;border:1px solid #e0dcd4;border-radius:4px;padding:1px 6px">리포트 3</span>
+</span>
+<span style="height:96px;border:1px dashed #b9b4aa;border-radius:6px;background:repeating-linear-gradient(45deg,#f5f3ef 0 6px,#eae7e1 6px 12px);display:flex;align-items:center;justify-content:center;font:400 12px ui-monospace;color:#7d786f">인라인 미니 차트 + 교차 신호</span>
+</span>
+</div>
+<sc-for list="{{ agents }}" as="a" hint-placeholder-count="3">
+<div style="display:flex;gap:9px;align-items:flex-start">
+<span style="width:26px;height:26px;border:1.5px solid #1a1a1a;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font:700 12px 'Gaegu'">{{ a.i }}</span>
+<span style="flex:1;border:1.5px solid #1a1a1a;border-radius:4px 12px 12px 12px;padding:9px 11px;display:flex;flex-direction:column;gap:6px;background:#fff">
+<span style="font:700 15px 'Gaegu';display:flex;justify-content:space-between"><span>{{ a.role }}</span><span style="font:400 11px ui-monospace;color:#a5a097">{{ a.src }}</span></span>
+<span style="height:9px;width:100%;border-radius:4px;background:#e2ded6"></span>
+<span style="height:9px;width:88%;border-radius:4px;background:#e8e5df"></span>
+<span style="height:9px;width:54%;border-radius:4px;background:#eeebe5"></span>
+</span>
+</div>
+</sc-for>
+<div style="display:flex;gap:9px;align-items:center">
+<span style="width:26px;height:26px;border:1.5px dashed #1a1a1a;border-radius:50%;flex:none"></span>
+<span style="font:400 15px 'Gaegu';color:#888;animation:wfpulse 1.3s infinite">종합 판단 생성 중…</span>
+</div>
+<div style="border:2px solid #1a1a1a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;background:#faf8f3">
+<span style="font:700 16px 'Gaegu';display:flex;justify-content:space-between;align-items:center">최종 판단<span style="font:400 12px 'Gaegu';color:#8a5a2b;border:1px dashed #d9b98a;border-radius:4px;padding:1px 7px">규칙 기반 대체 가능</span></span>
+<span style="display:flex;gap:8px;align-items:center"><span style="font:700 18px 'Gaegu';border:2px solid #1a1a1a;border-radius:6px;padding:2px 12px">관망</span><span style="font:400 13px 'Gaegu';color:#666">근거 3 · 리스크 2</span></span>
+<span style="height:9px;width:96%;border-radius:4px;background:#e2ded6"></span>
+<span style="height:9px;width:72%;border-radius:4px;background:#eae7e1"></span>
+</div>
+<div style="border:1.5px solid #1a1a1a;border-radius:9px;padding:8px 11px;display:flex;justify-content:space-between;align-items:center;font:400 15px 'Gaegu';color:#8a857c"><span>추가 질문 입력</span><span style="font:700 15px 'Gaegu';color:#1a1a1a">↑</span></div>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<div style="font:400 12px/1.4 ui-monospace,Menlo,monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:6px;padding:6px 8px">각 버블 = invoke_stock_agent 결과 스트리밍 · 마지막 = invoke_decision_agent</div>
+</sc-if>
+</div>
+</div>
+
+<sc-if value="{{ showStates }}" hint-placeholder-val="{{ true }}">
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>상태 · 폴백 화면 모음 (명세의 예외 경로)</div>
+<div class="dv-card" style="width:1140px;padding:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;background:#fbfaf7">
+
+<div style="border:1.5px solid #1a1a1a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:9px;background:#fff">
+<span style="font:700 15px 'Gaegu'">첫 자동완성 지연</span>
+<span style="height:32px;border:1.5px solid #1a1a1a;border-radius:8px"></span>
+<span style="height:10px;width:90%;border-radius:4px;background:#e2ded6;animation:wfpulse 1.2s infinite"></span>
+<span style="height:10px;width:70%;border-radius:4px;background:#e2ded6;animation:wfpulse 1.2s .2s infinite"></span>
+<span style="height:10px;width:80%;border-radius:4px;background:#e2ded6;animation:wfpulse 1.2s .4s infinite"></span>
+<span style="font:400 13px/1.35 'Gaegu';color:#555;background:#f3f1ec;border-left:3px solid #1a1a1a;padding:6px 8px">상장사 목록을 준비하고 있어요. 잠시만요.</span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 11px/1.4 ui-monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:5px;padding:5px 7px">ensure_listed_companies (&lt;100건이면 수집)</span>
+</sc-if>
+</div>
+
+<div style="border:1.5px solid #1a1a1a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:9px;background:#fff">
+<span style="font:700 15px 'Gaegu'">목록 수집 폴백</span>
+<span style="border:1px dashed #d9b98a;background:#fff8ea;border-radius:6px;padding:7px 8px;font:400 14px/1.35 'Gaegu';color:#8a5a2b">KRX 조회 실패 → KIND 목록 사용 중. 일부 종목이 빠질 수 있어요.</span>
+<span style="display:flex;flex-direction:column;gap:6px">
+<span style="display:flex;justify-content:space-between;font:400 14px 'Gaegu';color:#444"><span>KRX CSV</span><span style="font:400 12px ui-monospace;color:#b04a3a">실패</span></span>
+<span style="display:flex;justify-content:space-between;font:400 14px 'Gaegu';color:#444"><span>KIND 목록</span><span style="font:400 12px ui-monospace;color:#3a7d4a">사용</span></span>
+<span style="display:flex;justify-content:space-between;font:400 14px 'Gaegu';color:#999"><span>내부 기본 종목</span><span style="font:400 12px ui-monospace">대기</span></span>
+</span>
+<span style="height:10px;width:84%;border-radius:4px;background:#e2ded6"></span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 11px/1.4 ui-monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:5px;padding:5px 7px">fetch_krx_listed_companies → fetch_kind_listed_companies → fallback_listed_companies</span>
+</sc-if>
+</div>
+
+<div style="border:1.5px solid #1a1a1a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:9px;background:#fff">
+<span style="font:700 15px 'Gaegu'">LLM 실패 → 규칙 기반</span>
+<span style="border:2px dashed #1a1a1a;border-radius:8px;padding:9px;display:flex;flex-direction:column;gap:6px">
+<span style="font:400 12px 'Gaegu';color:#8a5a2b;border:1px dashed #d9b98a;border-radius:4px;padding:1px 7px;align-self:flex-start">규칙 기반 판단</span>
+<span style="font:700 17px 'Gaegu'">관망</span>
+<span style="height:9px;width:92%;border-radius:4px;background:#e2ded6"></span>
+<span style="height:9px;width:66%;border-radius:4px;background:#eae7e1"></span>
+</span>
+<span style="font:400 13px/1.35 'Gaegu';color:#555">AI 의견을 못 받아 지표 규칙으로 판단했어요.</span>
+<span style="border:1.5px solid #1a1a1a;border-radius:7px;padding:6px;text-align:center;font:700 14px 'Gaegu'">AI 분석 다시 시도</span>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 11px/1.4 ui-monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:5px;padding:5px 7px">fallback_decision</span>
+</sc-if>
+</div>
+
+<div style="border:1.5px solid #1a1a1a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:9px;background:#fff">
+<span style="font:700 15px 'Gaegu'">코드 정규화 실패</span>
+<span style="border:1.5px solid #1a1a1a;border-radius:8px;padding:7px 9px;font:400 15px 'Gaegu';color:#444">삼성전자우선주?</span>
+<span style="font:400 14px/1.4 'Gaegu';color:#555">6자리 코드를 찾지 못했어요. 아래 후보 중에서 골라주세요.</span>
+<sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="3">
+<span style="display:flex;justify-content:space-between;align-items:center;border:1px solid #e0dcd4;border-radius:6px;padding:5px 8px"><span style="font:400 14px 'Gaegu'">{{ s.name }}</span><span style="font:400 11px ui-monospace;color:#a5a097">{{ s.y }}</span></span>
+</sc-for>
+<sc-if value="{{ showNotes }}" hint-placeholder-val="{{ true }}">
+<span style="font:400 11px/1.4 ui-monospace;color:#8a5a2b;background:#fff8ea;border:1px dashed #d9b98a;border-radius:5px;padding:5px 7px">normalize_stock_code · krx_symbol_to_yfinance (.KS/.KQ)</span>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+<p class="dv-next">다음에 시도해볼 것: “<a class="dv-oid" href="#1b">1b</a>를 모바일로 좁혀줘” · “<a class="dv-oid" href="#1c">1c</a>의 에이전트 카드를 비교 표로” · “시장 개요 홈 화면만 3안 더”</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;chartStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;캔들&quot;,&quot;영역(라인)&quot;],&quot;default&quot;:&quot;캔들&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;하이파이 (턴 2)&quot;},&quot;autoRunAgents&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;하이파이 (턴 2)&quot;},&quot;showEnglishNames&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;하이파이 (턴 2)&quot;},&quot;showApiNotes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;와이어프레임 (턴 1)&quot;},&quot;showStateVariants&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;와이어프레임 (턴 1)&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#2a78d6&quot;,&quot;options&quot;:[&quot;#2a78d6&quot;,&quot;#c8352c&quot;,&quot;#3a7d4a&quot;,&quot;#1a1a1a&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;와이어프레임 (턴 1)&quot;}}">
+class Component extends DCLogic {
+  state = { openA: false, openB: false, openC: false, stageA: 0, stageB: 0, stageC: 0 };
+
+  series = (() => {
+    let s = 20240115, r = () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const out = []; let px = 58200;
+    for (let i = 0; i < 240; i++) {
+      const drift = i < 90 ? -18 : i < 150 ? 42 : 96;
+      const o = px, ch = (r() - 0.46) * 1150 + drift, c = Math.max(30000, o + ch);
+      const hiP = Math.max(o, c) + r() * 420, loP = Math.min(o, c) - r() * 420;
+      const d = new Date(2025, 7, 1); d.setDate(d.getDate() + i);
+      out.push({ o, c, h: hiP, l: loP, v: Math.round(7e6 + r() * 1.4e7 + (Math.abs(ch) > 700 ? 9e6 : 0)), d });
+      px = c;
+    }
+    const ma = (n, i) => { if (i < n - 1) return null; let t = 0; for (let k = i - n + 1; k <= i; k++) t += out[k].c; return t / n; };
+    out.forEach((b, i) => {
+      b.ma20 = ma(20, i); b.ma60 = ma(60, i);
+      if (i >= 19) { let m = 0; for (let k = i - 19; k <= i; k++) m += Math.pow(out[k].c - b.ma20, 2); const sd = Math.sqrt(m / 20); b.bu = b.ma20 + 2 * sd; b.bl = b.ma20 - 2 * sd; }
+      if (i > 0 && out[i - 1].ma20 != null && out[i - 1].ma60 != null && b.ma20 != null && b.ma60 != null) {
+        if (out[i - 1].ma20 <= out[i - 1].ma60 && b.ma20 > b.ma60) b.cross = 'golden';
+        if (out[i - 1].ma20 >= out[i - 1].ma60 && b.ma20 < b.ma60) b.cross = 'dead';
+      }
+    });
+    return out;
+  })();
+
+  Chart = (p) => {
+    const h = React.createElement, th = p.th, data = p.data;
+    const [range, setRange] = React.useState(p.range || 70);
+    const [hov, setHov] = React.useState(null);
+    const wrap = React.useRef(null);
+    React.useEffect(() => {
+      const el = wrap.current; if (!el) return;
+      const onW = (e) => { e.preventDefault(); setRange(r => Math.min(240, Math.max(18, Math.round(r * (e.deltaY > 0 ? 1.14 : 0.88))))); };
+      el.addEventListener('wheel', onW, { passive: false });
+      return () => el.removeEventListener('wheel', onW);
+    }, []);
+    const W = p.w, H = p.h, volH = p.vol ? Math.round(H * 0.19) : 0;
+    const padR = p.compact ? 40 : 54, padT = 12, padB = p.compact ? 16 : 22;
+    const i1 = data.length - 1, i0 = Math.max(0, i1 - range + 1), vis = data.slice(i0, i1 + 1);
+    const plotH = H - padT - padB - volH - (p.vol ? 8 : 0);
+    let mn = Infinity, mx = -Infinity;
+    vis.forEach(b => { mn = Math.min(mn, b.l, b.bl == null ? b.l : b.bl); mx = Math.max(mx, b.h, b.bu == null ? b.h : b.bu); });
+    const pad = (mx - mn) * 0.06; mn -= pad; mx += pad;
+    const iw = W - padR, step = iw / vis.length;
+    const X = i => step * (i + 0.5), Y = v => padT + (mx - v) / (mx - mn) * plotH;
+    const vmx = Math.max.apply(null, vis.map(b => b.v));
+    const VY = v => H - padB - (v / vmx) * volH;
+    const line = (key, col, wd) => { let d = '', st = false; vis.forEach((b, i) => { if (b[key] == null) return; d += (st ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(b[key]).toFixed(1); st = true; }); return d ? h('path', { key: key, d: d, fill: 'none', stroke: col, strokeWidth: wd, strokeLinecap: 'round' }) : null; };
+    let bu = '', bl = '';
+    vis.forEach((b, i) => { if (b.bu == null) return; bu += (bu ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(b.bu).toFixed(1); });
+    for (let i = vis.length - 1; i >= 0; i--) { if (vis[i].bl == null) continue; bl += 'L' + X(i).toFixed(1) + ' ' + Y(vis[i].bl).toFixed(1); }
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => mn + (mx - mn) * f);
+    const body = [];
+    if (p.mode === 'area') {
+      let d = '', a = '';
+      vis.forEach((b, i) => { d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(b.c).toFixed(1); });
+      a = d + 'L' + X(vis.length - 1).toFixed(1) + ' ' + (padT + plotH) + 'L' + X(0).toFixed(1) + ' ' + (padT + plotH) + 'Z';
+      body.push(h('path', { key: 'a', d: a, fill: 'url(#g' + p.id + ')' }), h('path', { key: 'l', d: d, fill: 'none', stroke: th.up, strokeWidth: 2.2, strokeLinejoin: 'round' }));
+    } else {
+      vis.forEach((b, i) => {
+        const up = b.c >= b.o, col = up ? th.up : th.down, bw = Math.max(1.6, step * 0.62);
+        body.push(h('line', { key: 'w' + i, x1: X(i), x2: X(i), y1: Y(b.h), y2: Y(b.l), stroke: col, strokeWidth: Math.min(1.4, step * 0.2 + 0.6) }));
+        body.push(h('rect', { key: 'c' + i, x: X(i) - bw / 2, y: Y(Math.max(b.o, b.c)), width: bw, height: Math.max(1, Math.abs(Y(b.o) - Y(b.c))), fill: up ? col : th.downFill || col, stroke: col, strokeWidth: .8 }));
+      });
+    }
+    const hb = hov == null ? null : vis[hov];
+    return h('div', { ref: wrap, style: { position: 'relative', width: W + 'px', height: H + 'px', cursor: 'crosshair', userSelect: 'none' } },
+      h('svg', {
+        width: W, height: H, style: { display: 'block', overflow: 'visible' },
+        onMouseMove: e => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.floor((e.clientX - r.left) / step); setHov(i >= 0 && i < vis.length ? i : null); },
+        onMouseLeave: () => setHov(null)
+      },
+        h('defs', null, h('linearGradient', { id: 'g' + p.id, x1: 0, y1: 0, x2: 0, y2: 1 }, h('stop', { offset: '0%', stopColor: th.up, stopOpacity: .28 }), h('stop', { offset: '100%', stopColor: th.up, stopOpacity: 0 }))),
+        ticks.map((t, i) => h('g', { key: 't' + i },
+          h('line', { x1: 0, x2: iw, y1: Y(t), y2: Y(t), stroke: th.grid, strokeWidth: 1, strokeDasharray: i === 0 || i === 4 ? '' : '2 4' }),
+          h('text', { x: iw + 7, y: Y(t) + 3.5, fill: th.axis, style: { font: '500 10px "IBM Plex Mono",monospace' } }, Math.round(t).toLocaleString('en-US'))
+        )),
+        bu && bl ? h('path', { d: bu + bl + 'Z', fill: th.band, stroke: 'none' }) : null,
+        line('ma60', th.ma60, 1.4), line('ma20', th.ma20, 1.6),
+        body,
+        p.vol ? vis.map((b, i) => h('rect', { key: 'v' + i, x: X(i) - Math.max(1.4, step * 0.6) / 2, y: VY(b.v), width: Math.max(1.4, step * 0.6), height: H - padB - VY(b.v), fill: b.c >= b.o ? th.up : th.down, opacity: .3 })) : null,
+        vis.map((b, i) => b.cross ? h('g', { key: 'x' + i },
+          h('circle', { cx: X(i), cy: Y(b.ma20), r: 4.2, fill: th.bg, stroke: b.cross === 'golden' ? th.up : th.down, strokeWidth: 1.6 }),
+          h('text', { x: X(i), y: Y(b.ma20) - 10, textAnchor: 'middle', fill: b.cross === 'golden' ? th.up : th.down, style: { font: '600 9px "IBM Plex Mono",monospace' } }, b.cross === 'golden' ? 'GC' : 'DC')
+        ) : null),
+        hb ? h('g', null,
+          h('line', { x1: X(hov), x2: X(hov), y1: padT, y2: H - padB, stroke: th.axis, strokeWidth: 1, strokeDasharray: '3 3' }),
+          h('line', { x1: 0, x2: iw, y1: Y(hb.c), y2: Y(hb.c), stroke: th.axis, strokeWidth: 1, strokeDasharray: '3 3' }),
+          h('circle', { cx: X(hov), cy: Y(hb.c), r: 3, fill: th.axis })
+        ) : null,
+        [0, Math.floor(vis.length / 2), vis.length - 1].map((i, k) => h('text', { key: 'd' + k, x: Math.min(Math.max(X(i), 16), iw - 16), y: H - 4, textAnchor: 'middle', fill: th.axis, style: { font: '400 9.5px "IBM Plex Mono",monospace' } }, (vis[i].d.getMonth() + 1) + '/' + vis[i].d.getDate()))
+      ),
+      h('div', { style: { position: 'absolute', top: 0, right: 0, display: 'flex', gap: '3px' } },
+        [30, 70, 140, 240].map(r => h('button', {
+          key: r, onClick: () => setRange(r),
+          style: { font: '500 9.5px "IBM Plex Mono",monospace', letterSpacing: '.04em', padding: '2px 6px', cursor: 'pointer', color: range === r ? th.btnFg : th.axis, background: range === r ? th.btnBg : 'transparent', border: '1px solid ' + (range === r ? th.btnBg : th.grid), borderRadius: '3px' }
+        }, r === 30 ? '1M' : r === 70 ? '3M' : r === 140 ? '6M' : '1Y'))
+      ),
+      hb ? h('div', {
+        style: {
+          position: 'absolute', left: Math.min(Math.max(X(hov) + 12, 4), W - 168) + 'px', top: '18px', width: '150px', pointerEvents: 'none',
+          background: th.tipBg, color: th.tipFg, border: '1px solid ' + th.tipBd, borderRadius: '4px', padding: '7px 9px',
+          font: '400 10.5px/1.65 "IBM Plex Mono",monospace', boxShadow: '0 6px 22px rgba(0,0,0,.18)', zIndex: 4
+        }
+      }, [
+        h('div', { key: 'd', style: { fontWeight: 600, marginBottom: '3px' } }, hb.d.getFullYear() + '.' + String(hb.d.getMonth() + 1).padStart(2, '0') + '.' + String(hb.d.getDate()).padStart(2, '0')),
+        ['시 ' + Math.round(hb.o).toLocaleString(), '고 ' + Math.round(hb.h).toLocaleString(), '저 ' + Math.round(hb.l).toLocaleString(), '종 ' + Math.round(hb.c).toLocaleString(), '량 ' + (hb.v / 1e6).toFixed(1) + 'M'].map((t, i) => h('div', { key: i, style: { display: 'flex', justifyContent: 'space-between' } }, h('span', { style: { opacity: .6 } }, t.slice(0, 1)), h('span', null, t.slice(2))))
+      ]) : null,
+      h('div', { style: { position: 'absolute', left: 0, bottom: p.vol ? '-2px' : '-2px', display: 'flex', gap: '10px', font: '400 9.5px "IBM Plex Mono",monospace', color: th.axis, pointerEvents: 'none' } })
+    );
+  };
+
+  Spark = (p) => {
+    const h = React.createElement, a = p.data, W = p.w, H = p.h;
+    const mn = Math.min.apply(null, a), mx = Math.max.apply(null, a), sp = (mx - mn) || 1;
+    const X = i => (i / (a.length - 1)) * W, Y = v => 2 + (mx - v) / sp * (H - 4);
+    let d = '';
+    a.forEach((v, i) => { d += (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); });
+    return h('svg', { width: W, height: H, style: { display: 'block', overflow: 'visible' } },
+      p.fill ? h('path', { d: d + 'L' + W + ' ' + H + 'L0 ' + H + 'Z', fill: p.col, opacity: .1 }) : null,
+      h('path', { d: d, fill: 'none', stroke: p.col, strokeWidth: p.sw || 1.4, strokeLinejoin: 'round', strokeLinecap: 'round' })
+    );
+  };
+
+  toggle(k) {
+    const ok = 'open' + k;
+    if (this.state[ok]) { this.setState({ [ok]: false }); return; }
+    this.setState({ [ok]: true, ['stage' + k]: 0 });
+    if ((this.props || {}).autoRunAgents === false) { this.setState({ ['stage' + k]: 4 }); return; }
+    [650, 1250, 1900, 2700].forEach((ms, i) => setTimeout(() => { if (this.state[ok]) this.setState({ ['stage' + k]: i + 1 }); }, ms));
+  }
+
+  renderVals() {
+    const p = this.props || {};
+    const S = this.state, last = this.series[this.series.length - 1], prev = this.series[this.series.length - 2];
+    const price = Math.round(last.c), chg = Math.round(last.c - prev.c), pct = ((last.c / prev.c - 1) * 100).toFixed(2);
+    const agents = [
+      { i: '01', role: '저널리스트', en: 'Journalist', src: '뉴스 3건', line: '“HBM 공급 계약 관련 보도가 3건 중 2건에서 긍정적으로 다뤄졌고, 부정 이슈는 환율 부담 한 건에 그쳤다.”', tag: '뉴스 톤: 우호적' },
+      { i: '02', role: '경제학자', en: 'Economist', src: '금리·환율·업황', line: '“반도체 사이클이 회복 초기 구간이다. 다만 원/달러 1,380원대와 미국 금리 경로가 단기 변동성을 키울 수 있다.”', tag: '거시: 중립' },
+      { i: '03', role: '애널리스트', en: 'Analyst', src: '지표·리포트 3건', line: '“20일선이 60일선을 상향 돌파했고 거래량은 평균의 1.8배다. 목표가 컨센서스는 현재가 대비 12% 위에 있다.”', tag: '기술적: 강세' }
+    ];
+    const stages = ['주가 데이터 조회', '뉴스·리포트 수집', '3개 에이전트 의견 생성', '최종 판단 종합'];
+    const mk = k => {
+      const st = S['stage' + k];
+      return {
+        open: S['open' + k], stage: st, ready: st >= 4,
+        pct: (st / 4 * 100) + '%',
+        label: st >= 4 ? '분석 완료 · 4/4 단계' : stages[st] + ' · ' + (st + 1) + '/4 단계',
+        agents: agents.slice(0, st >= 4 ? 3 : Math.max(0, st - 1)),
+        pending: st < 4,
+        toggle: () => this.toggle(k),
+        close: () => this.setState({ ['open' + k]: false })
+      };
+    };
+    const A = mk('A'), B = mk('B'), C = mk('C');
+    const thPaper = { up: '#c8352c', down: '#1f57c3', downFill: '#fdfbf6', ma20: '#1a1a17', ma60: '#b8a98a', band: 'rgba(26,26,23,.055)', grid: 'rgba(26,26,23,.14)', axis: 'rgba(26,26,23,.45)', bg: '#fdfbf6', tipBg: '#1a1a17', tipFg: '#fdfbf6', tipBd: '#1a1a17', btnBg: '#1a1a17', btnFg: '#fdfbf6' };
+    const thDark = { up: '#ff5449', down: '#4d8dff', downFill: '#0e1116', ma20: '#e8e3d8', ma60: '#7b8494', band: 'rgba(232,227,216,.06)', grid: 'rgba(232,227,216,.12)', axis: 'rgba(232,227,216,.42)', bg: '#0e1116', tipBg: '#e8e3d8', tipFg: '#0e1116', tipBd: '#e8e3d8', btnBg: '#e8e3d8', btnFg: '#0e1116' };
+    const thMag = { up: '#d13b2e', down: '#2b4fd6', downFill: '#fff', ma20: '#12100e', ma60: '#c9c2b4', band: 'rgba(18,16,14,.05)', grid: 'rgba(18,16,14,.1)', axis: 'rgba(18,16,14,.4)', bg: '#fffdf8', tipBg: '#12100e', tipFg: '#fffdf8', tipBd: '#12100e', btnBg: '#12100e', btnFg: '#fffdf8' };
+    const mode = p.chartStyle === '영역(라인)' ? 'area' : 'candle';
+    const paint = (arr, key, sel) => arr.map(o => {
+      const up = sel(o);
+      return Object.assign({}, o, {
+        [key]: up == null ? '#1a1a17' : up ? '#c8352c' : '#1f57c3',
+        [key + 'D']: up == null ? '#e8e3d8' : up ? '#ff5449' : '#4d8dff',
+        [key + 'M']: up == null ? '#12100e' : up ? '#d13b2e' : '#2b4fd6'
+      });
+    });
+    const upsign = s => s.trim().charAt(0) === '-' ? false : true;
+    return {
+      A: A, B: B, C: C,
+      openA: A.open, openB: B.open, openC: C.open,
+      toggleA: A.toggle, toggleB: B.toggle, toggleC: C.toggle,
+      closeA: A.close, closeB: B.close, closeC: C.close,
+      pctA: A.pct, pctB: B.pct, pctC: C.pct,
+      labelA: A.label, labelB: B.label, labelC: C.label,
+      agentsA: A.agents, agentsB: B.agents, agentsC: C.agents,
+      readyA: A.ready, readyB: B.ready, readyC: C.ready,
+      pendA: A.pending, pendB: B.pending, pendC: C.pending,
+      price: '71,400',
+      chg: '+1,000',
+      pctTxt: '+1.42%',
+      showEn: p.showEnglishNames ?? true,
+      chartDeskA: React.createElement(this.Chart, { data: this.series, w: 748, h: 344, th: thPaper, vol: true, mode: mode, id: 'da' }),
+      chartDeskB: React.createElement(this.Chart, { data: this.series, w: 712, h: 356, th: thDark, vol: true, mode: mode, id: 'db' }),
+      chartDeskC: React.createElement(this.Chart, { data: this.series, w: 660, h: 292, th: thMag, vol: false, mode: 'area', id: 'dc' }),
+      chartPhoneA: React.createElement(this.Chart, { data: this.series, w: 322, h: 176, th: thPaper, vol: false, mode: mode, compact: true, range: 40, id: 'pa' }),
+      chartPhoneB: React.createElement(this.Chart, { data: this.series, w: 322, h: 190, th: thDark, vol: true, mode: mode, compact: true, range: 40, id: 'pb' }),
+      chartPhoneC: React.createElement(this.Chart, { data: this.series, w: 322, h: 168, th: thMag, vol: false, mode: 'area', compact: true, range: 40, id: 'pc' }),
+      hiMetrics: paint([
+        { k: '20일 수익률', v: '+6.24%', up: true }, { k: '60일 수익률', v: '+11.42%', up: true },
+        { k: '추세', v: '상승 전환', up: true }, { k: '거래량 배율', v: '1.82x', up: true },
+        { k: '52주 위치', v: '84%', up: null }, { k: '변동성 20D', v: '1.9%', up: null }
+      ], 'dcol', o => o.up),
+      hiNews: [
+        { t: 'HBM4 공급 협의 진전 보도 … 하반기 물량 확대 가능성', s: '연합뉴스', tm: '2시간 전' },
+        { t: '반도체 재고 조정 마무리 국면 진입 분석', s: '한국경제', tm: '5시간 전' },
+        { t: '원/달러 1,380원대 … 수출주 환율 효과 점검', s: 'Reuters', tm: '어제' }
+      ],
+      hiReports: paint([
+        { f: '증권사 A', act: '목표가 상향', from: '82,000', to: '95,000', o: '매수' },
+        { f: '증권사 B', act: '등급 유지', from: '88,000', to: '88,000', o: '매수' },
+        { f: '증권사 C', act: '커버리지 개시', from: '—', to: '91,000', o: '중립' }
+      ], 'ocol', o => o.o === '매수' ? true : o.o === '매도' ? false : null),
+      watch: paint([
+        { n: '삼성전자', e: 'Samsung Elec', c: '005930', p: '71,400', d: '+1.42%', up: true, rowBg: 'rgba(232,176,75,.1)' },
+        { n: 'SK하이닉스', e: 'SK hynix', c: '000660', p: '198,300', d: '+2.86%', up: true, rowBg: 'transparent' },
+        { n: '에코프로', e: 'Ecopro', c: '086520', p: '104,200', d: '-1.05%', up: false, rowBg: 'transparent' },
+        { n: '현대차', e: 'Hyundai Motor', c: '005380', p: '243,500', d: '+0.41%', up: true, rowBg: 'transparent' },
+        { n: 'Apple', e: 'Apple Inc.', c: 'AAPL', p: '$226.40', d: '-0.32%', up: false, rowBg: 'transparent' }
+      ], 'dcol', o => o.up),
+      mkt: paint([
+        { n: 'KOSPI', v: '2,842.19', d: '+0.84%', up: true }, { n: 'KOSDAQ', v: '861.44', d: '+1.12%', up: true },
+        { n: 'S&P 500', v: '5,738.02', d: '-0.21%', up: false }, { n: 'USD/KRW', v: '1,381.50', d: '+0.36%', up: true }
+      ], 'dcol', o => o.up),
+      showNotes: p.showApiNotes ?? true,
+      showStates: p.showStateVariants ?? true,
+      searchGroups: (() => {
+        const S2 = this.series, sub = (st, len, inv) => { const a = S2.slice(st, st + len).map(b => b.c); return inv ? a.map(v => 2 * a[0] - v) : a; };
+        const sp = (st, len, inv, col) => React.createElement(this.Spark, { data: sub(st, len, inv), w: 92, h: 26, col: col });
+        const R = '#c8352c', B = '#1f57c3';
+        return [
+          { g: '이름 · 초성 일치', note: 'normalize_stock_candidates · get_initial_consonants', items: [
+            { n: '삼성전자', e: 'Samsung Electronics', c: '005930.KS', m: 'KOSPI', p: '71,400', d: '+1.42%', col: R, hit: '삼성', rest: '전자', s: sp(180, 40, false, R) },
+            { n: '삼성전자우', e: 'Samsung Elec. Pref.', c: '005935.KS', m: 'KOSPI', p: '60,800', d: '+0.99%', col: R, hit: '삼성', rest: '전자우', s: sp(150, 40, false, R) },
+            { n: '삼성SDI', e: 'Samsung SDI', c: '006400.KS', m: 'KOSPI', p: '318,000', d: '-2.14%', col: B, hit: '삼성', rest: 'SDI', s: sp(120, 40, true, B) },
+            { n: '삼성바이오로직스', e: 'Samsung Biologics', c: '207940.KS', m: 'KOSPI', p: '862,000', d: '+0.35%', col: R, hit: '삼성', rest: '바이오로직스', s: sp(90, 40, false, R) }
+          ] },
+          { g: '최근 검색', note: 'get_common_stock_name → 한글 표시명', items: [
+            { n: 'SK하이닉스', e: 'SK hynix', c: '000660.KS', m: 'KOSPI', p: '198,300', d: '+2.86%', col: R, hit: '', rest: 'SK하이닉스', s: sp(160, 40, false, R) },
+            { n: '에코프로', e: 'Ecopro', c: '086520.KQ', m: 'KOSDAQ', p: '104,200', d: '-1.05%', col: B, hit: '', rest: '에코프로', s: sp(60, 40, true, B) }
+          ] },
+          { g: '코드 · 해외 티커', note: 'normalize_stock_code · krx_symbol_to_yfinance', items: [
+            { n: '005930', e: '6자리 코드 → 005930.KS', c: '005930.KS', m: 'KOSPI', p: '71,400', d: '+1.42%', col: R, hit: '00593', rest: '0', s: sp(180, 40, false, R) },
+            { n: 'AAPL', e: 'Apple Inc.', c: 'AAPL', m: 'NASDAQ', p: '$226.40', d: '-0.32%', col: B, hit: '', rest: 'AAPL', s: sp(40, 40, true, B) }
+          ] }
+        ];
+      })(),
+      homeIdx: (() => {
+        const S2 = this.series, sub = (st, len, inv) => { const a = S2.slice(st, st + len).map(b => b.c); return inv ? a.map(v => 2 * a[0] - v) : a; };
+        const R = '#c8352c', B = '#1f57c3';
+        const c = (st, inv, col) => React.createElement(this.Spark, { data: sub(st, 50, inv), w: 232, h: 58, col: col, fill: true, sw: 1.8 });
+        return [
+          { n: 'KOSPI', e: '코스피', v: '2,842.19', d: '+23.71 (+0.84%)', col: R, s: c(170, false, R) },
+          { n: 'KOSDAQ', e: '코스닥', v: '861.44', d: '+9.53 (+1.12%)', col: R, s: c(140, false, R) },
+          { n: 'S&P 500', e: '미국', v: '5,738.02', d: '-12.06 (-0.21%)', col: B, s: c(100, true, B) },
+          { n: 'USD/KRW', e: '환율', v: '1,381.50', d: '+4.90 (+0.36%)', col: R, s: c(70, false, R) }
+        ];
+      })(),
+      moversUp: (() => {
+        const S2 = this.series, sub = (st, len, inv) => { const a = S2.slice(st, st + len).map(b => b.c); return inv ? a.map(v => 2 * a[0] - v) : a; };
+        const mk = (n, e, c, p, d, st) => ({ n: n, e: e, c: c, p: p, d: d, col: '#c8352c', s: React.createElement(this.Spark, { data: sub(st, 34, false), w: 76, h: 24, col: '#c8352c' }) });
+        return [mk('한미반도체', 'Hanmi Semi', '042700', '112,700', '+8.42%', 190), mk('SK하이닉스', 'SK hynix', '000660', '198,300', '+2.86%', 160), mk('두산에너빌리티', 'Doosan Enerbility', '034020', '24,150', '+2.31%', 130), mk('삼성전자', 'Samsung Elec', '005930', '71,400', '+1.42%', 180), mk('현대차', 'Hyundai Motor', '005380', '243,500', '+0.41%', 110)];
+      })(),
+      moversDown: (() => {
+        const S2 = this.series, sub = (st, len) => { const a = S2.slice(st, st + len).map(b => b.c); return a.map(v => 2 * a[0] - v); };
+        const mk = (n, e, c, p, d, st) => ({ n: n, e: e, c: c, p: p, d: d, col: '#1f57c3', s: React.createElement(this.Spark, { data: sub(st, 34), w: 76, h: 24, col: '#1f57c3' }) });
+        return [mk('에코프로비엠', 'Ecopro BM', '247540', '158,400', '-3.94%', 100), mk('삼성SDI', 'Samsung SDI', '006400', '318,000', '-2.14%', 120), mk('LG화학', 'LG Chem', '051910', '332,500', '-1.68%', 80), mk('에코프로', 'Ecopro', '086520', '104,200', '-1.05%', 60), mk('네이버', 'NAVER', '035420', '171,900', '-0.52%', 40)];
+      })(),
+      folio: (() => {
+        const S2 = this.series, sub = (st, len, inv) => { const a = S2.slice(st, st + len).map(b => b.c); return inv ? a.map(v => 2 * a[0] - v) : a; };
+        const R = '#c8352c', B = '#1f57c3';
+        const mk = (o) => Object.assign({}, o, {
+          col: o.up ? R : B, plcol: o.plUp ? R : B,
+          s: React.createElement(this.Spark, { data: sub(o.st, 36, !o.up), w: 104, h: 28, col: o.up ? R : B }),
+          sD: React.createElement(this.Spark, { data: sub(o.st, 36, !o.up), w: 104, h: 28, col: o.up ? '#ff5449' : '#4d8dff' })
+        });
+        return [
+          mk({ n: '삼성전자', e: 'Samsung Electronics', c: '005930.KS', m: 'KOSPI', p: '71,400', d: '+1.42%', up: true, st: 180, qty: '120주', avg: '64,800', pl: '+10.19%', plUp: true, alert: '75,000원 도달 시', ai: '비중 확대', grp: '코어' }),
+          mk({ n: 'SK하이닉스', e: 'SK hynix', c: '000660.KS', m: 'KOSPI', p: '198,300', d: '+2.86%', up: true, st: 160, qty: '18주', avg: '176,200', pl: '+12.54%', plUp: true, alert: 'MA20 이탈 시', ai: '유지', grp: '코어' }),
+          mk({ n: '한미반도체', e: 'Hanmi Semiconductor', c: '042700.KS', m: 'KOSPI', p: '112,700', d: '+8.42%', up: true, st: 190, qty: '—', avg: '—', pl: '관심만', plUp: true, alert: '거래량 2배 급증', ai: '과열 주의', grp: '관찰' }),
+          mk({ n: '에코프로', e: 'Ecopro', c: '086520.KQ', m: 'KOSDAQ', p: '104,200', d: '-1.05%', up: false, st: 60, qty: '30주', avg: '118,400', pl: '-12.00%', plUp: false, alert: '없음', ai: '관망', grp: '2차전지' }),
+          mk({ n: '에코프로비엠', e: 'Ecopro BM', c: '247540.KQ', m: 'KOSDAQ', p: '158,400', d: '-3.94%', up: false, st: 100, qty: '—', avg: '—', pl: '관심만', plUp: false, alert: '150,000원 이탈 시', ai: '관망', grp: '2차전지' }),
+          mk({ n: 'Apple', e: 'Apple Inc.', c: 'AAPL', m: 'NASDAQ', p: '$226.40', d: '-0.32%', up: false, st: 40, qty: '12주', avg: '$198.10', pl: '+14.28%', plUp: true, alert: '실적 발표일', ai: '유지', grp: '해외' })
+        ];
+      })(),
+      folioTabs: [
+        { n: '전체', c: '18', on: true }, { n: '코어', c: '5', on: false }, { n: '2차전지', c: '4', on: false },
+        { n: '관찰', c: '6', on: false }, { n: '해외', c: '3', on: false }
+      ],
+      sectors: [
+        { n: '반도체', v: '+2.41%', w: '84%', col: '#c8352c' }, { n: '자동차', v: '+0.86%', w: '46%', col: '#c8352c' },
+        { n: '금융', v: '+0.32%', w: '24%', col: '#c8352c' }, { n: '2차전지', v: '-2.18%', w: '72%', col: '#1f57c3' },
+        { n: '인터넷', v: '-0.74%', w: '38%', col: '#1f57c3' }, { n: '바이오', v: '-0.21%', w: '16%', col: '#1f57c3' }
+      ],
+      accent: p.accent ?? '#2a78d6',
+      suggestions: [
+        { name: '삼성전자', code: '005930', mkt: 'KOSPI', y: '005930.KS' },
+        { name: '삼성전기', code: '009150', mkt: 'KOSPI', y: '009150.KS' },
+        { name: '삼성SDI', code: '006400', mkt: 'KOSPI', y: '006400.KS' },
+        { name: '에코프로', code: '086520', mkt: 'KOSDAQ', y: '086520.KQ' },
+        { name: 'Apple', code: 'AAPL', mkt: 'NASDAQ', y: 'AAPL' }
+      ],
+      marketCats: [
+        { label: 'KOSPI' }, { label: 'KOSDAQ' }, { label: 'S&P 500' }, { label: 'USD/KRW' }, { label: 'WTI' }
+      ],
+      metrics: [
+        { k: '현재가' }, { k: '전일 대비' }, { k: '20일 수익률' },
+        { k: '60일 수익률' }, { k: '추세' }, { k: '거래량 배율' }
+      ],
+      agents: [
+        { i: '저', role: '저널리스트', src: '뉴스 3건' },
+        { i: '경', role: '경제학자', src: '시장·금리' },
+        { i: '애', role: '애널리스트', src: '지표·리포트' }
+      ],
+      news: [{ s: '출처 · 2시간 전' }, { s: '출처 · 5시간 전' }, { s: '출처 · 어제' }],
+      reports: [{ t: '등급 변경' }, { t: '목표가' }, { t: '추천 요약' }],
+      steps: [
+        { t: '주가 조회', fill: '#1a1a1a' },
+        { t: '뉴스·리포트 수집', fill: '#1a1a1a' },
+        { t: '에이전트 의견 3건', fill: '#9a958c' },
+        { t: '최종 판단 종합', fill: '#fff' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
