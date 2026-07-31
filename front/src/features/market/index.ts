@@ -1,5 +1,6 @@
 export { getMarketOverview } from "./services/getMarketOverview";
 export { getMarketHome } from "./services/getMarketHome";
+export { getMovers, type MoversBlock } from "./services/getMovers";
 
 export { MarketOverviewList } from "./components/MarketOverviewList";
 export { IndexCards } from "./components/IndexCards";

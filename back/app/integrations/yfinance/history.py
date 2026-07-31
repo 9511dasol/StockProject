@@ -17,7 +17,7 @@ from app.domain.symbols import (
 from app.integrations.yfinance.client import get_stock_name, load_yfinance
 from app.integrations.yfinance.news import fetch_stock_news
 from app.integrations.yfinance.reports import fetch_analyst_reports
-from app.schemas.stock import StockHistory, StockRow
+from app.schemas.stock import KrxListing, StockHistory, StockRow
 from app.utils.numbers import int_or_none, number_or_none
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,18 @@ def _build_rows(history: Any, stock_name: str, symbol: str, limit: int) -> list[
     return rows
 
 
+def _candidates(symbol: str, listing: KrxListing | None) -> list[str]:
+    """확정된 심볼을 맨 앞으로. 나머지는 기존 추측 순서를 그대로 뒤에 남긴다.
+
+    확정 심볼만 쓰지 않는 이유: KRX 목록이 실제 상장 상태보다 늦을 수 있어
+    그 심볼이 실패하면 기존 경로로 되돌아갈 자리가 필요하다.
+    """
+    guessed = normalize_stock_candidates(symbol)
+    if listing is None:
+        return guessed
+    return [listing.symbol, *(item for item in guessed if item != listing.symbol)]
+
+
 def fetch_stock_history(
     symbol: str,
     timeframe: str,
@@ -102,11 +114,17 @@ def fetch_stock_history(
     end_date: date | None = None,
     *,
     include_content: bool = True,
+    listing: KrxListing | None = None,
 ) -> StockHistory:
     """후보 심볼을 순서대로 시도해 첫 성공을 반환한다.
 
     파라미터 검증(timeframe/period/날짜 범위)은 서비스 계층에서 이미 끝난 상태로
     들어온다 — 이 함수는 공급자 호출과 변환만 담당한다.
+
+    `listing`은 서비스 계층이 KRX 목록에서 확정해 넘긴 신원이다. 있으면 그 심볼을
+    맨 앞에서 시도하고 이름도 그 값을 쓴다 — 6자리 코드로 `.KS`/`.KQ`를 추측하면
+    야후가 틀린 접미사에도 응답을 주기 때문에(다른 계열의 하루 늦은 시세) 조용히
+    잘못된 데이터가 화면까지 간다.
     """
     yf = load_yfinance()
 
@@ -115,7 +133,7 @@ def fetch_stock_history(
     interval = STOCK_TIMEFRAMES[timeframe]["interval"]
     requested_name = get_common_stock_name(symbol)
 
-    for candidate in normalize_stock_candidates(symbol):
+    for candidate in _candidates(symbol, listing):
         ticker = yf.Ticker(candidate)
 
         history_kwargs: dict[str, Any] = {"interval": interval, "auto_adjust": False}
@@ -139,8 +157,13 @@ def fetch_stock_history(
             continue
 
         history = _with_indicators(history)
+        # KRX 상호(에코프로비엠)가 공급자 영문명(ECOPROBM)보다 앞선다 —
+        # 목록·검색·관심종목이 모두 KRX 이름으로 표시되므로 상세만 다르면 안 된다.
         stock_name = (
-            requested_name or get_korean_stock_name(candidate) or get_stock_name(ticker, candidate)
+            requested_name
+            or (listing.name if listing else None)
+            or get_korean_stock_name(candidate)
+            or get_stock_name(ticker, candidate)
         )
 
         return StockHistory(

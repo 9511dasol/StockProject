@@ -19,7 +19,8 @@ export function MobileTabBar({
   current,
   search,
 }: {
-  current: "home" | "watchlist";
+  /** 생략하면 어느 탭도 활성이 아니다 — 404 처럼 탭 어디에도 속하지 않는 화면용 */
+  current?: "home" | "watchlist";
   search: React.ReactNode;
 }) {
   return (

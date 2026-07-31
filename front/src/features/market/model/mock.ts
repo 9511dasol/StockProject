@@ -65,6 +65,8 @@ export const MOCK_MARKET_HOME: MarketHome = {
   indices: INDICES,
   gainers: GAINERS,
   losers: LOSERS,
+  // 예시 데이터의 모집단 — 실 연결 시 백엔드가 스캔한 범위로 대체된다.
+  moversScope: "KOSPI+KOSDAQ",
   sectors: SECTORS,
   asOf: ASOF,
   news: [

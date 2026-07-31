@@ -26,6 +26,7 @@ router = APIRouter(prefix="/stocks", tags=["stocks"])
 
 @router.get("/history", response_model=StockHistory, summary="주가 히스토리 + 보조지표")
 async def get_stock_history(
+    repo: ListedCompanyRepo,
     symbol: Annotated[str, Query(min_length=1, max_length=80)],
     timeframe: Annotated[str, Query()] = "day",
     period: Annotated[str | None, Query()] = None,
@@ -42,6 +43,10 @@ async def get_stock_history(
         ),
     ] = True,
 ) -> StockHistory:
+    # 공급자를 부르기 전에 KRX 목록에서 심볼·상호를 확정한다. 6자리 코드만 넘기면
+    # `.KS`/`.KQ` 를 추측하게 되는데, 야후는 틀린 접미사에도 응답을 준다 —
+    # 247540(에코프로비엠, 코스닥)을 `.KS` 로 물으면 하루 늦은 시세와
+    # `"247540.KS,0P0001GZPV,623889"` 라는 이름이 돌아온다.
     return await stock_service.get_history(
         StockHistoryParams(
             symbol=symbol,
@@ -52,6 +57,7 @@ async def get_stock_history(
             end_date=end_date,
         ),
         include_content=include_content,
+        listing=await listed_company_service.resolve_listing(repo, symbol),
     )
 
 
@@ -87,8 +93,11 @@ async def get_listed_companies_status(repo: ListedCompanyRepo) -> ListedCompanie
 
 
 @router.post("/advice", response_model=StockAdviceResponse, summary="AI 멀티 에이전트 판단")
-async def create_stock_advice(payload: StockAdviceRequest) -> StockAdviceResponse:
-    return await advice_service.generate_advice(payload.symbol)
+async def create_stock_advice(
+    repo: ListedCompanyRepo, payload: StockAdviceRequest
+) -> StockAdviceResponse:
+    listing = await listed_company_service.resolve_listing(repo, payload.symbol)
+    return await advice_service.generate_advice(payload.symbol, listing=listing)
 
 
 @router.post(
@@ -96,15 +105,20 @@ async def create_stock_advice(payload: StockAdviceRequest) -> StockAdviceRespons
     summary="AI 멀티 에이전트 판단 (SSE 스트리밍)",
     response_class=StreamingResponse,
 )
-async def stream_stock_advice(payload: StockAdviceRequest) -> StreamingResponse:
+async def stream_stock_advice(
+    repo: ListedCompanyRepo, payload: StockAdviceRequest
+) -> StreamingResponse:
     """`/advice`와 같은 결과를 4단계로 나눠 흘린다.
 
     종목당 LLM 4회라 완료까지 수십 초가 걸린다 — 진행 단계를 보여주려면
     스트리밍이 필요하다. 응답 본문은 `AdviceStreamEvent` JSON 한 줄씩이다.
     """
+    # 스트림이 열리기 전에 읽어 값으로 넘긴다 — 제너레이터 안에서 DB를 만지면
+    # 수십 초 동안 세션이 붙잡힌다.
+    listing = await listed_company_service.resolve_listing(repo, payload.symbol)
 
     async def events() -> AsyncIterator[bytes]:
-        async for event in advice_stream.stream_advice(payload.symbol):
+        async for event in advice_stream.stream_advice(payload.symbol, listing=listing):
             yield f"data: {event.model_dump_json()}\n\n".encode()
 
     return StreamingResponse(

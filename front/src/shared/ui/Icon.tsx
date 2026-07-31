@@ -7,6 +7,7 @@ import {
   BiCaretUp,
   BiCheck,
   BiChevronDown,
+  BiCompass,
   BiGridVertical,
   BiHome,
   BiLeftArrowAlt,
@@ -58,6 +59,7 @@ const REGISTRY = {
   check: BiCheck,
   retry: BiRefresh,
   chart: BiBarChartAlt2,
+  compass: BiCompass,
 } as const satisfies Record<string, IconType>;
 
 /** 레지스트리에 있는 이름만 허용한다 — 새 아이콘은 위에 등록해야 쓸 수 있다. */

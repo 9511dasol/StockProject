@@ -15,7 +15,13 @@ from app.domain.constants import STOCK_PERIODS, STOCK_TIMEFRAMES
 from app.domain.metrics import build_stock_metrics
 from app.integrations.yfinance.content import fetch_stock_content
 from app.integrations.yfinance.history import fetch_stock_history
-from app.schemas.stock import StockContent, StockHistory, StockHistoryParams, StockMetrics
+from app.schemas.stock import (
+    KrxListing,
+    StockContent,
+    StockHistory,
+    StockHistoryParams,
+    StockMetrics,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +43,18 @@ def validate_params(params: StockHistoryParams) -> None:
         raise UnsupportedPeriodError
 
 
-async def get_history(params: StockHistoryParams, *, include_content: bool = True) -> StockHistory:
+async def get_history(
+    params: StockHistoryParams,
+    *,
+    include_content: bool = True,
+    listing: KrxListing | None = None,
+) -> StockHistory:
+    """`listing`은 라우터가 KRX 목록에서 확정해 넘긴 신원이다 (없으면 추측 경로).
+
+    이 계층에서 조회하지 않고 받아만 쓰는 이유: 서비스가 리포지토리를 직접 잡으면
+    AI 스트리밍처럼 수십 초 도는 호출이 DB 세션을 그동안 붙들게 된다. 라우터가
+    요청 초입에 한 번 읽고 값으로 넘긴다.
+    """
     validate_params(params)
 
     # yfinance는 동기 블로킹 라이브러리 → 이벤트 루프를 막지 않도록 스레드로 넘긴다.
@@ -50,6 +67,7 @@ async def get_history(params: StockHistoryParams, *, include_content: bool = Tru
         params.start_date,
         params.end_date,
         include_content=include_content,
+        listing=listing,
     )
 
     # 지표는 rows에서 파생되므로 응답에 함께 담는다. 프런트가 동일한 계산을

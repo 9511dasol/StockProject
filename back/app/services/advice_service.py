@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from app.agents.analysts import build_context, collect_opinions
 from app.agents.decision import decide
 from app.schemas.advice import StockAdviceResponse, StockRef, resolve_decision_label
-from app.schemas.stock import StockHistoryParams
+from app.schemas.stock import KrxListing, StockHistoryParams
 from app.services import stock_service
 
 logger = logging.getLogger(__name__)
@@ -20,14 +20,17 @@ _ADVICE_ROW_LIMIT = 504
 _ADVICE_TIMEFRAME = "day"
 
 
-async def generate_advice(symbol: str) -> StockAdviceResponse:
+async def generate_advice(
+    symbol: str, *, listing: KrxListing | None = None
+) -> StockAdviceResponse:
     params = StockHistoryParams(
         symbol=symbol,
         timeframe=_ADVICE_TIMEFRAME,
         limit=_ADVICE_ROW_LIMIT,
     )
 
-    stock_data = await stock_service.get_history(params)
+    # 판단 결과에 종목명이 그대로 실린다 — 상세 화면과 같은 KRX 이름이어야 한다.
+    stock_data = await stock_service.get_history(params, listing=listing)
     metrics = stock_service.get_metrics(stock_data)
 
     context = build_context(stock_data, metrics)

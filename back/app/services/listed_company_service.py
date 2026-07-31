@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
 from app.domain.ranking import rank_companies
+from app.domain.symbols import krx_symbol_to_yfinance, normalize_stock_code
 from app.integrations.krx.client import collect_listed_companies
 from app.integrations.krx.market_cap import (
     fetch_market_caps_from_krx,
@@ -14,6 +15,7 @@ from app.integrations.krx.market_cap import (
 )
 from app.repositories.listed_company import ListedCompanyRepository
 from app.schemas.stock import (
+    KrxListing,
     ListedCompaniesStatus,
     ListedSource,
     SourceStep,
@@ -191,6 +193,32 @@ async def get_status(repo: ListedCompanyRepository) -> ListedCompaniesStatus:
         total=_seed.total or max(count, settings.listed_company_min_count),
         source=_seed.source,
         steps=_steps(_seed.source),
+    )
+
+
+async def resolve_listing(
+    repo: ListedCompanyRepository, symbol: str
+) -> KrxListing | None:
+    """입력 심볼을 KRX 목록에서 확정한다. 국내 6자리 코드가 아니면 None.
+
+    상세·AI 판단이 yfinance를 부르기 전에 거치는 단계다. 여기서 접미사를 확정하지
+    않으면 `247540` → `.KS` 먼저 시도 → 야후가 엉뚱한 계열(하루 늦은 시세 +
+    `"247540.KS,0P0001GZPV,623889"` 이름)을 돌려주고 그게 화면에 뜬다.
+
+    `ensure_seeded()`를 부르지 않는다 — 상세 화면 한 번 여는데 KRX 벌크 수집(수 초)을
+    기다리게 할 수는 없다. 목록이 아직 비어 있으면 None 을 주고 기존 경로로 내려간다.
+    """
+    code = normalize_stock_code(symbol)
+    if len(code) != 6:
+        return None
+
+    company = await repo.find_by_code(code)
+    if company is None:
+        return None
+
+    return KrxListing(
+        symbol=krx_symbol_to_yfinance(company.symbol, company.market),
+        name=company.name,
     )
 
 

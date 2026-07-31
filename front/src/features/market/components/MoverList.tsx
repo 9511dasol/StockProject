@@ -62,7 +62,7 @@ export function MoverList({
                   className="font-mono text-muted-45"
                   style={{ fontSize: 9.5 }}
                 >
-                  {item.code} · {item.nameEn}
+                  {item.nameEn ? `${item.code} · ${item.nameEn}` : item.code}
                 </span>
               </span>
               <Sparkline

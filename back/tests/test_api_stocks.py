@@ -168,6 +168,80 @@ async def test_history_can_skip_content_for_speed(
     assert seen["include_content"] is False
 
 
+async def test_history_resolves_krx_symbol_and_name(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """6자리 코드는 KRX 목록에서 확정해 공급자에 넘겨야 한다.
+
+    확정하지 않으면 `.KS`를 먼저 시도하는데, 야후는 틀린 접미사에도 응답을 준다 —
+    247540(에코프로비엠, 코스닥)을 `.KS`로 물으면 하루 늦은 시세와
+    `"247540.KS,0P0001GZPV,623889"`라는 이름이 돌아와 그대로 화면 제목이 된다.
+    """
+    repo = ListedCompanyRepository(db_session)
+    await repo.upsert_many(
+        [
+            ListedCompanyRecord(
+                symbol="247540.KQ",
+                name="에코프로비엠",
+                market="코스닥",
+                initial_consonants=get_initial_consonants("에코프로비엠"),
+            )
+        ]
+    )
+
+    seen: dict[str, object] = {}
+
+    def _fake(*args, **kwargs):
+        seen.update(kwargs)
+        from app.schemas.stock import StockHistory
+
+        return StockHistory(
+            name="에코프로비엠",
+            symbol="247540.KQ",
+            query="247540",
+            timeframe="day",
+            period="2y",
+            interval="1d",
+        )
+
+    monkeypatch.setattr(stock_service, "fetch_stock_history", _fake)
+
+    response = await client.get("/api/v1/stocks/history", params={"symbol": "247540"})
+
+    assert response.status_code == 200
+    listing = seen["listing"]
+    assert listing is not None
+    assert listing.symbol == "247540.KQ"
+    assert listing.name == "에코프로비엠"
+
+
+async def test_history_listing_is_none_for_unknown_code(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """목록에 없으면 확정하지 않고 기존 추측 경로로 내려간다 (해외 티커·신규 상장)."""
+    seen: dict[str, object] = {}
+
+    def _fake(*args, **kwargs):
+        seen.update(kwargs)
+        from app.schemas.stock import StockHistory
+
+        return StockHistory(
+            name="Apple Inc.",
+            symbol="AAPL",
+            query="AAPL",
+            timeframe="day",
+            period="2y",
+            interval="1d",
+        )
+
+    monkeypatch.setattr(stock_service, "fetch_stock_history", _fake)
+
+    response = await client.get("/api/v1/stocks/history", params={"symbol": "AAPL"})
+
+    assert response.status_code == 200
+    assert seen["listing"] is None
+
+
 async def test_content_endpoint_returns_news_and_reports(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

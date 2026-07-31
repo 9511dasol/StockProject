@@ -12,7 +12,7 @@
 |---|---|---|
 | [`back/`](back/) | FastAPI · SQLAlchemy(async) · Pydantic v2 · Anthropic SDK | 시세·검색·지표·AI 판단 API |
 | [`front/`](front/) | Next.js 16 (App Router · Cache Components) · Tailwind v4 · axios | SSR 리서치 화면 |
-| [`docs/`](docs/) | — | 제품·사업 기획서 |
+| [`docs/`](docs/) | — | 제품·사업 기획서 ([사주 통합 기획](docs/saju-integration-plan.md) · [초기 제품 기획](docs/product-plan.md)) |
 
 ## 실행
 

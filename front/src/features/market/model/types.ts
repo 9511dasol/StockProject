@@ -17,7 +17,11 @@ export interface MarketIndex {
 /** 상승률·하락률 상위 1행 */
 export interface Mover {
   name: string;
-  nameEn: string;
+  /**
+   * 영문 상호. 백엔드 상장사 목록은 KRX 한글명만 갖고 있어 실데이터에서는 비고,
+   * 목 데이터에만 채워진다 — 있을 때만 코드 옆에 덧붙인다.
+   */
+  nameEn?: string;
   code: string;
   price: number;
   changePercent: number;
@@ -55,6 +59,12 @@ export interface MarketHome {
   indices: MarketIndex[];
   gainers: Mover[];
   losers: Mover[];
+  /**
+   * 등락 상위 목록의 모집단 캡션. 백엔드가 실제로 스캔한 범위를 그대로 받는다
+   * ("시가총액 상위 200종목") — 화면에 "KOSPI+KOSDAQ" 을 박아 두면 전 종목을
+   * 훑은 것처럼 읽힌다.
+   */
+  moversScope: string;
   sectors: Sector[];
   news: MarketNewsItem[];
   /** ISO */

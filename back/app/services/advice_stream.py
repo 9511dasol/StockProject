@@ -26,7 +26,7 @@ from app.schemas.advice import (
     StockRef,
     resolve_decision_label,
 )
-from app.schemas.stock import StockHistoryParams
+from app.schemas.stock import KrxListing, StockHistoryParams
 from app.services import stock_service
 
 logger = logging.getLogger(__name__)
@@ -35,14 +35,18 @@ _ADVICE_ROW_LIMIT = 504
 _ADVICE_TIMEFRAME = "day"
 
 
-async def stream_advice(symbol: str) -> AsyncIterator[AdviceStreamEvent]:
+async def stream_advice(
+    symbol: str, *, listing: KrxListing | None = None
+) -> AsyncIterator[AdviceStreamEvent]:
     """단계 이벤트를 순서대로 내보낸다. 소비자가 끊으면 GeneratorExit로 종료된다."""
     try:
         # 1) 주가 — 뉴스·리포트는 응답 시간의 대부분을 차지하므로 뒤로 미룬다.
         params = StockHistoryParams(
             symbol=symbol, timeframe=_ADVICE_TIMEFRAME, limit=_ADVICE_ROW_LIMIT
         )
-        stock_data = await stock_service.get_history(params, include_content=False)
+        stock_data = await stock_service.get_history(
+            params, include_content=False, listing=listing
+        )
         metrics = stock_service.get_metrics(stock_data)
         yield AdviceStreamEvent(stage=1)
 

@@ -83,12 +83,12 @@ export default async function MarketHomePage() {
               <div className="hidden grid-cols-2 gap-[26px] md:grid">
                 <MoverList
                   title="상승률 상위"
-                  scope="KOSPI+KOSDAQ"
+                  scope={market.moversScope}
                   items={market.gainers}
                 />
                 <MoverList
                   title="하락률 상위"
-                  scope="KOSPI+KOSDAQ"
+                  scope={market.moversScope}
                   items={market.losers}
                 />
               </div>

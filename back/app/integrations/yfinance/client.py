@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from app.core.exceptions import ProviderUnavailableError
+from app.domain.symbols import is_usable_stock_name
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +24,22 @@ def load_yfinance() -> Any:
 
 
 def get_stock_name(ticker: Any, fallback: str) -> str:
-    """`ticker.info`는 느리고 자주 실패한다 — 실패 시 조용히 fallback을 쓴다."""
+    """`ticker.info`는 느리고 자주 실패한다 — 실패 시 조용히 fallback을 쓴다.
+
+    성공해도 값을 그대로 믿지 않는다. 야후에 없는 심볼이면 `shortName`에
+    검색 결과가 섞여 나와("247540.KS,0P0001GZPV,623889") 그게 화면 제목이
+    된다 — 이름 검증(`is_usable_stock_name`)을 통과한 값만 내보낸다.
+    """
     try:
         info = ticker.info
     except Exception as exc:
         logger.debug("ticker.info 조회 실패 (%s) → fallback=%r", exc, fallback)
         return fallback
 
-    return info.get("shortName") or info.get("longName") or fallback
+    name = info.get("shortName") or info.get("longName")
+    if is_usable_stock_name(name, fallback):
+        return str(name).strip()
+
+    if name:
+        logger.info("%s 의 shortName 이 이름 형태가 아닙니다 (%r) → fallback", fallback, name)
+    return fallback

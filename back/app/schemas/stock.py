@@ -44,6 +44,20 @@ class ListedCompanyRecord(BaseModel):
     initial_consonants: str = ""
 
 
+class KrxListing(BaseModel):
+    """KRX 목록에서 확정한 종목 한 건. 리포지토리 → 서비스 → 통합 계층 계약.
+
+    yfinance보다 우선하는 신원이다. 6자리 코드만으로는 접미사(`.KS`/`.KQ`)를 알
+    수 없어 둘 다 시도하게 되는데, 야후는 틀린 접미사에도 **다른 종목의 계열**을
+    돌려주므로(`247540.KS`는 하루 늦은 시세와 쓰레기 이름) 추측 대신 이 값을 쓴다.
+    """
+
+    #: yfinance에 그대로 넘길 수 있는 심볼 (247540.KQ)
+    symbol: str
+    #: KRX 상호 (에코프로비엠) — 공급자 영문명보다 우선한다
+    name: str
+
+
 class MarketCapRecord(BaseModel):
     """시가총액 배치 1회분. `caps` 는 6자리 코드 → 시총(원)."""
 

@@ -22,6 +22,23 @@ class ListedCompanyRepository:
         result = await self._db.execute(select(func.count()).select_from(ListedCompany))
         return result.scalar_one()
 
+    async def find_by_code(self, code: str) -> ListedCompany | None:
+        """6자리 코드로 상장사 한 건. 저장된 심볼은 `247540.KQ` 형태라 접두 매칭한다.
+
+        `search_symbol`이 아니라 `symbol`을 보는 이유: 코드는 이미 정규화된
+        숫자열이라 검색용 사본을 거칠 이유가 없고, `symbol`에는 unique 인덱스가 있다.
+        """
+        if not code:
+            return None
+
+        stmt = (
+            select(ListedCompany)
+            .where(or_(ListedCompany.symbol == code, ListedCompany.symbol.like(f"{code}.%")))
+            .limit(1)
+        )
+        result = await self._db.execute(stmt)
+        return result.scalars().first()
+
     async def find_candidates(
         self,
         keyword: str,
@@ -60,6 +77,29 @@ class ListedCompanyRepository:
             return companies[:candidate_limit]
 
         return companies
+
+    async def top_by_market_cap(self, limit: int) -> Sequence[ListedCompany]:
+        """등락률 스캔의 모집단. 시가총액 상위부터, 큰 값 먼저.
+
+        `.KS`/`.KQ` 가 붙은 행만 남긴다 — 접미사 없는 행(수집 원본이 깨진 44건)은
+        yfinance 심볼로 쓸 수 없어 스캔 자리만 낭비한다.
+
+        SQLite 는 NULL 을 가장 작은 값으로 보므로 `DESC` 에서 시총 미수집 종목이
+        자연히 뒤로 밀린다 — 배치가 아직 안 돈 환경에서도 순서가 무너지지 않는다.
+        """
+        stmt = (
+            select(ListedCompany)
+            .where(
+                or_(
+                    ListedCompany.symbol.like("%.KS"),
+                    ListedCompany.symbol.like("%.KQ"),
+                )
+            )
+            .order_by(ListedCompany.market_cap.desc(), ListedCompany.symbol)
+            .limit(limit)
+        )
+        result = await self._db.execute(stmt)
+        return result.scalars().all()
 
     async def latest_market_cap_update(self) -> datetime | None:
         """가장 최근 시총 갱신 시각. 하루 1회 배치의 TTL 판단에 쓴다."""

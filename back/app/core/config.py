@@ -42,6 +42,20 @@ class Settings(BaseSettings):
     # 시가총액 배치의 yfinance 폴백이 한 번에 채우는 종목 수.
     # KRX 벌크가 되면 쓰이지 않는다 — 종목당 1회 호출이라 상한이 필요하다.
     market_cap_batch_limit: int = Field(default=400, ge=0)
+    # 기동 직후 상장사 목록을 배경에서 채운다. 첫 검색·상세 요청이 KRX 수집(수 초)을
+    # 기다리지 않게 하는 것이 목적이다. 테스트·오프라인에서는 끈다.
+    seed_listed_companies_on_startup: bool = True
+
+    # --- 등락률 랭킹 ---
+    # 등락률을 스캔할 종목 수. 시가총액 상위부터 채운다 — 전 종목(2,700+)을
+    # 매번 훑을 수는 없고, 상위권 밖은 등락 상위에 올라와도 의미가 옅다.
+    # KRX 벌크(전 종목 한 번에)가 열리면 이 상한 자체가 불필요해진다.
+    market_movers_universe_size: int = Field(default=200, ge=10, le=2000)
+    # 랭킹 스냅샷 수명(초). 만료되면 다음 요청이 배경 갱신을 예약하고,
+    # 그동안은 직전 스냅샷을 그대로 낸다 — 스캔이 수 초라 동기로 기다릴 수 없다.
+    market_movers_ttl_seconds: int = Field(default=300, ge=0)
+    # 기동 직후 랭킹을 미리 데워 첫 홈 화면이 예시 데이터로 떨어지지 않게 한다.
+    warm_market_movers_on_startup: bool = True
 
     # --- LLM ---
     anthropic_api_key: str | None = None
