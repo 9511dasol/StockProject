@@ -1,0 +1,77 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { clock, masthead, relative, stamp } from "./date";
+
+/**
+ * 이 파일이 지키는 것 두 가지.
+ *
+ * 1. 표시 시각은 KST 다. 화면이 "장 마감 15:30 KST" 라고 선언하므로
+ *    UTC 달력 필드를 그리면 KST 00:00~09:00 사이 날짜가 하루 어긋난다.
+ * 2. 파싱 불가 입력에서 죽지 않는다. 백엔드 스키마가 published_at 을
+ *    `str = ""` 로 두어 빈 문자열이 실제로 내려오는데, Intl 은 Invalid Date
+ *    에서 RangeError 를 던진다 — 뉴스 한 줄 때문에 페이지 전체가 죽었다.
+ */
+
+describe("date · KST 변환", () => {
+  it("장 마감 시각을 KST 로 그린다", () => {
+    // 2026-07-30 06:30Z === 2026-07-30 15:30 KST
+    assert.equal(masthead("2026-07-30T06:30:00Z"), "2026. 07. 30 목요일");
+    assert.equal(clock("2026-07-30T06:30:00Z"), "15:30:00");
+  });
+
+  it("KST 자정 경계에서 날짜가 넘어간다", () => {
+    // UTC 로 읽으면 7/29 로 하루 밀리던 자리
+    assert.equal(masthead("2026-07-29T15:00:00Z"), "2026. 07. 30 목요일");
+    assert.equal(clock("2026-07-29T15:00:00Z"), "00:00:00");
+
+    // 자정 1초 전은 아직 전날이다
+    assert.equal(masthead("2026-07-29T14:59:59Z"), "2026. 07. 29 수요일");
+    assert.equal(clock("2026-07-29T14:59:59Z"), "23:59:59");
+  });
+
+  it("UTC 늦은 밤은 KST 다음 날 오전이다", () => {
+    assert.equal(masthead("2026-07-30T23:30:00Z"), "2026. 07. 31 금요일");
+    assert.equal(stamp("2026-07-30T23:30:00Z"), "07.31 08:30");
+  });
+});
+
+describe("date · 잘못된 입력", () => {
+  // 백엔드 NewsItem.published_at / AnalystReport.published_at 의 기본값
+  const BAD = ["", "not-a-date", "0000-00-00"];
+
+  it("빈 문자열·쓰레기 값에 던지지 않는다", () => {
+    for (const value of BAD) {
+      assert.doesNotThrow(() => masthead(value), `masthead(${JSON.stringify(value)})`);
+      assert.doesNotThrow(() => stamp(value), `stamp(${JSON.stringify(value)})`);
+      assert.doesNotThrow(() => clock(value), `clock(${JSON.stringify(value)})`);
+      assert.doesNotThrow(
+        () => relative(value, "2026-07-30T06:30:00Z"),
+        `relative(${JSON.stringify(value)})`,
+      );
+    }
+  });
+
+  it("NaN 을 화면에 흘리지 않는다", () => {
+    for (const value of BAD) {
+      for (const out of [masthead(value), stamp(value), clock(value)]) {
+        assert.ok(!out.includes("NaN"), `"${out}" 에 NaN 이 있다`);
+      }
+    }
+  });
+
+  it("기준 시각이 잘못돼도 relative 가 버틴다", () => {
+    assert.doesNotThrow(() => relative("2026-07-30T06:30:00Z", ""));
+  });
+});
+
+describe("date · relative", () => {
+  const now = "2026-07-30T06:30:00Z";
+
+  it("경과 시간을 구간별로 말한다", () => {
+    assert.equal(relative("2026-07-30T06:29:30Z", now), "방금");
+    assert.equal(relative("2026-07-30T06:00:00Z", now), "30분 전");
+    assert.equal(relative("2026-07-30T03:30:00Z", now), "3시간 전");
+    assert.equal(relative("2026-07-29T06:00:00Z", now), "어제");
+    assert.equal(relative("2026-07-27T06:00:00Z", now), "3일 전");
+  });
+});

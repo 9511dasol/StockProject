@@ -96,6 +96,11 @@ async def _invoke(profile: AgentProfile, context: str, metrics: StockMetrics) ->
     return AgentOpinion(agent=profile.name, status="done", summary=summary)
 
 
+async def invoke_one(profile: AgentProfile, context: str, metrics: StockMetrics) -> AgentOpinion:
+    """에이전트 1인 호출. 스트리밍 경로가 완료 순서대로 흘려보내기 위해 노출한다."""
+    return await _invoke(profile, context, metrics)
+
+
 async def collect_opinions(context: str, metrics: StockMetrics) -> list[AgentOpinion]:
     """에이전트 3인을 병렬 실행한다. 개별 실패는 폴백 의견으로 흡수된다."""
     return list(

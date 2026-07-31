@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,6 +60,56 @@ class ListedCompanyRepository:
             return companies[:candidate_limit]
 
         return companies
+
+    async def latest_market_cap_update(self) -> datetime | None:
+        """가장 최근 시총 갱신 시각. 하루 1회 배치의 TTL 판단에 쓴다."""
+        result = await self._db.execute(
+            select(func.max(ListedCompany.market_cap_updated_at))
+        )
+        value = result.scalar_one_or_none()
+        if value is None:
+            return None
+        # SQLite 는 tz 정보를 잃어버린다 — 비교 전에 UTC 로 되살린다.
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+    async def symbols_without_market_cap(self, limit: int) -> list[str]:
+        """아직 시총이 없는 종목 심볼. yfinance 폴백이 한 번에 처리할 만큼만 가져온다.
+
+        KOSPI 를 먼저 채운다 — 대형주가 몰려 있어 랭킹 개선 효과가 가장 크다.
+        """
+        stmt = (
+            select(ListedCompany.symbol)
+            .where(ListedCompany.market_cap.is_(None))
+            .order_by((ListedCompany.market == "KOSPI").desc(), ListedCompany.symbol)
+            .limit(limit)
+        )
+        result = await self._db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def update_market_caps(self, caps: dict[str, int]) -> int:
+        """6자리 코드 → 시총 매핑을 반영한다. 반영된 행 수를 돌려준다.
+
+        pykrx 는 접미사 없는 6자리 코드를 주고 저장된 심볼은 `005930.KS` 이므로
+        접미사를 떼고 맞춘다. 매칭되지 않는 종목(해외·신규 상장)은 그대로 NULL 로 둔다.
+        """
+        if not caps:
+            return 0
+
+        now = datetime.now(UTC)
+        result = await self._db.execute(select(ListedCompany))
+        updated = 0
+
+        for company in result.scalars().all():
+            code = company.symbol.split(".", 1)[0]
+            cap = caps.get(code)
+            if cap is None:
+                continue
+            company.market_cap = cap
+            company.market_cap_updated_at = now
+            updated += 1
+
+        await self._db.commit()
+        return updated
 
     async def upsert_many(self, records: Sequence[ListedCompanyRecord]) -> int:
         """심볼 기준 upsert. 중복 심볼은 첫 건만 반영한다."""

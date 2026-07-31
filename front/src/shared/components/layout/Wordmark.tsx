@@ -1,0 +1,62 @@
+import Link from "next/link";
+
+/**
+ * 서비스명 워드마크 겸 홈 버튼. 모든 화면 좌상단에 같은 자리·같은 모양으로 놓인다.
+ *
+ * 이미지·SVG 가 아니라 텍스트다 — 제호(Masthead)가 이미 Noto Serif KR 로
+ * 조판돼 있고, 같은 글자를 이미지로 다시 만들면 테마 반전 때 색이 따라오지 않는다.
+ * 색은 `text-ink` 하나로 두어 라이트/터미널 모두 배경 대비 전경색을 그대로 받는다.
+ *
+ * variant
+ *  - "masthead" 신문 제호. 3b 홈·2a 상세·4b 관심종목 헤더용 (모바일 20 → 데스크탑 24px)
+ *  - "compact"  좁은 바 안에 들어가는 한 줄 (2b 콘솔 상단 바·모바일 팔레트 헤더)
+ */
+export function Wordmark({
+  variant = "masthead",
+  caption,
+}: {
+  variant?: "masthead" | "compact";
+  caption?: string;
+}) {
+  if (variant === "compact") {
+    return (
+      <Link
+        href="/"
+        aria-label="종목 원장 홈으로"
+        // -mx/-my 로 히트 영역만 44px 로 넓히고 글자 위치는 그대로 둔다.
+        // 좁은 바 안에서 min-h-11 을 그냥 주면 바 높이가 같이 늘어난다.
+        className="-my-2 flex min-h-[var(--tap)] items-center py-2 text-ink"
+      >
+        <span
+          className="font-serif-kr font-bold leading-none tracking-[-0.01em]"
+          style={{ fontSize: 18 }}
+        >
+          종목 원장<span className="text-up">.</span>
+        </span>
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      href="/"
+      aria-label="종목 원장 홈으로"
+      className="-my-1 flex min-h-[var(--tap)] flex-col justify-center gap-[3px] py-1 text-ink"
+    >
+      <span className="font-serif-kr font-bold leading-none tracking-[-0.01em] text-[20px] md:text-[24px]">
+        종목 원장<span className="text-up">.</span>{" "}
+        <span className="font-serif-en tracking-[0.02em] text-muted-50 text-[13px] md:text-[15px]">
+          The Stock Ledger
+        </span>
+      </span>
+      {caption ? (
+        <span
+          className="font-mono uppercase leading-none tracking-label-wide text-muted-50"
+          style={{ fontSize: 10.5 }}
+        >
+          {caption}
+        </span>
+      ) : null}
+    </Link>
+  );
+}

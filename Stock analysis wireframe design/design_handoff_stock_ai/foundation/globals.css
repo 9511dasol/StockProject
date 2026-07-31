@@ -1,0 +1,114 @@
+/* 에디토리얼 라이트 = 기본, 다크 터미널 = [data-theme="terminal"] */
+/* Tailwind v4 기준. v3라면 :root 블록만 쓰고 tailwind.config.ts를 참고. */
+@import "tailwindcss";
+
+:root {
+  --paper: #fdfbf6;
+  --surface: #f4efe4;
+  --surface-hover: #f7f2e6;
+  --ink: #1a1a17;
+  --ink-2: #2b2a25;
+  --muted: rgba(26, 26, 23, 0.6);
+  --muted-soft: rgba(26, 26, 23, 0.5);
+  --line: rgba(26, 26, 23, 0.14);
+  --line-dot: rgba(26, 26, 23, 0.22);
+  --up: #c8352c;
+  --down: #1f57c3;
+  --up-on-ink: #f0a89f;
+  --down-on-ink: #9dbcf5;
+  --ma60: #b8a98a;
+  --accent: #e8b04b;
+
+  --shadow-drawer: -24px 0 60px rgba(26, 26, 23, 0.14);
+  --shadow-modal: 0 30px 80px rgba(18, 16, 14, 0.3);
+  --shadow-palette: 0 28px 70px rgba(26, 26, 23, 0.28);
+  --shadow-tooltip: 0 6px 22px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="terminal"] {
+  --paper: #0e1116;
+  --surface: #131820;
+  --surface-hover: #18202a;
+  --ink: #e8e3d8;
+  --ink-2: #c9c3b6;
+  --muted: rgba(232, 227, 216, 0.55);
+  --muted-soft: rgba(232, 227, 216, 0.42);
+  --line: rgba(232, 227, 216, 0.12);
+  --line-dot: rgba(232, 227, 216, 0.2);
+  --up: #ff5449;
+  --down: #4d8dff;
+  --up-on-ink: #ff5449;
+  --down-on-ink: #4d8dff;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-up-on-ink: var(--up-on-ink);
+  --color-down-on-ink: var(--down-on-ink);
+  --color-accent: var(--accent);
+
+  /* next/font가 주입하는 CSS 변수와 연결 */
+  --font-serif-kr: var(--font-noto-serif-kr);
+  --font-sans-kr: var(--font-plex-sans-kr);
+  --font-mono: var(--font-plex-mono);
+  --font-serif-en: var(--font-instrument-serif);
+
+  --radius-none: 0px;
+  --tracking-label: 0.16em;
+
+  --animate-fade-up: fadeUp 0.34s ease both;
+  --animate-slide-in: slideIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-pop-in: popIn 0.28s ease both;
+  --animate-sheet-up: sheetUp 0.34s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-pulse-wf: wfpulse 1.2s ease-in-out infinite;
+  --animate-dot-spin: dotSpin 0.8s linear infinite;
+}
+
+@keyframes fadeUp   { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+@keyframes slideIn  { from { transform: translateX(100%) } to { transform: none } }
+@keyframes popIn    { from { opacity: 0; transform: scale(0.97) } to { opacity: 1; transform: none } }
+@keyframes sheetUp  { from { transform: translateY(100%) } to { transform: none } }
+@keyframes wfpulse  { 0%, 100% { opacity: 0.35 } 50% { opacity: 1 } }
+@keyframes dotSpin  { to { transform: rotate(360deg) } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans-kr), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+p, li { text-wrap: pretty; }
+
+/* 모든 숫자는 고정폭 정렬 — 표·가격·차트 축 필수 */
+.num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* mono 시스템 라벨 */
+.label {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+a { color: var(--ink); text-underline-offset: 3px; }
+a:hover { color: var(--up); }
+
+button, input, select { border-radius: 0; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

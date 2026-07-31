@@ -191,6 +191,8 @@ KRX/해외 종목을 검색하고, 주가·뉴스·애널리스트 리포트를 
 - `screenshots/` — 화면별 캡처 11장.
 
 ## Claude Code에 전달하는 방법
+화면 단위로 진행하는 프롬프트 대본은 `PROMPTS.md` 에 정리해 두었습니다.
+
 1. 이 폴더를 Next.js 저장소 루트에 복사합니다 (예: `design_handoff_stock_ai/`).
 2. `Stock AI Wireframes.dc.html` 을 브라우저로 한 번 열어 인터랙션을 확인합니다.
 3. Claude Code에 다음처럼 요청합니다:

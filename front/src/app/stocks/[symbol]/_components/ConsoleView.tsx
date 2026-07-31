@@ -1,0 +1,397 @@
+import Link from "next/link";
+import { AdviceTrigger } from "@/features/advice";
+import type { MarketIndex } from "@/features/market";
+import { SearchTrigger } from "@/features/search";
+import {
+  StockChart,
+  type NewsItem,
+  type AnalystReport,
+  type Metric,
+  type Quote,
+  type StockDetail,
+  type StockRef,
+} from "@/features/stocks";
+import type { WatchItem } from "@/features/watchlist";
+import {
+  decimal,
+  deltaColorClass,
+  percent as fmtPercent,
+  price as fmtPrice,
+  relative,
+} from "@/lib/format";
+import { Wordmark } from "@/shared/components/layout/Wordmark";
+import { Delta } from "@/shared/ui";
+import { ViewToggle } from "./ViewSwitch";
+
+/**
+ * 2b 다크 터미널 콘솔.
+ *
+ * 2a 와 같은 데이터를 3분할로 보여준다: 좌 워치리스트 214px / 중앙 차트 + 3열
+ * 지표 그리드 / 우 뉴스·리포트 252px. 모든 라벨은 mono uppercase 다.
+ *
+ * app/ 에 둔 이유는 stocks·market·watchlist·advice 네 feature 를 한 화면에서
+ * 조합하기 때문이다 — feature 끼리는 직접 import 할 수 없다.
+ */
+
+const LABEL = "font-mono font-medium uppercase text-muted-60";
+const LABEL_STYLE = { fontSize: 9.5, letterSpacing: "0.2em" } as const;
+
+export function ConsoleView({
+  detail,
+  indices,
+  watchlist,
+  universeCount,
+  universeSource,
+}: {
+  detail: StockDetail;
+  indices: MarketIndex[];
+  watchlist: WatchItem[];
+  universeCount: number;
+  universeSource: string;
+}) {
+  return (
+    /* 2b 는 다크 터미널 팔레트를 전제로 설계된 화면이다. 그런데 테마는 쿠키로만
+       정해져서, `?view=console` 링크로 들어온 첫 방문자는 콘솔 레이아웃을 라이트
+       토큰으로 본다 — ViewSwitch 의 useEffect 가 붙기 전까지 한 프레임 동안.
+       서브트리에 data-theme 을 못 박으면 서버 첫 HTML 부터 올바른 색이 나온다.
+
+       콘솔 화면에는 테마 토글이 없으므로(상단 바는 검색·뷰전환·AI 뿐)
+       '콘솔 + 라이트' 는 UI 로 도달할 수 없는 상태다 — 고정해도 사용자 선택을
+       덮지 않는다.
+
+       하단 AI 바까지 함께 감싼다: 밖에 두면 bg-accent 위 text-paper 가 라이트
+       토큰(크림)으로 잡혀 대비가 무너진다. fixed 요소는 transform 없는 평범한
+       조상에 영향받지 않으므로 감싸도 위치는 그대로다. */
+    <div data-theme="terminal">
+      {/* pb: 모바일 하단 고정 AI 버튼 자리 */}
+      <div className="flex min-h-screen flex-col bg-paper pb-[76px] text-ink md:pb-0">
+        <ConsoleTopBar indices={indices} />
+
+        <div className="flex flex-1 flex-col md:flex-row">
+          <WatchRail
+            items={watchlist}
+            activeCode={detail.ref.code}
+            universeCount={universeCount}
+            universeSource={universeSource}
+          />
+
+          {/* order-first: 세로 스택에서 워치리스트가 먼저 오면 정작 보러 온 종목이
+              한참 아래로 밀린다. 데스크탑 3분할에서는 DOM 순서 그대로 가운데다. */}
+          <main className="order-first flex min-w-0 flex-1 flex-col border-line-14 md:order-none md:border-x">
+            <ConsoleHeadline stock={detail.ref} quote={detail.quote} />
+            <ConsoleChart candles={detail.candles} />
+            <MetricGrid metrics={detail.metrics} />
+            <ConsoleFooter notes={detail.apiNotes} />
+          </main>
+
+          <ContentRail
+            news={detail.news}
+            reports={detail.reports}
+            now={detail.now}
+          />
+        </div>
+      </div>
+
+      {/* 2b 의 AI 레일도 모바일에서는 같은 전체화면 시트로 뜬다 (AdviceDrawer).
+          톤은 앰버 — 이 화면의 액션 색이고, bg-ink 는 다크에서 크림색이 된다. */}
+      <AdviceTrigger variant="bar" tone="accent" />
+    </div>
+  );
+}
+
+function ConsoleTopBar({ indices }: { indices: MarketIndex[] }) {
+  return (
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-14 px-[18px] py-3">
+      {/* 좌상단 홈 링크 — 다른 화면의 마스트헤드와 같은 자리다.
+          색은 text-ink 라 반전 배경에서도 그대로 읽힌다. */}
+      <Wordmark variant="compact" />
+      <span
+        className="hidden font-mono font-semibold text-muted-60 md:inline"
+        style={{ fontSize: 11, letterSpacing: "0.2em" }}
+      >
+        QUANT·DESK
+      </span>
+
+      <span className="flex flex-1 flex-wrap gap-4">
+        {indices.map((index) => (
+          <span
+            key={index.name}
+            className="num flex gap-[7px]"
+            style={{ fontSize: 11 }}
+          >
+            <span className="text-muted-50">{index.name}</span>
+            <span>{decimal(index.value, index.digits)}</span>
+            <span className={deltaColorClass(index.changePercent)}>
+              {fmtPercent(index.changePercent)}
+            </span>
+          </span>
+        ))}
+      </span>
+
+      <span className="hidden items-center gap-2 md:flex">
+        <SearchTrigger />
+        <ViewToggle />
+        <AdviceTrigger variant="console" />
+      </span>
+    </header>
+  );
+}
+
+function WatchRail({
+  items,
+  activeCode,
+  universeCount,
+  universeSource,
+}: {
+  items: WatchItem[];
+  activeCode: string;
+  universeCount: number;
+  universeSource: string;
+}) {
+  return (
+    <aside className="flex w-full flex-col md:w-[214px]">
+      <h2 className={`${LABEL} px-[14px] py-3`} style={LABEL_STYLE}>
+        watchlist
+      </h2>
+      {items.map((item) => {
+        const active = item.code === activeCode;
+        return (
+          <Link
+            key={item.code}
+            href={`/stocks/${item.code}?view=console`}
+            aria-current={active ? "page" : undefined}
+            // 활성 행은 앰버 틴트다. bg-surface 는 패널과 같은 차가운 남색이라
+            // 좌측 앰버 보더만 남고 '선택됨'이 거의 안 읽혔다.
+            className={`flex min-h-[var(--tap)] items-center justify-between gap-2 border-b border-line-14 px-[14px] py-2.5 hover:bg-surface-hover md:items-baseline ${
+              active ? "border-l-2 border-l-accent bg-highlight" : ""
+            }`}
+          >
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate" style={{ fontSize: 13 }}>
+                {item.name}
+              </span>
+              <span
+                className="num truncate text-muted-50"
+                style={{ fontSize: 9.5 }}
+              >
+                {item.code} · {item.nameEn}
+              </span>
+            </span>
+            <span className="num flex flex-none flex-col items-end gap-0.5">
+              <span className="font-medium" style={{ fontSize: 12.5 }}>
+                {fmtPrice(item.price)}
+              </span>
+              <Delta
+                changePercent={item.changePercent}
+                arrow={false}
+                size={10.5}
+              />
+            </span>
+          </Link>
+        );
+      })}
+
+      {/* UNIVERSE 는 워치리스트 레일 하단이 제자리다 (디자인 2b) — 이 목록이
+          어디서 왔는지를 설명하는 각주라 목록 옆에 붙어야 뜻이 통한다.
+          mt-auto 로 레일 바닥에 밀어붙인다. */}
+      <div className="mt-auto flex flex-col gap-1 border-t border-line-14 px-[14px] py-3">
+        <span className={LABEL} style={LABEL_STYLE}>
+          universe
+        </span>
+        <span className="num text-muted-60" style={{ fontSize: 11 }}>
+          {universeCount.toLocaleString("ko-KR")} 종목 동기화
+        </span>
+        <span className="num text-ok" style={{ fontSize: 9.5 }}>
+          {universeSource} 목록 최신
+        </span>
+      </div>
+    </aside>
+  );
+}
+
+function ConsoleHeadline({
+  stock,
+  quote,
+}: {
+  stock: StockRef;
+  quote: Quote;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4 px-5 py-4">
+      <span className="flex flex-col gap-1.5">
+        <span className="flex items-baseline gap-2.5">
+          <h1 className="font-serif-kr font-bold" style={{ fontSize: 25 }}>
+            {stock.name}
+          </h1>
+          <span
+            className="num text-muted-60"
+            style={{ fontSize: 11.5, letterSpacing: "0.1em" }}
+          >
+            {stock.symbol} · {stock.market}
+          </span>
+        </span>
+        {stock.nameEn ? (
+          <span
+            className={LABEL}
+            style={{ fontSize: 10.5, letterSpacing: "0.14em" }}
+          >
+            {stock.nameEn}
+          </span>
+        ) : null}
+      </span>
+
+      <span className="flex items-baseline gap-3">
+        <span className="num font-medium leading-none" style={{ fontSize: 38 }}>
+          {quote.currency === "USD"
+            ? decimal(quote.price, 2)
+            : fmtPrice(quote.price)}
+        </span>
+        {/* 화살표·색 분기를 여기서 다시 쓰지 않는다 — Delta 가 유일한 소유자다
+            (00-READ-FIRST "하지 말 것"). 이전 구현은 글리프는 change 부호로,
+            색은 changePercent 부호로 갈라 둘이 어긋날 수 있었다. */}
+        <Delta
+          change={quote.change}
+          changePercent={quote.changePercent}
+          size={12.5}
+          layout="column"
+        />
+      </span>
+    </div>
+  );
+}
+
+function ConsoleChart({ candles }: { candles: StockDetail["candles"] }) {
+  return (
+    <section className="flex flex-col gap-2.5 border-t border-line-14 px-5 py-3.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <span className="flex gap-3.5">
+          {["MA20", "MA60", "BB(20,2)", "VOL"].map((item) => (
+            <span key={item} className={LABEL} style={LABEL_STYLE}>
+              {item}
+            </span>
+          ))}
+        </span>
+        <span className="flex gap-3.5">
+          <span className={LABEL} style={LABEL_STYLE}>
+            scroll=zoom
+          </span>
+          <span className={LABEL} style={LABEL_STYLE}>
+            hover=ohlcv
+          </span>
+        </span>
+      </div>
+      <StockChart
+        candles={candles}
+        height={320}
+        heightClassName="h-[220px] md:h-[320px]"
+      />
+    </section>
+  );
+}
+
+/** 3열 × 2행 지표 그리드 — 2a 의 우측 레일 6행과 같은 데이터다 */
+function MetricGrid({ metrics }: { metrics: Metric[] }) {
+  return (
+    <section className="grid grid-cols-2 border-t border-line-14 md:grid-cols-3">
+      {metrics.map((metric) => (
+        <div
+          key={metric.label}
+          className="flex flex-col gap-1.5 border-b border-r border-line-14 px-4 py-3.5"
+        >
+          <span
+            className={LABEL}
+            style={{ fontSize: 9.5, letterSpacing: "0.14em" }}
+          >
+            {metric.label}
+          </span>
+          <span
+            className={`num font-medium ${
+              metric.accent === "up"
+                ? "text-up"
+                : metric.accent === "down"
+                  ? "text-down"
+                  : "text-ink"
+            }`}
+            style={{ fontSize: 15 }}
+          >
+            {metric.value}
+          </span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ContentRail({
+  news,
+  reports,
+  now,
+}: {
+  news: NewsItem[];
+  reports: AnalystReport[];
+  now: string;
+}) {
+  return (
+    <aside className="flex w-full flex-col md:w-[252px]">
+      <h2 className={`${LABEL} px-[14px] py-3`} style={LABEL_STYLE}>
+        news · {news.length}
+      </h2>
+      {news.map((item) => {
+        // 링크 없는 기사는 앵커로 감싸지 않는다 (href="" = 현재 문서 재요청)
+        const Row = item.url ? "a" : "div";
+        return (
+          <Row
+            key={`${item.publisher}-${item.title}`}
+            {...(item.url
+              ? { href: item.url, target: "_blank", rel: "noopener noreferrer" }
+              : {})}
+            className="flex min-h-[var(--tap)] flex-col justify-center gap-1 border-b border-line-14 px-[14px] py-2.5 hover:bg-surface-hover md:min-h-0"
+          >
+            <span
+              className="text-pretty"
+              style={{ fontSize: 12.5, lineHeight: 1.45 }}
+            >
+              {item.title}
+            </span>
+            {/* 상대 시각이 빠져 있었다 — 뉴스는 언제 것인지가 절반이다 */}
+            <span className="num text-muted-50" style={{ fontSize: 9.5 }}>
+              {item.publisher} · {relative(item.publishedAt, now)}
+            </span>
+          </Row>
+        );
+      })}
+
+      <h2 className={`${LABEL} px-[14px] py-3`} style={LABEL_STYLE}>
+        reports · {reports.length}
+      </h2>
+      {reports.map((item) => (
+        <div
+          key={item.publisher + item.title}
+          className="flex flex-col gap-1 border-b border-line-14 px-[14px] py-2.5"
+        >
+          <span style={{ fontSize: 12.5 }}>{item.publisher}</span>
+          <span
+            className="num truncate text-muted-50"
+            style={{ fontSize: 10.5 }}
+          >
+            {item.title}
+          </span>
+        </div>
+      ))}
+    </aside>
+  );
+}
+
+/** 중앙 열 하단은 API 메서드 노트만 남는다 — UNIVERSE 는 좌측 레일로 옮겼다 */
+function ConsoleFooter({ notes }: { notes: string[] }) {
+  return (
+    <footer className="mt-auto border-t border-line-14 px-5 py-3.5">
+      <span
+        className="num text-muted-45"
+        style={{ fontSize: 9.5, lineHeight: 1.6 }}
+      >
+        {notes.join(" / ")}
+      </span>
+    </footer>
+  );
+}

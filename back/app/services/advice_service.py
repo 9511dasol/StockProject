@@ -52,5 +52,6 @@ async def generate_advice(symbol: str) -> StockAdviceResponse:
         answer=decision.answer,
         buy_conditions=decision.buy_conditions,
         risk_notes=decision.risk_notes,
+        decision_source="fallback" if used_fallback else "llm",
         updated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )

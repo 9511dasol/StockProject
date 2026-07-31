@@ -23,24 +23,38 @@ from app.utils.numbers import int_or_none, number_or_none
 logger = logging.getLogger(__name__)
 
 _SMA_SHORT = 5
-_SMA_LONG = 20
+_SMA_MID = 20
+_SMA_LONG = 60
 _BOLLINGER_STD = 2
 _NEWS_LIMIT = 3
 _REPORT_LIMIT = 3
 
 
 def _with_indicators(history: Any) -> Any:
-    """SMA5/SMA20 · 볼린저밴드 · 골든/데드크로스 신호를 붙인다."""
+    """SMA5/20/60 · 볼린저밴드 · 골든/데드크로스 신호를 붙인다.
+
+    교차는 20일선과 60일선으로 판정한다. 5×20 교차는 노이즈가 많아 화면에
+    마커가 과도하게 찍히고, 프런트 차트 레전드(MA20/MA60)와도 어긋난다.
+    SMA5는 애널리스트 에이전트 프롬프트가 참조하므로 계속 계산한다.
+    """
     history = history.copy()
     history["SMA5"] = history["Close"].rolling(_SMA_SHORT).mean()
-    history["SMA20"] = history["Close"].rolling(_SMA_LONG).mean()
+    history["SMA20"] = history["Close"].rolling(_SMA_MID).mean()
+    history["SMA60"] = history["Close"].rolling(_SMA_LONG).mean()
 
-    std20 = history["Close"].rolling(_SMA_LONG).std()
+    std20 = history["Close"].rolling(_SMA_MID).std()
     history["BB_upper"] = history["SMA20"] + _BOLLINGER_STD * std20
     history["BB_lower"] = history["SMA20"] - _BOLLINGER_STD * std20
 
-    # SMA5가 SMA20을 상향 돌파하면 golden, 하향 이탈하면 dead.
-    ma_cross = (history["SMA5"] > history["SMA20"]).astype(int).diff()
+    # SMA20이 SMA60을 상향 돌파하면 golden, 하향 이탈하면 dead.
+    #
+    # 두 이동평균이 모두 존재하는 구간에서만 비교한다. 그냥 `SMA20 > SMA60`을 쓰면
+    # 워밍업 구간에서 `값 > NaN`이 False(=0)로 평가되고, SMA60이 처음 생기는 봉에서
+    # 0→1로 뒤집혀 교차가 없었는데도 golden이 찍힌다(차트 왼쪽 끝의 유령 마커).
+    both = history["SMA20"].notna() & history["SMA60"].notna()
+    above = (history["SMA20"] > history["SMA60"]).where(both)
+    # 워밍업 구간은 NaN이라 diff도 NaN → 경계에서 신호가 생기지 않는다.
+    ma_cross = above.astype(float).diff()
     history["CrossSignal"] = None
     history.loc[ma_cross == 1, "CrossSignal"] = "golden"
     history.loc[ma_cross == -1, "CrossSignal"] = "dead"
@@ -70,6 +84,7 @@ def _build_rows(history: Any, stock_name: str, symbol: str, limit: int) -> list[
                 volume=int_or_none(row.get("Volume")),
                 sma5=number_or_none(row.get("SMA5")),
                 sma20=number_or_none(row.get("SMA20")),
+                sma60=number_or_none(row.get("SMA60")),
                 bb_upper=number_or_none(row.get("BB_upper")),
                 bb_lower=number_or_none(row.get("BB_lower")),
                 cross_signal=row.get("CrossSignal"),

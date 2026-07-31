@@ -15,7 +15,7 @@ from app.domain.constants import (
 )
 from app.domain.symbols import krx_symbol_to_yfinance
 from app.integrations.krx.parser import parse_kind_html, parse_krx_csv
-from app.schemas.stock import ListedCompanyRecord
+from app.schemas.stock import ListedCompanyRecord, ListedSource
 from app.utils.text import get_initial_consonants
 
 logger = logging.getLogger(__name__)
@@ -85,8 +85,12 @@ def fallback_listed_companies() -> list[ListedCompanyRecord]:
     ]
 
 
-async def collect_listed_companies() -> list[ListedCompanyRecord]:
-    """KRX → KIND → 내부 기본값 순서로 시도한다. 각 실패는 경고로 남긴다."""
+async def collect_listed_companies() -> tuple[list[ListedCompanyRecord], ListedSource]:
+    """KRX → KIND → 내부 기본값 순서로 시도한다.
+
+    어느 경로에서 성공했는지를 함께 돌려준다 — 로그로만 남기면 프런트가
+    "일부 종목이 빠질 수 있다"는 사실을 사용자에게 알릴 방법이 없다 (와이어프레임 1d).
+    """
     timeout = httpx.Timeout(settings.http_timeout_seconds)
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -94,7 +98,7 @@ async def collect_listed_companies() -> list[ListedCompanyRecord]:
             records = await fetch_krx_listed_companies(client)
             if records:
                 logger.info("KRX 상장사 목록 %d건 수집", len(records))
-                return records
+                return records, "KRX"
             logger.warning("KRX 응답이 비어 있습니다 → KIND로 폴백")
         except (httpx.HTTPError, ValueError) as exc:
             logger.warning("KRX 상장사 목록 수집 실패 (%s) → KIND로 폴백", exc)
@@ -103,11 +107,11 @@ async def collect_listed_companies() -> list[ListedCompanyRecord]:
             records = await fetch_kind_listed_companies(client)
             if records:
                 logger.info("KIND 상장사 목록 %d건 수집", len(records))
-                return records
+                return records, "KIND"
             logger.warning("KIND 응답이 비어 있습니다 → 내부 기본 종목 사용")
         except (httpx.HTTPError, ValueError) as exc:
             logger.warning("KIND 상장사 목록 수집 실패 (%s) → 내부 기본 종목 사용", exc)
 
     records = fallback_listed_companies()
     logger.warning("내부 기본 종목 %d건으로 대체했습니다 (일부 종목이 누락됩니다)", len(records))
-    return records
+    return records, "INTERNAL"

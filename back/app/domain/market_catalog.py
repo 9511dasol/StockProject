@@ -14,6 +14,17 @@ class MarketCategory(TypedDict):
 
 
 MARKET_OVERVIEW_CATEGORIES: Final[dict[str, MarketCategory]] = {
+    # 홈 화면 지수 4카드 전용. index 카테고리는 8종목이고 KOSDAQ이 없으며
+    # 환율은 forex에 있어, 화면 하나를 그리려면 두 번 호출해야 했다.
+    "home": {
+        "label": "홈 지수",
+        "symbols": [
+            {"name": "KOSPI", "symbol": "^KS11"},
+            {"name": "KOSDAQ", "symbol": "^KQ11"},
+            {"name": "S&P 500", "symbol": "^GSPC"},
+            {"name": "USD/KRW", "symbol": "KRW=X"},
+        ],
+    },
     "forex": {
         "label": "외환",
         "symbols": [
@@ -30,6 +41,7 @@ MARKET_OVERVIEW_CATEGORIES: Final[dict[str, MarketCategory]] = {
         "label": "지수",
         "symbols": [
             {"name": "코스피지수", "symbol": "^KS11"},
+            {"name": "코스닥지수", "symbol": "^KQ11"},
             {"name": "코스피200", "symbol": "^KS200"},
             {"name": "US 500", "symbol": "^GSPC"},
             {"name": "US Tech 100", "symbol": "^NDX"},

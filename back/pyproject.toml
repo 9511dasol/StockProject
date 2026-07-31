@@ -22,6 +22,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "fastapi-pagination>=0.15.16",
     "openai>=2.50.0",
+    "pykrx>=1.2.8",
 ]
 
 [project.optional-dependencies]

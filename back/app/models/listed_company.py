@@ -1,6 +1,8 @@
 """상장사 ORM 모델."""
 
-from sqlalchemy import String
+from datetime import datetime
+
+from sqlalchemy import BigInteger, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -24,6 +26,14 @@ class ListedCompany(TimestampMixin, Base):
     search_symbol: Mapped[str] = mapped_column(String(20), index=True, default="")
     search_name: Mapped[str] = mapped_column(String(160), index=True, default="")
     initial_consonants: Mapped[str] = mapped_column(String(160), index=True, default="")
+
+    # 자동완성 랭킹 가중치. 하루 1회 배치로 채우며 실시간성이 필요 없다 —
+    # "삼성" 입력에 삼성전자가 먼저 나오게 하는 용도라 스테일해도 순서가 안 바뀐다.
+    # 배치 전이거나 KRX에 없는 종목(해외·신규)은 NULL 이고, 랭킹에서 뒤로 밀린다.
+    market_cap: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    market_cap_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     def __repr__(self) -> str:  # pragma: no cover - 디버깅용
         return f"<ListedCompany {self.symbol} {self.name}>"

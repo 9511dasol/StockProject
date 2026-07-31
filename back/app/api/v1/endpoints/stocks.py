@@ -3,15 +3,23 @@
 라우터는 파라미터 수신과 서비스 호출만 한다 — 비즈니스 로직은 서비스 계층에 있다.
 """
 
+from collections.abc import AsyncIterator
 from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import ListedCompanyRepo
 from app.schemas.advice import StockAdviceRequest, StockAdviceResponse
-from app.schemas.stock import StockContent, StockHistory, StockHistoryParams, StockSuggestion
-from app.services import advice_service, listed_company_service, stock_service
+from app.schemas.stock import (
+    ListedCompaniesStatus,
+    StockContent,
+    StockHistory,
+    StockHistoryParams,
+    StockSuggestion,
+)
+from app.services import advice_service, advice_stream, listed_company_service, stock_service
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -68,6 +76,43 @@ async def get_stock_suggestions(
     return await listed_company_service.search(repo, query, limit)
 
 
+@router.get(
+    "/listed-companies",
+    response_model=ListedCompaniesStatus,
+    summary="상장사 목록 준비 상태",
+)
+async def get_listed_companies_status(repo: ListedCompanyRepo) -> ListedCompaniesStatus:
+    """첫 자동완성 지연 배너가 폴링한다. 수집을 유발하지 않고 상태만 읽는다."""
+    return await listed_company_service.get_status(repo)
+
+
 @router.post("/advice", response_model=StockAdviceResponse, summary="AI 멀티 에이전트 판단")
 async def create_stock_advice(payload: StockAdviceRequest) -> StockAdviceResponse:
     return await advice_service.generate_advice(payload.symbol)
+
+
+@router.post(
+    "/advice/stream",
+    summary="AI 멀티 에이전트 판단 (SSE 스트리밍)",
+    response_class=StreamingResponse,
+)
+async def stream_stock_advice(payload: StockAdviceRequest) -> StreamingResponse:
+    """`/advice`와 같은 결과를 4단계로 나눠 흘린다.
+
+    종목당 LLM 4회라 완료까지 수십 초가 걸린다 — 진행 단계를 보여주려면
+    스트리밍이 필요하다. 응답 본문은 `AdviceStreamEvent` JSON 한 줄씩이다.
+    """
+
+    async def events() -> AsyncIterator[bytes]:
+        async for event in advice_stream.stream_advice(payload.symbol):
+            yield f"data: {event.model_dump_json()}\n\n".encode()
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            # nginx 등 리버스 프록시가 SSE를 버퍼링하지 않도록.
+            "X-Accel-Buffering": "no",
+        },
+    )

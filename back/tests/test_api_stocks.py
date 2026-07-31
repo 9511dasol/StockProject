@@ -36,11 +36,13 @@ async def _seed(repo: ListedCompanyRepository) -> None:
 def no_external_collection(monkeypatch: pytest.MonkeyPatch) -> None:
     """`ensure_seeded`가 네트워크를 타지 않게 막는다."""
 
-    async def _empty() -> list[ListedCompanyRecord]:
-        return []
+    async def _empty() -> tuple[list[ListedCompanyRecord], str]:
+        return [], "KRX"
 
     monkeypatch.setattr(listed_company_service, "collect_listed_companies", _empty)
     monkeypatch.setattr(listed_company_service.settings, "listed_company_min_count", 1)
+    # 시총 배치는 pykrx 네트워크를 탄다 — 검색 테스트에서는 스케줄 자체를 막는다.
+    monkeypatch.setattr(listed_company_service, "_schedule_market_cap_refresh", lambda: None)
 
 
 async def test_health(client: AsyncClient) -> None:
@@ -59,7 +61,9 @@ async def test_suggestions_ranks_prefix_first(
 
     assert response.status_code == 200
     names = [item["name"] for item in response.json()]
-    assert names[:3] == ["삼성SDI", "삼성전기", "삼성전자"]  # 접두 일치 → 이름 오름차순
+    # 시총이 없는 상태 → 폴백 정렬(보통주 → KOSPI → 이름 길이 → 가나다).
+    # 넷 다 보통주·KOSPI이므로 이름 길이가 갈라놓는다: 4글자 둘이 먼저, 그다음 삼성SDI(5).
+    assert names[:3] == ["삼성전기", "삼성전자", "삼성SDI"]
 
 
 async def test_suggestions_by_initials(client: AsyncClient, db_session: AsyncSession) -> None:

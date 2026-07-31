@@ -11,6 +11,9 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // node --test 로 도는 *.test.ts 는 Node 의 타입 스트리핑을 거친다.
+    // Node ESM 은 확장자를 붙인 완전한 specifier 만 해석하므로 필요하다 (noEmit 이라 허용됨).
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "incremental": true,
     "plugins": [

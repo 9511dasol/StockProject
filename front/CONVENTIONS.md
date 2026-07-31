@@ -53,7 +53,7 @@ front/
 │   │   ├── ui/                       #   shadcn/ui 생성물 (button, card, ...) — 직접 수정 O
 │   │   ├── components/               #   ui/ 를 조합한 자체 공통 컴포넌트
 │   │   │   ├── layout/               #     Header, Footer, Container
-│   │   │   ├── chart/                #     서버 SVG 차트 프리미티브
+│   │   │   ├── chart/                #     서버 SVG 그래픽 프리미티브 (스파크라인 등)
 │   │   │   └── feedback/             #     Skeleton, EmptyState, ErrorBox
 │   │   ├── hooks/                    #   도메인 무관 훅 (useDebounce 등)
 │   │   ├── types/                    #   여러 도메인이 공유하는 타입 (ApiResponse 등)
@@ -146,7 +146,11 @@ import { formatKrw } from "@/lib/format/number";
 ## 이 프로젝트에 한정된 제약
 
 - **서버 컴포넌트가 기본이다.** `'use client'`는 사용자 입력이 필요한 최소 단위에만 붙인다.
-  차트도 서버에서 SVG로 렌더한다.
+- **차트는 예외적으로 클라이언트다.** 원래 "차트도 서버에서 SVG로" 였으나, 휠 줌·크로스헤어
+  툴팁·프리셋 전환은 서버 렌더로 구현할 수 없어 `lightweight-charts`(캔버스)로 간다.
+  데이터는 서버에서 받아 prop 으로 넘기고, 클라이언트는 그리기만 한다
+  (`features/stocks/components/StockChart.tsx`). 스파크라인처럼 상호작용이 없는 그래픽은
+  계속 서버 SVG(`shared/ui/Sparkline.tsx`)로 그린다.
 - **지표 계산은 백엔드 소유다.** `/stocks/history` 응답의 `metrics`를 쓰고, 프런트에서 같은 공식을
   다시 구현하지 않는다.
 - **브라우저에서 FastAPI를 직접 호출하지 않는다.** 클라이언트 컴포넌트가 데이터를 필요로 하면

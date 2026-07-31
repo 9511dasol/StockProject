@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     listed_company_min_count: int = Field(default=100, ge=1)
     # 검색 후보를 DB에서 가져올 때의 상한. 초과분은 경고 로그로 남긴다.
     suggestion_candidate_limit: int = Field(default=500, ge=10)
+    # 시가총액 배치의 yfinance 폴백이 한 번에 채우는 종목 수.
+    # KRX 벌크가 되면 쓰이지 않는다 — 종목당 1회 호출이라 상한이 필요하다.
+    market_cap_batch_limit: int = Field(default=400, ge=0)
 
     # --- LLM ---
     anthropic_api_key: str | None = None
