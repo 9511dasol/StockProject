@@ -26,15 +26,20 @@ uv run ruff format .   # 포맷
 
 ## 엔드포인트
 
+전체 파라미터 · 응답 필드 · 오류 코드는 [`docs/api-spec.md`](docs/api-spec.md)에 있다.
+
 | 메서드 | 경로 | 명세 | 설명 |
 |---|---|---|---|
 | GET | `/api/v1/markets/overview?category=` | 6.1 | 카테고리별 시장 개요 + 스파크라인 |
 | GET | `/api/v1/stocks/suggestions?query=` | 6.2 | 종목명 · 코드 · 초성 자동완성 |
-| GET | `/api/v1/stocks/history?symbol=` | 6.3 | OHLCV + SMA/볼린저밴드/교차신호 + 뉴스 + 리포트 |
+| GET | `/api/v1/stocks/listed-companies` | 6.2 | 상장사 목록 준비 상태 (첫 호출 지연 배너용) |
+| GET | `/api/v1/stocks/history?symbol=` | 6.3 | OHLCV + SMA/볼린저밴드/교차신호 + 지표 + 뉴스 + 리포트 |
+| GET | `/api/v1/stocks/content?symbol=` | 6.3 | 뉴스 · 애널리스트 리포트만 (차트 우선 로딩용) |
 | POST | `/api/v1/stocks/advice` | 6.4 | 에이전트 3인 병렬 분석 → 최종 판단 |
+| POST | `/api/v1/stocks/advice/stream` | 6.4 | 위와 동일 + 4단계 SSE 스트리밍 |
 | GET | `/health` | — | 헬스체크 |
 
-`category`: `index` · `forex` · `commodity` · `stock`
+`category`: `home` · `index` · `forex` · `commodity` · `stock`
 `timeframe`: `day` · `week` · `month`
 
 오류 응답은 모두 같은 형태다:
