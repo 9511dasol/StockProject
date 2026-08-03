@@ -10,3 +10,5 @@ work/
 .env.local
 .env*.local
 env
+
+*.pptx
