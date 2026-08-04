@@ -27,7 +27,7 @@ from app.schemas.advice import (
     resolve_decision_label,
 )
 from app.schemas.stock import KrxListing, StockHistoryParams
-from app.services import stock_service
+from app.services import fundamentals_service, stock_service
 
 logger = logging.getLogger(__name__)
 
@@ -50,15 +50,19 @@ async def stream_advice(
         metrics = stock_service.get_metrics(stock_data)
         yield AdviceStreamEvent(stage=1)
 
-        # 2) 뉴스·리포트
-        content = await stock_service.get_content(stock_data.symbol)
+        # 2) 뉴스·리포트 + 재무 — 둘 다 네트워크 대기라 병렬로 묶는다. 재무를 여기에
+        #    합치는 이유는 단계를 늘리지 않기 위해서다 (프런트와의 계약이 4단계다).
+        content, fundamentals = await asyncio.gather(
+            stock_service.get_content(stock_data.symbol),
+            fundamentals_service.get_fundamentals_or_none(stock_data.symbol),
+        )
         stock_data = stock_data.model_copy(
             update={"news": content.news, "reports": content.reports}
         )
         yield AdviceStreamEvent(stage=2)
 
         # 3) 에이전트 3인 병렬 — 먼저 끝난 것부터 내보낸다.
-        context = build_context(stock_data, metrics)
+        context = build_context(stock_data, metrics, fundamentals=fundamentals)
         tasks = [
             asyncio.create_task(invoke_one(profile, context, metrics))
             for profile in ANALYST_PROFILES
@@ -75,7 +79,9 @@ async def stream_advice(
             raise
 
         # 4) 최종 판단
-        decision, used_fallback = await decide(stock_data, metrics, opinions)
+        decision, used_fallback = await decide(
+            stock_data, metrics, opinions, fundamentals=fundamentals
+        )
         yield AdviceStreamEvent(
             stage=4,
             decision=AdviceStreamDecision(

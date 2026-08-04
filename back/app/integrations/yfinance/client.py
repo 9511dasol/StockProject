@@ -23,6 +23,15 @@ def load_yfinance() -> Any:
     return yf
 
 
+def is_empty_frame(frame: Any) -> bool:
+    """pandas DataFrame 가드. `None`과 빈 프레임을 한 번에 걸러낸다.
+
+    yfinance의 표 형태 응답(등급 변경·손익계산서·밸류에이션)은 실패해도 예외가 아니라
+    `None`이나 빈 프레임으로 온다 — 두 모듈이 같은 가드를 쓰므로 여기에 둔다.
+    """
+    return frame is None or getattr(frame, "empty", True)
+
+
 def get_stock_name(ticker: Any, fallback: str) -> str:
     """`ticker.info`는 느리고 자주 실패한다 — 실패 시 조용히 fallback을 쓴다.
 

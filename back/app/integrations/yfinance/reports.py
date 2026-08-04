@@ -7,6 +7,7 @@
 import logging
 from typing import Any
 
+from app.integrations.yfinance.client import is_empty_frame
 from app.schemas.stock import AnalystReport
 from app.utils.numbers import format_compact_number, int_or_none
 from app.utils.text import clean_text, format_date_text
@@ -31,10 +32,6 @@ def _recommendation_summary(row: Any) -> str:
     )
 
 
-def _is_empty(frame: Any) -> bool:
-    return frame is None or getattr(frame, "empty", True)
-
-
 def _upgrade_reports(ticker: Any, analysis_url: str, limit: int) -> list[AnalystReport]:
     try:
         upgrades = ticker.get_upgrades_downgrades()
@@ -42,7 +39,7 @@ def _upgrade_reports(ticker: Any, analysis_url: str, limit: int) -> list[Analyst
         logger.debug("등급 변경 조회 실패: %s", exc)
         return []
 
-    if _is_empty(upgrades):
+    if is_empty_frame(upgrades):
         return []
 
     reports: list[AnalystReport] = []
@@ -114,7 +111,7 @@ def _recommendation_reports(ticker: Any, analysis_url: str, limit: int) -> list[
             logger.debug("투자의견 조회 실패: %s", inner)
             return []
 
-    if _is_empty(recommendations):
+    if is_empty_frame(recommendations):
         return []
 
     reports: list[AnalystReport] = []

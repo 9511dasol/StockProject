@@ -5,12 +5,14 @@ import { MOCK_STOCK_DETAIL } from "../model/mock";
 import type { StockDetail } from "../model/types";
 import {
   toCandles,
+  toFundamentals,
   toMetrics,
   toNews,
   toQuote,
   toReports,
   toStockRef,
   type WireStockContent,
+  type WireStockFundamentals,
   type WireStockHistory,
 } from "./wire";
 
@@ -18,15 +20,17 @@ import {
 const HISTORY_LIMIT = 504;
 
 /**
- * 조회 결과. 호출부(page.tsx)가 세 갈래를 구분해야 한다:
+ * 조회 결과. 호출부(page.tsx)가 네 갈래를 구분해야 한다:
  *   ok        정상
  *   not-found 정규화 실패 → 후보 선택 화면
- *   timeout   상류 지연 → 에러 화면 (예외를 던지지 않으므로 렌더는 살아 있다)
+ *   timeout   상류 지연 → 잠시 뒤 재시도 안내
+ *   offline   백엔드에 닿지 못함 → 서버를 켜라는 안내 (재시도는 소용없다)
  */
 export type StockDetailResult =
   | { status: "ok"; detail: StockDetail }
   | { status: "not-found" }
-  | { status: "timeout" };
+  | { status: "timeout" }
+  | { status: "offline" };
 
 /**
  * 종목 상세 한 벌. 서버에서만 실행된다.
@@ -54,12 +58,23 @@ export async function getStockDetail(
     });
     if (!history.ok) return { status: "timeout" };
 
-    // 뉴스·리포트는 없어도 화면이 성립한다 — 실패든 지연이든 빈 목록으로 내려간다.
-    // 시세가 아니라 콘텐츠라 장중/장외 분기를 적용하지 않는다.
-    const content = await apiGetCached<WireStockContent>("/stocks/content", {
-      query: { symbol: history.data.symbol },
-      revalidate: REVALIDATE_STATIC,
-    }).catch(() => ({ ok: false as const, reason: "timeout" as const }));
+    // 뉴스·리포트와 재무는 둘 다 없어도 화면이 성립한다 — 실패든 지연이든 빈 값으로
+    // 내려간다. 서로 독립이라 병렬로 부르고, 그래서 재무를 붙여도 벽시계 시간이
+    // 늘지 않는다. .catch 가 ApiError 까지 삼키는 것은 의도적이다: 재무 탭 하나
+    // 때문에 상세 페이지 전체가 에러 화면이 되면 안 된다.
+    const [content, fundamentals] = await Promise.all([
+      // 시세가 아니라 콘텐츠라 장중/장외 분기를 적용하지 않는다.
+      apiGetCached<WireStockContent>("/stocks/content", {
+        query: { symbol: history.data.symbol },
+        revalidate: REVALIDATE_STATIC,
+      }).catch(() => ({ ok: false as const, reason: "timeout" as const })),
+      // PER/PBR 은 주가를 따라 움직이므로 뉴스처럼 1시간 고정할 수 없다.
+      // 백엔드가 종목당 15분 TTL 을 들고 있어 대부분 캐시 히트다.
+      apiGetCached<WireStockFundamentals>("/stocks/fundamentals", {
+        query: { symbol: history.data.symbol },
+        revalidate,
+      }).catch(() => ({ ok: false as const, reason: "timeout" as const })),
+    ]);
 
     const articles = content.ok
       ? content.data
@@ -74,11 +89,13 @@ export async function getStockDetail(
         metrics: toMetrics(history.data.metrics),
         news: toNews(articles.news),
         reports: toReports(articles.reports),
+        fundamentals: fundamentals.ok ? toFundamentals(fundamentals.data) : null,
         now: new Date().toISOString(),
         apiNotes: [
           "fetch_stock_history_from_yfinance",
           "build_stock_metrics",
           "fetch_stock_news · fetch_analyst_reports",
+          "fetch_stock_fundamentals",
         ],
       },
     };
@@ -86,6 +103,10 @@ export async function getStockDetail(
     // 정규화 실패(404)만 '후보 선택' 경로로 보낸다. 공급자 장애(503)는 그대로
     // 던져 error.tsx 가 받게 한다 — 타임아웃과 달리 재시도가 의미 있다.
     if (error instanceof ApiError && error.isNotFound) return { status: "not-found" };
+    // 백엔드에 닿지도 못한 경우는 예외로 올리지 않는다. error.tsx 는 "yfinance
+    // 응답이 늦습니다" 라고 안내하는데, 서버가 꺼져 있을 때 그건 거짓이고
+    // 개발자가 할 일(백엔드 실행)을 가린다.
+    if (error instanceof ApiError && error.isOffline) return { status: "offline" };
     throw error;
   }
 }

@@ -69,6 +69,47 @@ export interface Metric {
   accent?: "up" | "down";
 }
 
+/** 연간 손익 한 해분. 백엔드 AnnualFinancial 대응 */
+export interface AnnualFinancial {
+  /** 2025 — 회계연도 */
+  year: number;
+  /** 매출액. 원/달러 원단위 raw — 표시 단위는 컴포넌트가 고른다 */
+  revenue: number | null;
+  operatingIncome: number | null;
+}
+
+/**
+ * 재무·밸류에이션. 백엔드 StockFundamentals 대응.
+ *
+ * 위 Metric 과 달리 표시 문자열이 아니라 값으로 받는다. Metric 이 label/value
+ * 문자열인 이유는 "지표 목록이 자주 바뀌고 값 타입이 제각각"이어서인데, 재무 항목은
+ * 그 두 조건이 모두 아니다 — PER·PBR·EPS 는 백엔드가 하나씩 늘려가는 목록이 아니라
+ * 고정된 회계 개념이고, 행마다 단위가 달라(조·억 / 배 / % / 날짜) 미리 문자열로
+ * 굳히면 포맷을 고를 수 없다.
+ *
+ * 모든 값이 null 일 수 있다. 공급자가 국내 종목에서 항목별로 구멍을 낸다.
+ */
+export interface Fundamentals {
+  per: number | null;
+  pbr: number | null;
+  /** 국내 종목은 `현재가 ÷ PER` 역산값이다 (공시 EPS 가 아니다) */
+  eps: number | null;
+  /** 국내 종목은 `현재가 ÷ PBR` 역산값이다 */
+  bps: number | null;
+  /** 30.79 = 30.79% */
+  roePercent: number | null;
+  marketCap: number | null;
+  /** 0.57 = 0.57% */
+  dividendYieldPercent: number | null;
+  dividendPerShare: number | null;
+  /** YYYY-MM-DD */
+  exDividendDate: string | null;
+  /** YYYY-MM-DD. 공급자 추정치일 수 있다 */
+  nextEarningsDate: string | null;
+  /** 최신 회계연도부터 내림차순 */
+  annual: AnnualFinancial[];
+}
+
 /** 백엔드 NewsItem 대응 */
 export interface NewsItem {
   title: string;
@@ -110,6 +151,8 @@ export interface StockDetail {
   metrics: Metric[];
   news: NewsItem[];
   reports: AnalystReport[];
+  /** 재무 탭·우측 밸류에이션. 조회 실패·미지원 종목이면 null (화면은 빈 상태로 남는다) */
+  fundamentals: Fundamentals | null;
   /** 서버가 상대시각을 계산하는 기준 시각 (ISO) — 하이드레이션 불일치 방지 */
   now: string;
   /** 이 화면이 소비하는 백엔드 메서드 — 우측 레일 API 메모 */

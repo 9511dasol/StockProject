@@ -169,6 +169,46 @@ class StockContent(BaseModel):
     reports: list[AnalystReport] = Field(default_factory=list)
 
 
+class AnnualFinancial(BaseModel):
+    """연간 손익 한 해분. 공급자 연간 손익계산서는 최대 4개년만 준다."""
+
+    fiscal_year: int
+    revenue: float | None = None
+    operating_income: float | None = None
+
+
+class StockFundamentals(BaseModel):
+    """`GET /stocks/fundamentals` 응답 — 재무·밸류에이션 (명세 6.3).
+
+    주가·뉴스와 분리한 이유는 비용이다. `ticker.info` 한 번이 0.5~1.5초이고 여기에
+    밸류에이션·손익계산서 호출이 붙어 종목당 1~2초가 든다 — 차트가 이걸 기다리면 안 된다.
+
+    모든 필드가 `None`일 수 있다. 값이 없다고 오류로 나가지 않는다(부분 실패 흡수).
+    """
+
+    symbol: str
+    #: KRW · USD 등. 화면은 심볼에서 통화를 유도하지만 API 소비자와 LLM에는 필요하다.
+    currency: str | None = None
+    per: float | None = None
+    pbr: float | None = None
+    #: 국내 종목은 공급자가 주지 않아 `현재가 ÷ PER`로 역산한 값이다 (공시 EPS가 아니다).
+    eps: float | None = None
+    #: 국내 종목은 `현재가 ÷ PBR`로 역산한 값이다.
+    bps: float | None = None
+    #: 백분율로 정규화한 값(30.79 = 30.79%). 공급자는 소수(0.30792)로 준다.
+    roe_pct: float | None = None
+    market_cap: float | None = None
+    #: 공급자가 이미 백분율로 준다(0.57 = 0.57%). 바로 위 ROE와 단위 규약이 다르다.
+    dividend_yield_pct: float | None = None
+    dividend_per_share: float | None = None
+    #: 배당락일 `YYYY-MM-DD`
+    ex_dividend_date: str | None = None
+    #: 다음 실적 발표 예정일 `YYYY-MM-DD`. 공급자 추정치일 수 있다.
+    next_earnings_date: str | None = None
+    #: 최신 회계연도부터 내림차순, 최대 4개년.
+    annual: list[AnnualFinancial] = Field(default_factory=list)
+
+
 class StockHistoryParams(BaseModel):
     """히스토리 조회 파라미터. 검증은 서비스 계층에서 도메인 규칙으로 수행한다."""
 

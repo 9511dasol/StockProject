@@ -6,6 +6,7 @@ import type {
   AnalystReport,
   Candle,
   CrossSignal,
+  Fundamentals,
   Metric,
   NewsItem,
   Quote,
@@ -89,6 +90,30 @@ export interface WireStockContent {
   symbol: string;
   news: WireNewsItem[];
   reports: WireAnalystReport[];
+}
+
+/** back/app/schemas/stock.py : AnnualFinancial */
+export interface WireAnnualFinancial {
+  fiscal_year: number;
+  revenue: number | null;
+  operating_income: number | null;
+}
+
+/** back/app/schemas/stock.py : StockFundamentals */
+export interface WireStockFundamentals {
+  symbol: string;
+  currency: string | null;
+  per: number | null;
+  pbr: number | null;
+  eps: number | null;
+  bps: number | null;
+  roe_pct: number | null;
+  market_cap: number | null;
+  dividend_yield_pct: number | null;
+  dividend_per_share: number | null;
+  ex_dividend_date: string | null;
+  next_earnings_date: string | null;
+  annual: WireAnnualFinancial[];
 }
 
 /**
@@ -199,6 +224,35 @@ export function toMetrics(metrics: WireStockMetrics | null): Metric[] {
     });
   }
   return rows;
+}
+
+/**
+ * 재무·밸류에이션.
+ *
+ * `currency` 는 도메인 타입에 싣지 않는다 — 화면은 기존 `currencyOf(symbol)` 을 쓰므로
+ * 헤드라인 가격과 재무 탭이 단위를 두고 어긋날 수 없다. 백엔드가 그 필드를 유지하는
+ * 것은 API 소비자와 LLM 컨텍스트를 위해서다.
+ *
+ * 날짜는 백엔드가 null 로 주지만 빈 문자열도 '없음'으로 접는다 (toNews 와 같은 규칙).
+ */
+export function toFundamentals(wire: WireStockFundamentals): Fundamentals {
+  return {
+    per: wire.per,
+    pbr: wire.pbr,
+    eps: wire.eps,
+    bps: wire.bps,
+    roePercent: wire.roe_pct,
+    marketCap: wire.market_cap,
+    dividendYieldPercent: wire.dividend_yield_pct,
+    dividendPerShare: wire.dividend_per_share,
+    exDividendDate: wire.ex_dividend_date || null,
+    nextEarningsDate: wire.next_earnings_date || null,
+    annual: wire.annual.map((row) => ({
+      year: row.fiscal_year,
+      revenue: row.revenue,
+      operatingIncome: row.operating_income,
+    })),
+  };
 }
 
 export function toNews(items: WireNewsItem[]): NewsItem[] {

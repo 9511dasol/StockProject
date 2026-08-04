@@ -11,7 +11,7 @@ import logging
 from app.agents.prompts import ANALYST_PROFILES, AgentProfile
 from app.integrations.llm import ask_text
 from app.schemas.advice import AgentOpinion
-from app.schemas.stock import StockHistory, StockMetrics
+from app.schemas.stock import StockFundamentals, StockHistory, StockMetrics
 from app.utils.numbers import format_compact_number, format_percent
 from app.utils.text import clean_text
 
@@ -21,8 +21,18 @@ _CONTEXT_NEWS_LIMIT = 3
 _CONTEXT_REPORT_LIMIT = 3
 
 
-def build_context(stock_data: StockHistory, metrics: StockMetrics) -> str:
-    """에이전트에게 넘길 JSON 컨텍스트. 봉 데이터는 제외하고 요약만 담는다."""
+def build_context(
+    stock_data: StockHistory,
+    metrics: StockMetrics,
+    *,
+    fundamentals: StockFundamentals | None = None,
+) -> str:
+    """에이전트에게 넘길 JSON 컨텍스트. 봉 데이터는 제외하고 요약만 담는다.
+
+    `fundamentals`는 없어도 **키를 `null`로 항상 내보낸다.** 경제학자 프롬프트가
+    이 필드를 명시적으로 참조하므로, 키가 상황에 따라 사라지면 프롬프트가 거짓이 되고
+    모델이 없는 값을 지어낸다.
+    """
     return json.dumps(
         {
             "stock": {
@@ -31,6 +41,7 @@ def build_context(stock_data: StockHistory, metrics: StockMetrics) -> str:
                 "query": stock_data.query,
             },
             "metrics": metrics.model_dump(),
+            "fundamentals": fundamentals.model_dump() if fundamentals else None,
             "news": [
                 {
                     "title": item.title,

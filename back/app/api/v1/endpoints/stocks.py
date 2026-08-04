@@ -15,11 +15,18 @@ from app.schemas.advice import StockAdviceRequest, StockAdviceResponse
 from app.schemas.stock import (
     ListedCompaniesStatus,
     StockContent,
+    StockFundamentals,
     StockHistory,
     StockHistoryParams,
     StockSuggestion,
 )
-from app.services import advice_service, advice_stream, listed_company_service, stock_service
+from app.services import (
+    advice_service,
+    advice_stream,
+    fundamentals_service,
+    listed_company_service,
+    stock_service,
+)
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -67,6 +74,18 @@ async def get_stock_content(
 ) -> StockContent:
     """`/stocks/history` 응답의 `symbol`을 그대로 넘긴다 (이미 해석된 심볼)."""
     return await stock_service.get_content(symbol)
+
+
+@router.get("/fundamentals", response_model=StockFundamentals, summary="재무 · 밸류에이션")
+async def get_stock_fundamentals(
+    symbol: Annotated[str, Query(min_length=1, max_length=80)],
+) -> StockFundamentals:
+    """`/stocks/history` 응답의 `symbol`을 그대로 넘긴다 (이미 해석된 심볼).
+
+    항목별 실패는 `null`로 흡수한다 — 전 필드가 `null`이어도 200이다.
+    종목당 캐시가 있어 두 번째 호출부터는 즉시 응답한다.
+    """
+    return await fundamentals_service.get_fundamentals(symbol)
 
 
 @router.get(

@@ -1,4 +1,4 @@
-"""API 계층 테스트. 외부 호출(KRX·yfinance·Claude)은 모두 대체한다."""
+"""API 계층 테스트. 외부 호출(KRX·yfinance·LLM)은 모두 대체한다."""
 
 import pytest
 from httpx import AsyncClient
@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.listed_company import ListedCompanyRepository
 from app.schemas.stock import ListedCompanyRecord
-from app.services import listed_company_service, stock_service
+from app.services import fundamentals_service, listed_company_service, stock_service
 from app.utils.text import get_initial_consonants
 
 _SEED = [
@@ -263,6 +263,59 @@ async def test_content_endpoint_returns_news_and_reports(
     assert body["symbol"] == "005930.KS"
     assert body["news"][0]["title"] == "뉴스 제목"
     assert body["reports"][0]["title"] == "리포트 제목"
+
+
+async def test_fundamentals_endpoint_returns_valuation(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.schemas.stock import AnnualFinancial, StockFundamentals
+
+    def _fake(symbol: str) -> StockFundamentals:
+        return StockFundamentals(
+            symbol=symbol,
+            currency="KRW",
+            per=21.06,
+            pbr=3.64,
+            roe_pct=30.79,
+            dividend_yield_pct=0.57,
+            ex_dividend_date="2026-06-29",
+            next_earnings_date="2026-10-28",
+            annual=[AnnualFinancial(fiscal_year=2025, revenue=333.6, operating_income=43.6)],
+        )
+
+    monkeypatch.setattr(fundamentals_service, "fetch_stock_fundamentals", _fake)
+
+    response = await client.get("/api/v1/stocks/fundamentals", params={"symbol": "005930.KS"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["symbol"] == "005930.KS"
+    assert body["per"] == 21.06
+    assert body["roe_pct"] == 30.79
+    # 배당수익률은 공급자가 이미 백분율로 주므로 그대로 나가야 한다 (57.0 이 아니다).
+    assert body["dividend_yield_pct"] == 0.57
+    assert body["next_earnings_date"] == "2026-10-28"
+    assert body["annual"][0]["fiscal_year"] == 2025
+
+
+async def test_fundamentals_endpoint_tolerates_all_null(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """전 필드가 비어도 200이다 — 재무 탭 하나가 상세 페이지를 죽이면 안 된다."""
+    from app.schemas.stock import StockFundamentals
+
+    monkeypatch.setattr(
+        fundamentals_service,
+        "fetch_stock_fundamentals",
+        lambda symbol: StockFundamentals(symbol=symbol),
+    )
+
+    response = await client.get("/api/v1/stocks/fundamentals", params={"symbol": "999999.KQ"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["per"] is None
+    assert body["annual"] == []
 
 
 async def test_validation_error_envelope(client: AsyncClient) -> None:

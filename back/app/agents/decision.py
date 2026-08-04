@@ -6,7 +6,7 @@ import logging
 from app.agents.prompts import DECISION_PROFILE
 from app.integrations.llm import ask_structured
 from app.schemas.advice import AgentOpinion, InvestmentDecision
-from app.schemas.stock import StockHistory, StockMetrics
+from app.schemas.stock import StockFundamentals, StockHistory, StockMetrics
 from app.utils.numbers import format_percent, is_number
 
 logger = logging.getLogger(__name__)
@@ -86,11 +86,13 @@ def _decision_context(
     stock_data: StockHistory,
     metrics: StockMetrics,
     opinions: list[AgentOpinion],
+    fundamentals: StockFundamentals | None,
 ) -> str:
     return json.dumps(
         {
             "stock": {"name": stock_data.name, "symbol": stock_data.symbol},
             "metrics": metrics.model_dump(),
+            "fundamentals": fundamentals.model_dump() if fundamentals else None,
             "agent_opinions": [opinion.model_dump() for opinion in opinions],
         },
         ensure_ascii=False,
@@ -102,13 +104,19 @@ async def decide(
     stock_data: StockHistory,
     metrics: StockMetrics,
     opinions: list[AgentOpinion],
+    *,
+    fundamentals: StockFundamentals | None = None,
 ) -> tuple[InvestmentDecision, bool]:
     """최종 판단을 만든다.
+
+    `fundamentals`가 여기에도 들어가는 이유: BUY/WATCH/AVOID 가 형성되는 유일한
+    지점이다. 경제학자 의견에만 넣으면 "PER 176배"가 문장으로만 남고 판단을 움직이지
+    못한다. 키워드 전용이라 기존 호출부는 그대로 유효하다.
 
     Returns:
         (판단, 규칙 기반으로 대체했는지 여부)
     """
-    context = _decision_context(stock_data, metrics, opinions)
+    context = _decision_context(stock_data, metrics, opinions, fundamentals)
 
     try:
         decision = await ask_structured(DECISION_PROFILE.full_prompt(), context, InvestmentDecision)

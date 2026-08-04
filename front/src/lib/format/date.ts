@@ -90,6 +90,18 @@ export function masthead(iso: string): string {
   return `${d.year}. ${PAD(d.month)}. ${PAD(d.day)} ${WEEKDAYS[d.weekday]}요일`;
 }
 
+/**
+ * 2026. 06. 29 — 배당락일·실적발표일처럼 절대 날짜를 그대로 보여야 할 때
+ *
+ * relative() 는 미래 날짜를 전부 "방금" 으로 만들고 stamp() 는 연도를 버린다.
+ * 다음 실적발표일은 몇 달 뒤라 둘 다 쓸 수 없다.
+ */
+export function ymd(iso: string): string {
+  const d = kstParts(iso);
+  if (!d) return UNKNOWN;
+  return `${d.year}. ${PAD(d.month)}. ${PAD(d.day)}`;
+}
+
 /** 09.30 15:31 — 뉴스·로그 타임스탬프 */
 export function stamp(iso: string): string {
   const d = kstParts(iso);

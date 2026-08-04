@@ -1,6 +1,6 @@
 """테스트 픽스처. 인메모리 SQLite를 쓰고 외부 호출은 하지 않는다."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
 import pytest_asyncio
@@ -12,6 +12,17 @@ from app.core.database import get_db
 from app.main import create_app
 from app.models.base import Base
 from app.repositories.listed_company import ListedCompanyRepository
+from app.services import fundamentals_service
+
+
+@pytest.fixture(autouse=True)
+def reset_fundamentals_cache() -> Iterator[None]:
+    """재무 캐시는 모듈 전역이라 테스트 사이로 샌다 — 매번 비운다."""
+    fundamentals_service._cache.clear()
+    fundamentals_service._locks.clear()
+    yield
+    fundamentals_service._cache.clear()
+    fundamentals_service._locks.clear()
 
 
 @pytest_asyncio.fixture

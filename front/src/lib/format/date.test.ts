@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clock, masthead, relative, stamp } from "./date";
+import { clock, masthead, relative, stamp, ymd } from "./date";
 
 /**
  * 이 파일이 지키는 것 두 가지.
@@ -44,6 +44,7 @@ describe("date · 잘못된 입력", () => {
       assert.doesNotThrow(() => masthead(value), `masthead(${JSON.stringify(value)})`);
       assert.doesNotThrow(() => stamp(value), `stamp(${JSON.stringify(value)})`);
       assert.doesNotThrow(() => clock(value), `clock(${JSON.stringify(value)})`);
+      assert.doesNotThrow(() => ymd(value), `ymd(${JSON.stringify(value)})`);
       assert.doesNotThrow(
         () => relative(value, "2026-07-30T06:30:00Z"),
         `relative(${JSON.stringify(value)})`,
@@ -53,7 +54,7 @@ describe("date · 잘못된 입력", () => {
 
   it("NaN 을 화면에 흘리지 않는다", () => {
     for (const value of BAD) {
-      for (const out of [masthead(value), stamp(value), clock(value)]) {
+      for (const out of [masthead(value), stamp(value), clock(value), ymd(value)]) {
         assert.ok(!out.includes("NaN"), `"${out}" 에 NaN 이 있다`);
       }
     }
@@ -61,6 +62,19 @@ describe("date · 잘못된 입력", () => {
 
   it("기준 시각이 잘못돼도 relative 가 버틴다", () => {
     assert.doesNotThrow(() => relative("2026-07-30T06:30:00Z", ""));
+  });
+});
+
+describe("date · ymd", () => {
+  it("절대 날짜를 연도까지 그린다", () => {
+    // 배당락일·실적발표일은 미래라 relative() 는 전부 "방금", stamp() 는 연도를 버린다.
+    assert.equal(ymd("2026-06-29"), "2026. 06. 29");
+    assert.equal(ymd("2026-10-28"), "2026. 10. 28");
+  });
+
+  it("날짜만 있는 문자열은 UTC 자정으로 파싱돼 KST 같은 날이 된다", () => {
+    // 09:00 KST 라 하루 밀리지 않는다 — 백엔드가 epoch 를 UTC 로 변환하는 근거다.
+    assert.equal(ymd("2026-06-29"), "2026. 06. 29");
   });
 });
 

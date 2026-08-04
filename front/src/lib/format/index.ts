@@ -3,12 +3,14 @@ export {
   decimal,
   delta,
   marketCapKR,
+  multiple,
   percent,
   price,
   ratio,
   signedDecimal,
+  unsignedPercent,
 } from "./number";
-export { clock, masthead, relative, stamp } from "./date";
+export { clock, masthead, relative, stamp, ymd } from "./date";
 export {
   deltaBgClass,
   deltaColorClass,

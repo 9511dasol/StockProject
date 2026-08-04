@@ -1,6 +1,6 @@
 """에이전트 배선 계약 테스트.
 
-Claude 호출 경계(`ask_text` / `ask_structured`)만 대체하고 그 위의 로직을 전부 검증한다.
+LLM 호출 경계(`ask_text` / `ask_structured`)만 대체하고 그 위의 로직을 전부 검증한다.
 자격 증명 없이 CI에서 돌아가며, 라이브 검증에서 남는 미확인 영역을 "네트워크 왕복 한 번"
 으로 좁히는 것이 목적이다.
 """
@@ -129,11 +129,32 @@ def test_context_excludes_ohlcv_rows() -> None:
 
     context = json.loads(analysts.build_context(_HISTORY, _METRICS))
 
-    assert set(context) == {"stock", "metrics", "news", "analyst_reports"}
+    assert set(context) == {"stock", "metrics", "fundamentals", "news", "analyst_reports"}
     assert context["stock"]["symbol"] == "005930.KS"
     assert context["metrics"]["trend"] == "상승 우위"
     assert context["news"][0]["title"] == "뉴스 제목"
     assert "rows" not in context  # 봉 데이터는 토큰만 먹고 판단에 쓰이지 않는다
+
+
+def test_context_always_carries_fundamentals_key() -> None:
+    """재무가 없어도 키는 남는다.
+
+    경제학자 프롬프트가 `fundamentals` 를 명시적으로 참조하므로, 키가 상황에 따라
+    사라지면 프롬프트가 거짓이 되고 모델이 없는 PER 을 지어낸다.
+    """
+    import json
+
+    from app.schemas.stock import StockFundamentals
+
+    without = json.loads(analysts.build_context(_HISTORY, _METRICS))
+    assert without["fundamentals"] is None
+
+    with_data = json.loads(
+        analysts.build_context(
+            _HISTORY, _METRICS, fundamentals=StockFundamentals(symbol="005930.KS", per=21.06)
+        )
+    )
+    assert with_data["fundamentals"]["per"] == 21.06
 
 
 # --- 최종 판단 --------------------------------------------------------------
@@ -174,7 +195,7 @@ async def test_decision_falls_back_on_failure(monkeypatch: pytest.MonkeyPatch) -
 
 async def test_advice_response_prefers_canonical_label(monkeypatch: pytest.MonkeyPatch) -> None:
     """LLM이 준 라벨보다 표준 라벨 매핑이 우선한다."""
-    from app.services import advice_service, stock_service
+    from app.services import advice_service, fundamentals_service, stock_service
 
     async def fake_history(params, **kwargs) -> StockHistory:
         return _HISTORY
@@ -182,7 +203,7 @@ async def test_advice_response_prefers_canonical_label(monkeypatch: pytest.Monke
     async def fake_opinions(context, metrics) -> list[AgentOpinion]:
         return [AgentOpinion(agent="AI 저널리스트", status="done", summary="요약")]
 
-    async def fake_decide(stock_data, metrics, opinions):
+    async def fake_decide(stock_data, metrics, opinions, **kwargs):
         return (
             InvestmentDecision(
                 verdict="WATCH",
@@ -193,9 +214,15 @@ async def test_advice_response_prefers_canonical_label(monkeypatch: pytest.Monke
             False,
         )
 
+    async def fake_fundamentals(symbol: str) -> None:
+        return None
+
     monkeypatch.setattr(stock_service, "get_history", fake_history)
     monkeypatch.setattr(advice_service, "collect_opinions", fake_opinions)
     monkeypatch.setattr(advice_service, "decide", fake_decide)
+    # 이걸 막지 않으면 generate_advice 가 실제 야후를 친다 — 실패가 아니라
+    # 느리게 통과하다 네트워크 없는 환경에서만 드러나는 종류의 누수다.
+    monkeypatch.setattr(fundamentals_service, "get_fundamentals_or_none", fake_fundamentals)
 
     response = await advice_service.generate_advice("005930")
 

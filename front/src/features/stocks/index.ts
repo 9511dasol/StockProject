@@ -8,13 +8,16 @@ export { NewsList } from "./components/NewsList";
 export { ReportList } from "./components/ReportList";
 export { FinancialsPanel } from "./components/FinancialsPanel";
 export { MetricsRail } from "./components/MetricsRail";
+export { ValuationRail } from "./components/ValuationRail";
 export { ReportDigest } from "./components/ReportDigest";
 export { ApiNote } from "./components/ApiNote";
 
 export type {
   AnalystReport,
+  AnnualFinancial,
   Candle,
   CrossSignal,
+  Fundamentals,
   Metric,
   NewsItem,
   Quote,

@@ -13,7 +13,10 @@ dependencies = [
     "aiosqlite>=0.20",
     "httpx>=0.28",
     "anthropic>=0.40",
-    "yfinance>=0.2.50",
+    # 1.5 에서 추가된 get_valuation_measures() 가 필요하다. 국내 종목(.KS/.KQ)은
+    # info["trailingPE"]/["priceToBook"] 가 항상 None 이라 PER/PBR 의 유일한 소스다.
+    # 핀을 낮추면 오류 없이 조용히 전 종목 null 이 된다.
+    "yfinance>=1.5",
     "alembic>=1.18.5",
     "asyncpg>=0.31.0",
     "psycopg2-binary>=2.9.12",

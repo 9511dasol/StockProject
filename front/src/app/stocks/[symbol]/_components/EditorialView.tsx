@@ -11,6 +11,7 @@ import {
   ReportDigest,
   ReportList,
   StockHeadline,
+  ValuationRail,
   type StockDetail,
 } from "@/features/stocks";
 import { masthead } from "@/lib/format";
@@ -77,7 +78,12 @@ export function EditorialView({
                 {
                   key: "financials",
                   label: "재무",
-                  content: <FinancialsPanel />,
+                  content: (
+                    <FinancialsPanel
+                      fundamentals={detail.fundamentals}
+                      currency={detail.quote.currency}
+                    />
+                  ),
                 },
               ]}
             />
@@ -85,6 +91,9 @@ export function EditorialView({
 
           <aside className="flex min-w-0 flex-col gap-[18px]">
             <MetricsRail metrics={detail.metrics} />
+            {/* 재무 탭은 세 번째라 기본으로 가려져 있다 — "지금 비싼가/얼마 주나"는
+                클릭 없이 보이게 여기에 3행만 요약해 둔다. */}
+            <ValuationRail fundamentals={detail.fundamentals} />
             <MarketOverviewList indices={indices} />
             <ReportDigest reports={detail.reports} />
             <ApiNote notes={detail.apiNotes} />

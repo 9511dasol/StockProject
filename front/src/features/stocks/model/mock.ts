@@ -8,6 +8,7 @@ import type {
   AnalystReport,
   Candle,
   CrossSignal,
+  Fundamentals,
   Metric,
   NewsItem,
   Quote,
@@ -212,6 +213,27 @@ const REPORTS: AnalystReport[] = [
   },
 ];
 
+/** 005930.KS 실측 응답 기준값 (2026-08-04 조회). 단위 규약을 여기서도 지킨다:
+ *  roePercent 는 ×100 한 값, dividendYieldPercent 는 공급자가 준 백분율 그대로. */
+const FUNDAMENTALS: Fundamentals = {
+  per: 21.06,
+  pbr: 3.64,
+  eps: 11_039.89,
+  bps: 63_873.63,
+  roePercent: 30.79,
+  marketCap: 1_526_725_984_911_360,
+  dividendYieldPercent: 0.57,
+  dividendPerShare: 1_496,
+  exDividendDate: "2026-06-29",
+  nextEarningsDate: "2026-10-28",
+  annual: [
+    { year: 2025, revenue: 333_605_938_000_000, operatingIncome: 43_601_051_000_000 },
+    { year: 2024, revenue: 300_870_903_000_000, operatingIncome: 32_725_961_000_000 },
+    { year: 2023, revenue: 258_935_494_000_000, operatingIncome: 6_566_976_000_000 },
+    { year: 2022, revenue: 302_231_360_000_000, operatingIncome: 43_376_630_000_000 },
+  ],
+};
+
 export const MOCK_STOCK_DETAIL: StockDetail = {
   ref: REF,
   quote: QUOTE,
@@ -219,10 +241,12 @@ export const MOCK_STOCK_DETAIL: StockDetail = {
   metrics: METRICS,
   news: NEWS,
   reports: REPORTS,
+  fundamentals: FUNDAMENTALS,
   now: `${BASE_DATE}T06:30:00Z`,
   apiNotes: [
     "build_stock_metrics",
     "fetch_market_overview_from_yfinance",
     "fetch_analyst_reports",
+    "fetch_stock_fundamentals",
   ],
 };

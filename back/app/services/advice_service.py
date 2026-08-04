@@ -11,7 +11,7 @@ from app.agents.analysts import build_context, collect_opinions
 from app.agents.decision import decide
 from app.schemas.advice import StockAdviceResponse, StockRef, resolve_decision_label
 from app.schemas.stock import KrxListing, StockHistoryParams
-from app.services import stock_service
+from app.services import fundamentals_service, stock_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +33,15 @@ async def generate_advice(
     stock_data = await stock_service.get_history(params, listing=listing)
     metrics = stock_service.get_metrics(stock_data)
 
-    context = build_context(stock_data, metrics)
+    # 밸류에이션·배당. 실패는 None 으로 흡수한다 — PER 을 못 읽었다고 분석 전체가
+    # 죽으면 안 된다.
+    fundamentals = await fundamentals_service.get_fundamentals_or_none(stock_data.symbol)
+
+    context = build_context(stock_data, metrics, fundamentals=fundamentals)
     opinions = await collect_opinions(context, metrics)
-    decision, used_fallback = await decide(stock_data, metrics, opinions)
+    decision, used_fallback = await decide(
+        stock_data, metrics, opinions, fundamentals=fundamentals
+    )
 
     if used_fallback:
         logger.info("%s 판단을 규칙 기반으로 생성했습니다", stock_data.symbol)

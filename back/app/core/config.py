@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     # 기동 직후 랭킹을 미리 데워 첫 홈 화면이 예시 데이터로 떨어지지 않게 한다.
     warm_market_movers_on_startup: bool = True
 
+    # --- 재무·밸류에이션 ---
+    # 종목당 캐시 수명(초). ticker.info 한 번이 0.5~1.5초이고 밸류에이션·손익까지
+    # 합치면 1~2초라 요청마다 부를 수 없다. 그렇다고 PER/PBR 은 주가를 따라
+    # 움직이므로 하루 단위로 둘 수도 없다 — 15분이 그 사이의 타협점이다.
+    stock_fundamentals_ttl_seconds: int = Field(default=900, ge=0)
+    # 캐시에 담아 둘 종목 수 상한. 임의 심볼이 키라 상한이 없으면 무한히 증가한다.
+    stock_fundamentals_cache_size: int = Field(default=512, ge=1)
+
     # --- LLM ---
     anthropic_api_key: str | None = None
     # 미설정 시 SDK가 ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login`

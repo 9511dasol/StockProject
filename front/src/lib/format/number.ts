@@ -40,11 +40,34 @@ export function compact(value: number): string {
   return String(Math.round(value));
 }
 
-/** 421.8조 / 8,240억 — 시가총액 한국식 */
+/**
+ * 421.8조 / 8,240억 / -341억 — 시가총액·매출·영업이익 한국식
+ *
+ * 부호를 분리해 처리하는 이유: 영업이익은 음수가 될 수 있는데, 크기 비교만 하면
+ * 음수가 두 분기를 모두 빠져나가 `-34,109,363,660` 처럼 혼자 원 단위로 찍힌다
+ * (에코프로비엠 FY2024 영업손실이 실제로 그 값이다).
+ */
 export function marketCapKR(value: number): string {
-  if (value >= 1e12) return `${(value / 1e12).toFixed(1)}조`;
-  if (value >= 1e8) return `${KRW.format(Math.round(value / 1e8))}억`;
-  return KRW.format(value);
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  if (abs >= 1e12) return `${sign}${(abs / 1e12).toFixed(1)}조`;
+  if (abs >= 1e8) return `${sign}${KRW.format(Math.round(abs / 1e8))}억`;
+  return `${sign}${KRW.format(abs)}`;
+}
+
+/** 21.06배 — PER·PBR. 국내 표기는 x 가 아니라 '배'다 (ratio 는 거래량 배율용) */
+export function multiple(value: number, digits = 2): string {
+  return `${decimal(value, digits)}배`;
+}
+
+/**
+ * 30.79% — 부호 없는 비율.
+ *
+ * ROE·배당수익률·영업이익률은 등락이 아니라 수준이라 `+` 를 붙이면 안 된다.
+ * (percent() 는 전일 대비처럼 방향이 의미를 갖는 값 전용이다.)
+ */
+export function unsignedPercent(value: number, digits = 2): string {
+  return `${value.toFixed(digits)}%`;
 }
 
 /** 2,842.19 — 지수처럼 소수점을 유지해야 하는 값 */
