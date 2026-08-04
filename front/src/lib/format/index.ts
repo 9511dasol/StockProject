@@ -12,7 +12,6 @@ export {
 } from "./number";
 export { clock, masthead, relative, stamp, ymd } from "./date";
 export {
-  deltaBgClass,
   deltaColorClass,
   direction,
   directionGlyph,

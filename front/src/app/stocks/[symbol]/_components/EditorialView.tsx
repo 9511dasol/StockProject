@@ -14,6 +14,7 @@ import {
   ValuationRail,
   type StockDetail,
 } from "@/features/stocks";
+import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { ViewToggle } from "./ViewSwitch";
@@ -33,7 +34,7 @@ export function EditorialView({
   detail: StockDetail;
   indices: MarketIndex[];
 }) {
-  const caption = `${masthead(detail.now)} · 장 마감 15:30 KST`;
+  const caption = `${masthead(detail.now)} · ${MARKET_CAPTION_SUFFIX}`;
 
   return (
     <>

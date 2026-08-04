@@ -5,10 +5,18 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
+from app.domain.symbols import board_of
 from app.integrations.yfinance.market import fetch_market_overview
 from app.integrations.yfinance.movers import scan_movers
 from app.repositories.listed_company import ListedCompanyRepository
-from app.schemas.market import MarketMovers, MarketOverview, MoversScan
+from app.schemas.market import (
+    MarketMovers,
+    MarketOverview,
+    MarketRanking,
+    MoverRow,
+    MoversScan,
+    RankingRow,
+)
 from app.schemas.stock import ListedCompanyRecord
 
 logger = logging.getLogger(__name__)
@@ -125,6 +133,83 @@ def _to_response(scan: MoversScan | None, limit: int) -> MarketMovers:
         scanned=len(scan.rows),
         gainers=gainers,
         losers=losers,
+        updated_at=updated_at,
+    )
+
+
+def _ranked_rows(scan: MoversScan, caps: dict[str, int | None], sort: str) -> list[MoverRow]:
+    """필터 전 정렬만 적용한 행 목록.
+
+    `sort == "change"` 는 **재정렬하지 않는다** — `scan.rows` 가 이미 등락률
+    내림차순이라 다시 정렬하면 같은 순서를 얻으려고 비용만 쓴다.
+    """
+    if sort == "change":
+        return list(scan.rows)
+
+    # 시총 미수집(None)은 항상 뒤로. 파이썬 정렬은 안정적이라 시총이 같거나 둘 다
+    # 없으면 등락률 순서가 그대로 유지된다.
+    return sorted(
+        scan.rows,
+        key=lambda row: (caps.get(row.symbol) is None, -(caps.get(row.symbol) or 0)),
+    )
+
+
+async def get_ranking(
+    repo: ListedCompanyRepository,
+    *,
+    sort: str = "market_cap",
+    board: str = "ALL",
+    limit: int = 50,
+    offset: int = 0,
+) -> MarketRanking:
+    """탐색 화면용 랭킹. 등락률 스냅샷을 그대로 재사용한다.
+
+    스캔을 새로 돌지 않는 이유: `MoversScan.rows` 가 이미 모집단 **전체**를 담고 있고
+    그 모집단이 곧 `top_by_market_cap` 이다. 랭킹은 그걸 다르게 자를 뿐이다.
+
+    시가총액은 스냅샷에 없다(`_load_universe` 가 `ListedCompanyRecord` 로 좁히며 버린다).
+    그래서 모집단을 만든 그 쿼리를 다시 돌려 심볼로 붙인다 — 인덱스 쿼리 한 번이다.
+    **이 딕셔너리를 캐시하면 안 된다**: 시총 배치보다 오래 살아남아 갱신을 가린다.
+    """
+    if not _is_fresh():
+        # 반드시 기존 스케줄러를 쓴다 — 테스트가 이 이름 하나만 막고 있어서,
+        # 별도 스케줄러를 두면 랭킹 테스트가 실제 네트워크를 친다.
+        _schedule_movers_refresh()
+
+    updated_at = (_scanned_at or datetime.now(UTC)).isoformat(timespec="seconds")
+    scan = _scan
+    if scan is None:
+        return MarketRanking(sort=sort, board=board, updated_at=updated_at)
+
+    companies = await repo.top_by_market_cap(settings.market_movers_universe_size)
+    caps: dict[str, int | None] = {c.symbol: c.market_cap for c in companies}
+
+    rows = _ranked_rows(scan, caps, sort)
+    ranked = [
+        RankingRow(
+            **row.model_dump(),
+            board=row_board,
+            market_cap=caps.get(row.symbol),
+            rank=index,
+        )
+        for index, row in enumerate(rows, start=1)
+        # 접미사가 없는 종목은 시장을 단정할 수 없어 목록에서 뺀다.
+        if (row_board := board_of(row.symbol)) is not None
+        and (board == "ALL" or row_board == board)
+    ]
+
+    # rank 는 필터 후 다시 매긴다 — 코스닥만 본 사용자에게 "3위 다음 7위"는 뜻이 없다.
+    for position, item in enumerate(ranked, start=1):
+        item.rank = position
+
+    return MarketRanking(
+        as_of=scan.as_of,
+        source=scan.source,
+        universe_label=scan.universe_label,
+        sort=sort,
+        board=board,
+        total=len(ranked),
+        rows=ranked[offset : offset + limit],
         updated_at=updated_at,
     )
 

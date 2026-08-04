@@ -1,12 +1,6 @@
 // 시장 현황 목 데이터. 백엔드 /markets/overview 가 붙으면 삭제된다.
 
-import type {
-  MarketHome,
-  MarketIndex,
-  MarketOverview,
-  Mover,
-  Sector,
-} from "./types";
+import type { MarketHome, MarketIndex, MarketOverview, Mover } from "./types";
 
 /** 시드 고정 — 스파크라인이 매 렌더 흔들리지 않게 한다 */
 function spark(seed: number, changePercent: number, length = 40): number[] {
@@ -50,45 +44,15 @@ const LOSERS: Mover[] = [
   { name: "네이버", nameEn: "NAVER", code: "035420", price: 171_900, changePercent: -0.52, spark: spark(35420, -0.52, 24) },
 ];
 
-const SECTORS: Sector[] = [
-  { name: "반도체", changePercent: 2.41 },
-  { name: "자동차", changePercent: 0.86 },
-  { name: "금융", changePercent: 0.32 },
-  { name: "2차전지", changePercent: -2.18 },
-  { name: "인터넷", changePercent: -0.74 },
-  { name: "바이오", changePercent: -0.21 },
-];
-
 export const MOCK_MARKET_HOME: MarketHome = {
-  // 전부 목 데이터인 경우 — 실 연결 모드에서는 서비스가 이 목록을 좁힌다.
-  sampleSections: ["movers", "sectors", "news"],
+  // USE_MOCK 모드에서는 등락 상위도 당연히 예시다.
+  moversAreSample: true,
   indices: INDICES,
   gainers: GAINERS,
   losers: LOSERS,
   // 예시 데이터의 모집단 — 실 연결 시 백엔드가 스캔한 범위로 대체된다.
   moversScope: "KOSPI+KOSDAQ",
-  sectors: SECTORS,
   asOf: ASOF,
-  news: [
-    {
-      title: "HBM4 공급 협의 진전 보도 … 하반기 물량 확대 가능성",
-      publisher: "연합뉴스",
-      time: "2시간 전",
-      url: "#",
-    },
-    {
-      title: "반도체 재고 조정 마무리 국면 진입 분석",
-      publisher: "한국경제",
-      time: "5시간 전",
-      url: "#",
-    },
-    {
-      title: "원/달러 1,380원대 … 수출주 환율 효과 점검",
-      publisher: "Reuters",
-      time: "어제",
-      url: "#",
-    },
-  ],
   apiNotes: [
     "fetch_market_overview_from_yfinance (카테고리별 현재값·변동률·차트)",
     "ensure_listed_companies",

@@ -28,8 +28,14 @@ const DESTINATIONS: readonly NotFoundDestination[] = [
   {
     href: "/",
     label: "시장 현황",
-    hint: "지수 · 등락 상위 · AI 브리핑",
+    hint: "지수 · 등락 상위",
     icon: "home",
+  },
+  {
+    href: "/stocks",
+    label: "종목 탐색",
+    hint: "시가총액 · 등락률 순위",
+    icon: "compass",
   },
   {
     href: "/watchlist",

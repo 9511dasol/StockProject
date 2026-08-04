@@ -22,6 +22,21 @@ export const REVALIDATE_MARKET_CLOSED = 900;
 /** 시세와 무관한 데이터(종목 메타·상장사 정보)의 고정 주기 */
 export const REVALIDATE_STATIC = 3600;
 
+/**
+ * 시세 지연 고지.
+ *
+ * 공급자(야후)가 KRX 데이터를 `exchangeDataDelayedBy = 20` 으로 명시한다 — 실측 20분 지연이다.
+ * 인트라데이 봉은 09:00~14:59 까지만 오고 장 마감(15:30) 직전 30분이 비기도 한다.
+ * 실시간이 아닌 값을 실시간처럼 보이게 두는 것이 이 화면이 저지를 수 있는 가장 큰 거짓말이라
+ * 마스트헤드에 상시 노출한다.
+ *
+ * 컴포넌트가 아니라 문자열인 이유: `Masthead` 의 `caption` 이 ReactNode 가 아니라 string 이다.
+ */
+export const QUOTE_DELAY_NOTE = "20분 지연 시세";
+
+/** 마스트헤드 캡션 꼬리. 화면마다 따로 쓰던 "장 마감 15:30 KST" 를 여기로 합쳤다. */
+export const MARKET_CAPTION_SUFFIX = `장 마감 15:30 KST · ${QUOTE_DELAY_NOTE}`;
+
 const KST = new Intl.DateTimeFormat("en-US", {
   timeZone: "Asia/Seoul",
   weekday: "short",

@@ -13,14 +13,17 @@ const ITEM =
  * 각자 bottom-0 을 잡으면 정확히 포개진다.
  *
  * 검색 트리거는 features/search 소유라 슬롯으로 받는다.
- * AI 는 종목 컨텍스트가 있어야 열 수 있어 여기서는 안내만 한다.
+ *
+ * 네 번째 자리는 원래 AI 안내용 비활성 칸이었다. 누를 수 없는데다 `title` 툴팁은
+ * 터치에서 보이지 않아 사실상 죽은 자리였고, AI 는 종목을 고른 뒤에만 의미가 있어
+ * 탭바에서 잃을 것이 없었다 — 종목 탐색으로 바꿨다. 칸 수는 넷 그대로다.
  */
 export function MobileTabBar({
   current,
   search,
 }: {
   /** 생략하면 어느 탭도 활성이 아니다 — 404 처럼 탭 어디에도 속하지 않는 화면용 */
-  current?: "home" | "watchlist";
+  current?: "home" | "stocks" | "watchlist";
   search: React.ReactNode;
 }) {
   return (
@@ -45,6 +48,16 @@ export function MobileTabBar({
       {search}
 
       <Link
+        href="/stocks"
+        aria-current={current === "stocks" ? "page" : undefined}
+        className={`${ITEM} ${current === "stocks" ? "text-ink" : "text-muted-35"}`}
+        style={{ fontSize: 10 }}
+      >
+        <Icon name="compass" size={17} />
+        탐색
+      </Link>
+
+      <Link
         href="/watchlist"
         aria-current={current === "watchlist" ? "page" : undefined}
         className={`${ITEM} ${current === "watchlist" ? "text-ink" : "text-muted-35"}`}
@@ -53,16 +66,6 @@ export function MobileTabBar({
         <Icon name={current === "watchlist" ? "star-filled" : "star"} size={17} />
         관심
       </Link>
-
-      <span
-        aria-disabled
-        title="AI 판단은 종목 상세에서 열 수 있습니다"
-        className={`${ITEM} text-muted-35`}
-        style={{ fontSize: 10 }}
-      >
-        <Icon name="ai" size={17} />
-        AI
-      </span>
     </nav>
   );
 }

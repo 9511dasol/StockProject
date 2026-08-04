@@ -74,3 +74,36 @@ class MarketMovers(BaseModel):
     gainers: list[MoverRow] = Field(default_factory=list)
     losers: list[MoverRow] = Field(default_factory=list)
     updated_at: str
+
+
+RankingSort = Literal["market_cap", "change"]
+RankingBoard = Literal["ALL", "KOSPI", "KOSDAQ"]
+
+
+class RankingRow(MoverRow):
+    """탐색 화면(`/stocks`)의 한 줄. `MoverRow` + 순위·시총·시장 구분."""
+
+    #: 심볼 접미사에서 유도한 값. 위 `market`(유가·코스닥 원문)과 달리 프런트 계약이다.
+    board: Literal["KOSPI", "KOSDAQ"]
+    #: 원. 시가총액 배치가 아직 안 채운 종목은 None (전 종목의 30%가량)
+    market_cap: int | None = None
+    #: 1부터. offset을 반영한 절대 순위라 페이지를 넘겨도 이어진다
+    rank: int
+
+
+class MarketRanking(BaseModel):
+    """`GET /markets/ranking` 응답.
+
+    `MarketMovers`와 달리 부호로 가르지 않는다 — 필터가 적용된 **한 목록** + `total`이다.
+    같은 `MoversScan` 스냅샷에서 나오므로 랭킹 때문에 스캔이 추가로 돌지는 않는다.
+    """
+
+    as_of: str | None = None
+    source: Literal["YFINANCE", "KRX"] = "YFINANCE"
+    universe_label: str = ""
+    sort: RankingSort = "market_cap"
+    board: RankingBoard = "ALL"
+    #: 필터 적용 **후** 전체 건수. 페이지네이션의 근거다
+    total: int = 0
+    rows: list[RankingRow] = Field(default_factory=list)
+    updated_at: str

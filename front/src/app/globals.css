@@ -80,9 +80,6 @@
   --on-ink-18: rgba(253, 251, 246, 0.18);
   --on-ink-15: rgba(253, 251, 246, 0.15);
 
-  /* 막대 트랙 (그리드 헤어라인 트릭은 --line-16 을 배경으로 쓴다) */
-  --track: rgba(26, 26, 23, 0.08);
-
   /* 스켈레톤 3줄 — 위에서 아래로 옅어진다 */
   --skeleton-1: rgba(26, 26, 23, 0.12);
   --skeleton-2: rgba(26, 26, 23, 0.1);
@@ -214,8 +211,6 @@
   --on-ink-20: rgba(14, 17, 22, 0.2);
   --on-ink-18: rgba(14, 17, 22, 0.18);
   --on-ink-15: rgba(14, 17, 22, 0.15);
-
-  --track: rgba(232, 227, 216, 0.1);
 
   /* 아래 다섯 계열은 라이트 값이 '어두운 잉크의 낮은 알파'라, 오버라이드가
      없으면 다크에서 배경과 같은 색이 되어 아예 안 보인다. 알파를 밝은 쪽으로
@@ -350,8 +345,6 @@
   --color-on-ink-20: var(--on-ink-20);
   --color-on-ink-18: var(--on-ink-18);
   --color-on-ink-15: var(--on-ink-15);
-
-  --color-track: var(--track);
 
   --color-skeleton-1: var(--skeleton-1);
   --color-skeleton-2: var(--skeleton-2);

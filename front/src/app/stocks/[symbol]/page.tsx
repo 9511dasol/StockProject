@@ -3,7 +3,9 @@ import { getMarketOverview } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import { getStockDetail } from "@/features/stocks";
 import { getWatchlist } from "@/features/watchlist";
+import { API_BASE_URL } from "@/lib/config/env";
 import { Masthead } from "@/shared/components/layout/Masthead";
+import { BackendUnreachable } from "./_components/BackendUnreachable";
 import { ConsoleView } from "./_components/ConsoleView";
 import { EditorialView } from "./_components/EditorialView";
 import { StockDetailUnavailable } from "./_components/StockDetailUnavailable";
@@ -38,6 +40,17 @@ export default async function StockDetailPage({
           search={<SearchTrigger />}
         />
         <SymbolNotResolved query={decodeURIComponent(symbol)} />
+      </main>
+    );
+  }
+
+  // 백엔드가 안 떠 있거나 주소가 틀린 경우. 상류 지연과 문구가 달라야 한다 —
+  // 여기서는 재시도가 소용없고 서버를 켜는 것이 조치다.
+  if (result.status === "offline") {
+    return (
+      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
+        <Masthead caption="백엔드 연결 실패" search={<SearchTrigger />} />
+        <BackendUnreachable baseUrl={API_BASE_URL} />
       </main>
     );
   }

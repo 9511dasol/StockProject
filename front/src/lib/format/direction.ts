@@ -28,16 +28,7 @@ export function deltaColorClass(value: number, inverted = false): string {
   return d === "up" ? "text-up" : "text-down";
 }
 
-/**
- * 등락 **배경** 색. 업종 등락 막대처럼 글자가 아니라 면을 칠하는 자리용이다.
- *
- * Delta 는 글자 전용이라 이 자리를 대신할 수 없다. 그렇다고 컴포넌트가
- * `value > 0 ? "bg-up" : "bg-down"` 를 직접 쓰면 보합(0)이 하락으로 칠해져
- * 바로 옆 숫자(deltaColorClass 는 0 을 muted 로 준다)와 색이 어긋난다.
- * 그래서 분기를 이 파일에 함께 둔다 — 방향 판정의 소유자는 하나여야 한다.
- */
-export function deltaBgClass(value: number): string {
-  const d = direction(value);
-  if (d === "flat") return "bg-muted-30";
-  return d === "up" ? "bg-up" : "bg-down";
-}
+// 등락 **배경** 색(deltaBgClass)은 업종 등락 막대가 유일한 사용처였고 그 블록을
+// 걷어내면서 함께 지웠다. 면을 칠하는 자리가 다시 생기면 여기에 되살린다 —
+// 컴포넌트에서 `value > 0 ? "bg-up" : "bg-down"` 를 직접 쓰면 보합(0)이 하락으로
+// 칠해져 바로 옆 숫자(deltaColorClass 는 0 을 muted 로 준다)와 색이 어긋난다.

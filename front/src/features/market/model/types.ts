@@ -28,20 +28,6 @@ export interface Mover {
   spark: number[];
 }
 
-/** 업종 등락 바 1행 */
-export interface Sector {
-  name: string;
-  changePercent: number;
-}
-
-export interface MarketNewsItem {
-  title: string;
-  publisher: string;
-  /** 서버에서 계산해 내려보내는 상대 시각 문자열 */
-  time: string;
-  url: string;
-}
-
 export interface MarketOverview {
   category: string;
   indices: MarketIndex[];
@@ -49,13 +35,16 @@ export interface MarketOverview {
   asOf: string;
 }
 
-/** 대응 백엔드 API 가 없어 예시 값으로 채운 블록 */
-export type SampleSection = "movers" | "sectors" | "news";
-
-/** 홈(3b) 한 화면이 쓰는 전부 */
+/** 홈 한 화면이 쓰는 전부 */
 export interface MarketHome {
-  /** 실데이터가 아닌 섹션. 화면에서 '예시' 뱃지를 붙이는 근거다. */
-  sampleSections: SampleSection[];
+  /**
+   * 등락 상위가 예시 데이터인지. 화면에서 '예시' 뱃지를 붙이는 근거다.
+   *
+   * 전에는 `sampleSections: SampleSection[]` 였다 — 업종·뉴스가 목이던 시절엔
+   * 목록이 필요했지만, 그 둘을 걷어낸 뒤로는 예시가 될 수 있는 블록이 등락 상위
+   * 하나뿐이라(랭킹 스냅샷 워밍업 전) 불리언이 정직하다.
+   */
+  moversAreSample: boolean;
   indices: MarketIndex[];
   gainers: Mover[];
   losers: Mover[];
@@ -65,8 +54,6 @@ export interface MarketHome {
    * 훑은 것처럼 읽힌다.
    */
   moversScope: string;
-  sectors: Sector[];
-  news: MarketNewsItem[];
   /** ISO */
   asOf: string;
   apiNotes: string[];

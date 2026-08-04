@@ -4,6 +4,7 @@
 """
 
 import re
+from typing import Literal
 
 from app.domain.constants import (
     COMMON_STOCK_NAMES,
@@ -88,3 +89,22 @@ def krx_symbol_to_yfinance(symbol: str, market: str | None) -> str:
     market_text = clean_text(market).upper()
     suffix = ".KQ" if any(marker in market_text for marker in _KOSDAQ_MARKERS) else ".KS"
     return f"{code}{suffix}"
+
+
+def board_of(symbol: str) -> Literal["KOSPI", "KOSDAQ"] | None:
+    """`.KS` → KOSPI, `.KQ` → KOSDAQ. 접미사가 없으면 판정하지 않는다(None).
+
+    **DB의 `market` 컬럼을 쓰지 않는 이유**: 그 값은 수집 소스에 따라 한글이 들어온다
+    (실측 `코스닥`·`유가`·`코넥스`). `KOSPI`/`KOSDAQ` 문자열은 한 건도 없어서
+    `market == "KOSPI"` 같은 비교는 항상 거짓이다. 반면 접미사는 위
+    `krx_symbol_to_yfinance` 가 시장 구분을 보고 붙인 값이고 **실제로 공급자에게
+    물어본 심볼 그 자체**라, 그 행의 시세와 절대 어긋날 수 없다.
+
+    코넥스도 `_KOSDAQ_MARKERS` 에 걸려 `.KQ` 가 되므로 KOSDAQ 로 분류된다. 이 함수를
+    쓰는 랭킹은 시가총액 상위 모집단이라 코넥스가 올라올 일이 없어 그대로 둔다.
+    """
+    if symbol.endswith(".KS"):
+        return "KOSPI"
+    if symbol.endswith(".KQ"):
+        return "KOSDAQ"
+    return None

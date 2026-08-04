@@ -1,4 +1,5 @@
 import { price as fmtPrice } from "@/lib/format";
+import { QUOTE_DELAY_NOTE } from "@/lib/config/marketHours";
 import { Chip, Delta } from "@/shared/ui";
 import type { Quote, StockRef } from "../model/types";
 
@@ -43,11 +44,13 @@ export function StockHeadline({
           </span>
         </p>
         <Delta change={quote.change} changePercent={quote.changePercent} size={15} />
+        {/* 지연 고지를 가격 바로 밑에 둔다 — 마스트헤드 캡션은 스크롤로 사라지지만
+            이 숫자는 화면에 계속 남는다. 한 줄로 유지해야 헤드라인이 리플로우되지 않는다. */}
         <p
           className="font-mono uppercase tracking-[0.1em] text-muted-45"
           style={{ fontSize: 10.5 }}
         >
-          상승 빨강 / 하락 파랑 · 국내 관례
+          {QUOTE_DELAY_NOTE} · 상승 빨강 / 하락 파랑
         </p>
       </div>
     </div>

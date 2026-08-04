@@ -3,6 +3,7 @@
 import pytest
 
 from app.domain.symbols import (
+    board_of,
     get_common_stock_name,
     get_korean_stock_name,
     is_usable_stock_name,
@@ -91,3 +92,27 @@ def test_initial_consonants() -> None:
 
 def test_normalize_search_text_drops_symbols() -> None:
     assert normalize_search_text("LG에너지솔루션 (주)") == "lg에너지솔루션주"
+
+
+def test_board_of_uses_suffix_not_market_column() -> None:
+    """랭킹의 시장 필터 근거. DB의 `market` 컬럼은 한글이라(유가·코스닥) 쓸 수 없다."""
+    assert board_of("005930.KS") == "KOSPI"
+    assert board_of("247540.KQ") == "KOSDAQ"
+
+
+def test_board_of_returns_none_without_suffix() -> None:
+    """접미사 없는 수집 파손 행은 시장을 단정할 수 없다 — 목록에서 빠진다."""
+    assert board_of("02180") is None
+    assert board_of("AAPL") is None
+
+
+def test_konex_is_reported_as_kosdaq_on_purpose() -> None:
+    """코넥스도 `krx_symbol_to_yfinance` 가 `.KQ` 로 매핑해 KOSDAQ 로 분류된다.
+
+    의도된 동작이다 — 랭킹 모집단이 시가총액 상위라 코넥스가 올라올 일이 없다.
+    누군가 '버그'로 보고 고치지 않도록 여기에 고정한다.
+    """
+    konex_symbol = krx_symbol_to_yfinance("123456", "코넥스")
+
+    assert konex_symbol == "123456.KQ"
+    assert board_of(konex_symbol) == "KOSDAQ"
