@@ -19,11 +19,12 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/shared/ui";
 import { useBulkAdvice } from "@/features/advice";
 import {
+  ALL_GROUP,
   BulkActionBar,
   GroupTabs,
-  returnPercent,
   SortControl,
   TableHeader,
+  visibleItems,
   WatchCard,
   WatchlistHeader,
   WatchRow,
@@ -43,7 +44,7 @@ import {
  */
 export function WatchlistBoard({ initial }: { initial: Watchlist }) {
   const [items, setItems] = useState(initial.items);
-  const [group, setGroup] = useState("전체");
+  const [group, setGroup] = useState(ALL_GROUP);
   const [sort, setSort] = useState<SortKey>("order");
   const [selected, setSelected] = useState<string[]>([]);
   const [reordering, setReordering] = useState(false);
@@ -58,16 +59,11 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
     }),
   );
 
-  const visible = useMemo(() => {
-    const filtered =
-      group === "전체" ? items : items.filter((item) => item.group === group);
-    if (sort === "order") return filtered;
-    return [...filtered].sort((a, b) => {
-      if (sort === "name") return a.name.localeCompare(b.name, "ko");
-      if (sort === "change") return b.changePercent - a.changePercent;
-      return (returnPercent(b) ?? -Infinity) - (returnPercent(a) ?? -Infinity);
-    });
-  }, [items, group, sort]);
+  // 필터·정렬 규칙은 도메인이 소유한다 (features/watchlist/model/sort).
+  const visible = useMemo(
+    () => visibleItems(items, group, sort),
+    [items, group, sort],
+  );
 
   /**
    * '직접 정렬'일 때만 순서를 바꾼다.

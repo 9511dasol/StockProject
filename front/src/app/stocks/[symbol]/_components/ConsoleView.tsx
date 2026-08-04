@@ -3,13 +3,14 @@ import { AdviceTrigger } from "@/features/advice";
 import type { MarketIndex } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import {
-  StockChart,
-  type NewsItem,
-  type AnalystReport,
-  type Metric,
-  type Quote,
+  ConsoleChart,
+  ConsoleFooter,
+  ConsoleHeadline,
+  ContentRail,
+  MetricGrid,
+  CONSOLE_LABEL,
+  CONSOLE_LABEL_STYLE,
   type StockDetail,
-  type StockRef,
 } from "@/features/stocks";
 import type { WatchItem } from "@/features/watchlist";
 import {
@@ -17,7 +18,6 @@ import {
   deltaColorClass,
   percent as fmtPercent,
   price as fmtPrice,
-  relative,
 } from "@/lib/format";
 import { Wordmark } from "@/shared/components/layout/Wordmark";
 import { Delta } from "@/shared/ui";
@@ -31,10 +31,11 @@ import { ViewToggle } from "./ViewSwitch";
  *
  * app/ 에 둔 이유는 stocks·market·watchlist·advice 네 feature 를 한 화면에서
  * 조합하기 때문이다 — feature 끼리는 직접 import 할 수 없다.
+ *
+ * 그래서 이 파일에는 **여러 feature 를 엮는 조각만** 남는다. stocks 데이터만
+ * 보는 조각(헤드라인·차트·지표 그리드·콘텐츠 레일·푸터)은 `features/stocks` 안으로
+ * 옮겼다 — 이 파일이 397줄까지 자라 있던 이유가 그쪽이었다.
  */
-
-const LABEL = "font-mono font-medium uppercase text-muted-60";
-const LABEL_STYLE = { fontSize: 9.5, letterSpacing: "0.2em" } as const;
 
 export function ConsoleView({
   detail,
@@ -99,6 +100,7 @@ export function ConsoleView({
   );
 }
 
+/** market(지수) + search + advice 를 엮으므로 app 계층에 남는다 */
 function ConsoleTopBar({ indices }: { indices: MarketIndex[] }) {
   return (
     <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-14 px-[18px] py-3">
@@ -114,11 +116,7 @@ function ConsoleTopBar({ indices }: { indices: MarketIndex[] }) {
 
       <span className="flex flex-1 flex-wrap gap-4">
         {indices.map((index) => (
-          <span
-            key={index.name}
-            className="num flex gap-[7px]"
-            style={{ fontSize: 11 }}
-          >
+          <span key={index.name} className="num flex gap-[7px]" style={{ fontSize: 11 }}>
             <span className="text-muted-50">{index.name}</span>
             <span>{decimal(index.value, index.digits)}</span>
             <span className={deltaColorClass(index.changePercent)}>
@@ -137,6 +135,7 @@ function ConsoleTopBar({ indices }: { indices: MarketIndex[] }) {
   );
 }
 
+/** watchlist 데이터를 받으므로 app 계층에 남는다 */
 function WatchRail({
   items,
   activeCode,
@@ -150,7 +149,7 @@ function WatchRail({
 }) {
   return (
     <aside className="flex w-full flex-col md:w-[214px]">
-      <h2 className={`${LABEL} px-[14px] py-3`} style={LABEL_STYLE}>
+      <h2 className={`${CONSOLE_LABEL} px-[14px] py-3`} style={CONSOLE_LABEL_STYLE}>
         watchlist
       </h2>
       {items.map((item) => {
@@ -170,10 +169,7 @@ function WatchRail({
               <span className="truncate" style={{ fontSize: 13 }}>
                 {item.name}
               </span>
-              <span
-                className="num truncate text-muted-50"
-                style={{ fontSize: 9.5 }}
-              >
+              <span className="num truncate text-muted-50" style={{ fontSize: 9.5 }}>
                 {item.code} · {item.nameEn}
               </span>
             </span>
@@ -181,11 +177,7 @@ function WatchRail({
               <span className="font-medium" style={{ fontSize: 12.5 }}>
                 {fmtPrice(item.price)}
               </span>
-              <Delta
-                changePercent={item.changePercent}
-                arrow={false}
-                size={10.5}
-              />
+              <Delta changePercent={item.changePercent} arrow={false} size={10.5} />
             </span>
           </Link>
         );
@@ -195,7 +187,7 @@ function WatchRail({
           어디서 왔는지를 설명하는 각주라 목록 옆에 붙어야 뜻이 통한다.
           mt-auto 로 레일 바닥에 밀어붙인다. */}
       <div className="mt-auto flex flex-col gap-1 border-t border-line-14 px-[14px] py-3">
-        <span className={LABEL} style={LABEL_STYLE}>
+        <span className={CONSOLE_LABEL} style={CONSOLE_LABEL_STYLE}>
           universe
         </span>
         <span className="num text-muted-60" style={{ fontSize: 11 }}>
@@ -206,192 +198,5 @@ function WatchRail({
         </span>
       </div>
     </aside>
-  );
-}
-
-function ConsoleHeadline({
-  stock,
-  quote,
-}: {
-  stock: StockRef;
-  quote: Quote;
-}) {
-  return (
-    <div className="flex flex-wrap items-start justify-between gap-4 px-5 py-4">
-      <span className="flex flex-col gap-1.5">
-        <span className="flex items-baseline gap-2.5">
-          <h1 className="font-serif-kr font-bold" style={{ fontSize: 25 }}>
-            {stock.name}
-          </h1>
-          <span
-            className="num text-muted-60"
-            style={{ fontSize: 11.5, letterSpacing: "0.1em" }}
-          >
-            {stock.symbol} · {stock.market}
-          </span>
-        </span>
-        {stock.nameEn ? (
-          <span
-            className={LABEL}
-            style={{ fontSize: 10.5, letterSpacing: "0.14em" }}
-          >
-            {stock.nameEn}
-          </span>
-        ) : null}
-      </span>
-
-      <span className="flex items-baseline gap-3">
-        <span className="num font-medium leading-none" style={{ fontSize: 38 }}>
-          {quote.currency === "USD"
-            ? decimal(quote.price, 2)
-            : fmtPrice(quote.price)}
-        </span>
-        {/* 화살표·색 분기를 여기서 다시 쓰지 않는다 — Delta 가 유일한 소유자다
-            (00-READ-FIRST "하지 말 것"). 이전 구현은 글리프는 change 부호로,
-            색은 changePercent 부호로 갈라 둘이 어긋날 수 있었다. */}
-        <Delta
-          change={quote.change}
-          changePercent={quote.changePercent}
-          size={12.5}
-          layout="column"
-        />
-      </span>
-    </div>
-  );
-}
-
-function ConsoleChart({ candles }: { candles: StockDetail["candles"] }) {
-  return (
-    <section className="flex flex-col gap-2.5 border-t border-line-14 px-5 py-3.5">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <span className="flex gap-3.5">
-          {["MA20", "MA60", "BB(20,2)", "VOL"].map((item) => (
-            <span key={item} className={LABEL} style={LABEL_STYLE}>
-              {item}
-            </span>
-          ))}
-        </span>
-        <span className="flex gap-3.5">
-          <span className={LABEL} style={LABEL_STYLE}>
-            scroll=zoom
-          </span>
-          <span className={LABEL} style={LABEL_STYLE}>
-            hover=ohlcv
-          </span>
-        </span>
-      </div>
-      <StockChart
-        candles={candles}
-        height={320}
-        heightClassName="h-[220px] md:h-[320px]"
-      />
-    </section>
-  );
-}
-
-/** 3열 × 2행 지표 그리드 — 2a 의 우측 레일 6행과 같은 데이터다 */
-function MetricGrid({ metrics }: { metrics: Metric[] }) {
-  return (
-    <section className="grid grid-cols-2 border-t border-line-14 md:grid-cols-3">
-      {metrics.map((metric) => (
-        <div
-          key={metric.label}
-          className="flex flex-col gap-1.5 border-b border-r border-line-14 px-4 py-3.5"
-        >
-          <span
-            className={LABEL}
-            style={{ fontSize: 9.5, letterSpacing: "0.14em" }}
-          >
-            {metric.label}
-          </span>
-          <span
-            className={`num font-medium ${
-              metric.accent === "up"
-                ? "text-up"
-                : metric.accent === "down"
-                  ? "text-down"
-                  : "text-ink"
-            }`}
-            style={{ fontSize: 15 }}
-          >
-            {metric.value}
-          </span>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-function ContentRail({
-  news,
-  reports,
-  now,
-}: {
-  news: NewsItem[];
-  reports: AnalystReport[];
-  now: string;
-}) {
-  return (
-    <aside className="flex w-full flex-col md:w-[252px]">
-      <h2 className={`${LABEL} px-[14px] py-3`} style={LABEL_STYLE}>
-        news · {news.length}
-      </h2>
-      {news.map((item) => {
-        // 링크 없는 기사는 앵커로 감싸지 않는다 (href="" = 현재 문서 재요청)
-        const Row = item.url ? "a" : "div";
-        return (
-          <Row
-            key={`${item.publisher}-${item.title}`}
-            {...(item.url
-              ? { href: item.url, target: "_blank", rel: "noopener noreferrer" }
-              : {})}
-            className="flex min-h-[var(--tap)] flex-col justify-center gap-1 border-b border-line-14 px-[14px] py-2.5 hover:bg-surface-hover md:min-h-0"
-          >
-            <span
-              className="text-pretty"
-              style={{ fontSize: 12.5, lineHeight: 1.45 }}
-            >
-              {item.title}
-            </span>
-            {/* 상대 시각이 빠져 있었다 — 뉴스는 언제 것인지가 절반이다 */}
-            <span className="num text-muted-50" style={{ fontSize: 9.5 }}>
-              {item.publisher} · {relative(item.publishedAt, now)}
-            </span>
-          </Row>
-        );
-      })}
-
-      <h2 className={`${LABEL} px-[14px] py-3`} style={LABEL_STYLE}>
-        reports · {reports.length}
-      </h2>
-      {reports.map((item) => (
-        <div
-          key={item.publisher + item.title}
-          className="flex flex-col gap-1 border-b border-line-14 px-[14px] py-2.5"
-        >
-          <span style={{ fontSize: 12.5 }}>{item.publisher}</span>
-          <span
-            className="num truncate text-muted-50"
-            style={{ fontSize: 10.5 }}
-          >
-            {item.title}
-          </span>
-        </div>
-      ))}
-    </aside>
-  );
-}
-
-/** 중앙 열 하단은 API 메서드 노트만 남는다 — UNIVERSE 는 좌측 레일로 옮겼다 */
-function ConsoleFooter({ notes }: { notes: string[] }) {
-  return (
-    <footer className="mt-auto border-t border-line-14 px-5 py-3.5">
-      <span
-        className="num text-muted-45"
-        style={{ fontSize: 9.5, lineHeight: 1.6 }}
-      >
-        {notes.join(" / ")}
-      </span>
-    </footer>
   );
 }

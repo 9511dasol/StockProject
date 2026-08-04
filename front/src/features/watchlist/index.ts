@@ -11,6 +11,7 @@ export { BulkActionBar } from "./components/BulkActionBar";
 export { WATCH_GRID } from "./components/grid";
 
 export { returnPercent, SORT_LABELS } from "./model/types";
+export { ALL_GROUP, visibleItems } from "./model/sort";
 export type {
   AlertRule,
   Holding,
