@@ -26,6 +26,17 @@ export class ApiError extends Error {
   get isUpstream(): boolean {
     return this.status === 503 || this.code === "provider_unavailable";
   }
+
+  /**
+   * 백엔드에 닿지도 못한 경우 — 서버가 안 떠 있거나 주소·포트가 틀렸다.
+   *
+   * 다른 실패와 구분해야 하는 이유: 재시도가 소용없고, 사용자(개발자)가 할 일이
+   * "잠시 뒤 다시"가 아니라 "백엔드를 켜라"다. 이걸 뭉뚱그리면 화면이
+   * "yfinance 응답이 늦습니다" 라고 거짓말을 한다.
+   */
+  get isOffline(): boolean {
+    return this.status === 0;
+  }
 }
 
 /** back/app/core/exceptions.py 가 내려주는 형태 */

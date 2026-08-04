@@ -147,4 +147,32 @@ describe("apiGetCached — 오류는 타임아웃과 구분한다", () => {
       (error: unknown) => error instanceof ApiError,
     );
   });
+
+  test("연결 실패는 isOffline 로 식별된다 — 상류 오류와 다른 화면으로 가야 한다", async () => {
+    // 백엔드가 안 떠 있거나 STOCK_API_BASE_URL 의 포트가 틀리면 여기로 온다.
+    // 재시도가 소용없으므로 503(isUpstream)·404(isNotFound)와 반드시 갈라져야 한다.
+    stubFetch(async () => {
+      throw new TypeError("fetch failed");
+    });
+
+    await assert.rejects(
+      apiGetCached("/stocks/history", { query: { symbol: "005930" }, revalidate: 60 }),
+      (error: unknown) =>
+        error instanceof ApiError &&
+        error.isOffline &&
+        error.status === 0 &&
+        error.code === "network_error" &&
+        !error.isNotFound &&
+        !error.isUpstream,
+    );
+  });
+
+  test("503 은 isOffline 이 아니다 — 백엔드는 살아 있고 공급자만 죽은 것이다", async () => {
+    stubFetch(async () => json({ error: { code: "provider_unavailable" } }, 503));
+
+    await assert.rejects(
+      apiGetCached("/stocks/history", { query: { symbol: "005930" }, revalidate: 60 }),
+      (error: unknown) => error instanceof ApiError && error.isUpstream && !error.isOffline,
+    );
+  });
 });
