@@ -24,7 +24,7 @@ class StockAdviceRequest(BaseModel):
 class InvestmentDecision(BaseModel):
     """의사결정 에이전트의 구조화 출력 스키마.
 
-    Anthropic SDK의 `messages.parse(output_format=...)`에 그대로 전달된다. 구조화 출력이
+    OpenAI SDK의 `responses.parse(text_format=...)`에 그대로 전달된다. 구조화 출력이
     지원하지 않는 수치 제약(`ge`/`le`)은 SDK가 전송 스키마에서 제거하고 클라이언트
     측에서 검증한다.
     """

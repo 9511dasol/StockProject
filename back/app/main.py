@@ -53,7 +53,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     if settings.db_create_all_on_startup:
         await create_all()
-    logger.info("%s 시작 (model=%s)", settings.app_name, settings.anthropic_model)
+    logger.info("%s 시작 (model=%s)", settings.app_name, settings.openai_model)
 
     warm_up = asyncio.create_task(_warm_up())
 

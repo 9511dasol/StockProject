@@ -65,19 +65,17 @@ class Settings(BaseSettings):
     # 캐시에 담아 둘 종목 수 상한. 임의 심볼이 키라 상한이 없으면 무한히 증가한다.
     stock_fundamentals_cache_size: int = Field(default=512, ge=1)
 
-    # --- LLM ---
-    anthropic_api_key: str | None = None
-    # 미설정 시 SDK가 ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / `ant auth login`
-    # 프로필 순서로 자격 증명을 해석한다.
-    anthropic_model: str = "claude-opus-5"
+    # --- LLM (OpenAI) ---
+    # 미설정 시 SDK가 OPENAI_API_KEY 환경 변수를 읽는다.
+    openai_api_key: str | None = None
+    # 추론 강도(llm_effort)를 쓰므로 gpt-5 계열이나 o 시리즈여야 한다.
+    # 비추론 모델로 바꾸면 reasoning 파라미터에서 400이 날 수 있다.
+    openai_model: str = "gpt-5.4"
+    # 추론 토큰도 이 상한을 함께 먹는다 — 너무 낮으면 본문이 빈 채로 incomplete 가 된다.
     llm_max_tokens: int = Field(default=16000, ge=1024)
     llm_effort: EffortLevel = "medium"
     llm_timeout_seconds: float = Field(default=300.0, gt=0)
     llm_max_retries: int = Field(default=2, ge=0)
-    # 안전 분류기가 요청을 거절하면 서버 측에서 권장 대체 모델로 재실행한다.
-    # 베타 기능이라 조직별로 사용 가능 여부가 다르다 — 400이 나면 false로 두면 된다.
-    # 끄더라도 이 앱은 규칙 기반 판단으로 자체 폴백한다.
-    llm_server_side_fallback: bool = True
 
 
 @lru_cache

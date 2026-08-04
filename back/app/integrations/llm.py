@@ -2,16 +2,19 @@
 
 **앱 전체에서 이 파일 하나만 LLM SDK를 import한다.** 에이전트 계층은 `ask_text`와
 `ask_structured` 두 함수만 보므로, 프로바이더를 바꾸려면 이 파일만 교체하면 된다
-(그래서 파일명이 `anthropic_client`가 아니라 `llm`이다).
+(그래서 파일명이 `openai_client`가 아니라 `llm`이다). 실제로 Anthropic → OpenAI
+교체 때 바뀐 것은 이 파일과 설정 4줄뿐이고 에이전트 코드는 손대지 않았다.
 
-현재 구현은 공식 Anthropic SDK의 비동기 클라이언트다 — 에이전트 3건을
-`asyncio.gather`로 병렬 실행할 수 있고, 구조화 출력은 `messages.parse`가 Pydantic
-모델로 검증까지 해준다.
+현재 구현은 공식 OpenAI SDK의 비동기 클라이언트이며 **Responses API**를 쓴다.
+Chat Completions가 아니라 Responses인 이유는 구조화 출력(`text_format=`)이 Pydantic
+모델을 그대로 받아 검증까지 해주기 때문이다 — 최종 판단이 `InvestmentDecision`
+스키마를 반드시 만족해야 하는 이 앱의 요구와 맞는다.
 """
 
 import logging
 
-from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
+from openai.types.responses import Response
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -19,18 +22,13 @@ from app.core.exceptions import LLMRefusedError
 
 logger = logging.getLogger(__name__)
 
-# `fallbacks="default"`(스칼라 형태)를 게이트하는 베타 헤더.
-# 배열 형태(`fallbacks=[{...}]`)는 -2026-06-01을 쓴다 — 헤더와 형태를 섞으면 400이다.
-_FALLBACK_BETA = "server-side-fallback-2026-07-01"
-
-_client: AsyncAnthropic | None = None
+_client: AsyncOpenAI | None = None
 
 
-def get_client() -> AsyncAnthropic:
+def get_client() -> AsyncOpenAI:
     """프로세스 수명 동안 재사용되는 클라이언트.
 
-    `api_key`를 넘기지 않으면 SDK가 ANTHROPIC_API_KEY → ANTHROPIC_AUTH_TOKEN →
-    `ant auth login` 프로필 순으로 자격 증명을 해석한다.
+    `api_key`를 넘기지 않으면 SDK가 `OPENAI_API_KEY` 환경 변수를 읽는다.
     """
     global _client
     if _client is None:
@@ -38,9 +36,9 @@ def get_client() -> AsyncAnthropic:
             "timeout": settings.llm_timeout_seconds,
             "max_retries": settings.llm_max_retries,
         }
-        if settings.anthropic_api_key:
-            kwargs["api_key"] = settings.anthropic_api_key
-        _client = AsyncAnthropic(**kwargs)  # type: ignore[arg-type]
+        if settings.openai_api_key:
+            kwargs["api_key"] = settings.openai_api_key
+        _client = AsyncOpenAI(**kwargs)  # type: ignore[arg-type]
     return _client
 
 
@@ -51,35 +49,52 @@ async def close_client() -> None:
         _client = None
 
 
-def _fallback_kwargs() -> dict:
-    if not settings.llm_server_side_fallback:
-        return {}
-    return {"betas": [_FALLBACK_BETA], "fallbacks": "default"}
+def _reasoning() -> dict:
+    """추론 강도. gpt-5 계열·o 시리즈에서만 유효하다.
+
+    비추론 모델을 `OPENAI_MODEL`에 넣으면 이 파라미터에서 400이 날 수 있다 —
+    그럴 때는 `LLM_EFFORT`가 아니라 모델 선택을 되돌아본다.
+    """
+    return {"effort": settings.llm_effort}
 
 
-def _text_of(response) -> str:
-    return "".join(block.text for block in response.content if block.type == "text").strip()
+def _refusal_of(response: Response) -> str | None:
+    """거절 사유. 거절은 예외가 아니라 출력 블록으로 온다 — 반드시 먼저 검사한다."""
+    for item in response.output:
+        if item.type != "message":
+            continue
+        for content in item.content:
+            if content.type == "refusal":
+                return content.refusal
+    return None
+
+
+def _guard(response: Response) -> None:
+    refusal = _refusal_of(response)
+    if refusal:
+        raise LLMRefusedError(detail=refusal)
+
+    # 추론 토큰이 max_output_tokens를 다 먹으면 status가 incomplete로 끝나고 본문이 빈다.
+    # 그대로 두면 상위 계층에 "빈 응답"으로만 보여 원인을 못 찾는다.
+    if response.status == "incomplete":
+        reason = getattr(response.incomplete_details, "reason", None)
+        logger.warning("응답이 incomplete 로 끝났습니다 (reason=%s)", reason)
 
 
 async def ask_text(system_prompt: str, user_content: str) -> str:
     """자유 서술 응답 한 건. 거절되면 `LLMRefusedError`."""
     client = get_client()
-    response = await client.beta.messages.create(
-        model=settings.anthropic_model,
-        max_tokens=settings.llm_max_tokens,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_content}],
-        # Opus 5는 thinking이 기본 on이지만, 다른 모델로 바꿔도 동작이 같도록 명시한다.
-        thinking={"type": "adaptive"},
-        output_config={"effort": settings.llm_effort},
-        **_fallback_kwargs(),
+    response = await client.responses.create(
+        model=settings.openai_model,
+        max_output_tokens=settings.llm_max_tokens,
+        # Responses API 는 system 역할 대신 instructions 를 쓴다.
+        instructions=system_prompt,
+        input=user_content,
+        reasoning=_reasoning(),
     )
 
-    # 거절은 HTTP 200으로 온다 — content를 읽기 전에 반드시 검사한다.
-    if response.stop_reason == "refusal":
-        raise LLMRefusedError(detail=str(getattr(response, "stop_details", None)))
-
-    return _text_of(response)
+    _guard(response)
+    return response.output_text.strip()
 
 
 async def ask_structured[ModelT: BaseModel](
@@ -89,24 +104,22 @@ async def ask_structured[ModelT: BaseModel](
 ) -> ModelT:
     """스키마가 검증된 구조화 응답.
 
-    `output_config`(effort)는 넘기지 않는다 — `output_format`이 내부적으로
-    `output_config.format`을 채우므로 둘을 함께 지정하지 않는다. 최종 판단은
-    기본 effort(high)가 적절하기도 하다.
+    `text_format`에 Pydantic 모델을 그대로 넘기면 SDK가 JSON 스키마로 변환해
+    보내고, 응답을 다시 그 모델로 파싱해 `output_parsed`에 담는다.
     """
     client = get_client()
-    response = await client.beta.messages.parse(
-        model=settings.anthropic_model,
-        max_tokens=settings.llm_max_tokens,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_content}],
-        output_format=output_model,
-        **_fallback_kwargs(),
+    response = await client.responses.parse(
+        model=settings.openai_model,
+        max_output_tokens=settings.llm_max_tokens,
+        instructions=system_prompt,
+        input=user_content,
+        text_format=output_model,
+        reasoning=_reasoning(),
     )
 
-    if response.stop_reason == "refusal":
-        raise LLMRefusedError(detail=str(getattr(response, "stop_details", None)))
+    _guard(response)
 
-    parsed = response.parsed_output
+    parsed = response.output_parsed
     if parsed is None:
         raise LLMRefusedError("구조화 응답을 파싱하지 못했습니다.")
 
