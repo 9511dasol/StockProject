@@ -5,6 +5,8 @@
 확인한 동작만 기술한다.
 
 - 기준 코드: `app/api/v1/endpoints/stocks.py`, `app/api/v1/endpoints/markets.py`, `app/main.py`
+- **화면을 새로 짤 때는 [`api-screens.md`](api-screens.md)를 본다** — 화면별로 어떤 API를 어떤
+  순서로 부르는지, 성능 예산과 아직 없는 API가 정리돼 있다. 이 문서는 엔드포인트별 상세다.
 - 대응 기획 문서: [`docs/product-plan.md`](../../docs/product-plan.md) 6.1–6.4 / 7장
 - 자동 생성 문서: `http://127.0.0.1:8000/docs` (OpenAPI)
 
@@ -31,14 +33,24 @@
 |---|---|---|---|---|
 | 1 | GET | `/health` | 헬스체크 | — |
 | 2 | GET | `/api/v1/markets/overview` | 카테고리별 시장 개요 | 6.1 |
+| 2b | GET | `/api/v1/markets/ranking` | 시가총액 · 등락률 랭킹 (탐색 화면) | 6.1 |
 | 3 | GET | `/api/v1/stocks/history` | 주가 히스토리 + 보조지표 (+뉴스·리포트) | 6.3 |
 | 4 | GET | `/api/v1/stocks/content` | 종목 뉴스 · 애널리스트 리포트 | 6.3 |
-| 5 | GET | `/api/v1/stocks/suggestions` | 종목명 · 코드 · 초성 자동완성 | 6.2 |
-| 6 | GET | `/api/v1/stocks/listed-companies` | 상장사 목록 준비 상태 | 6.2 |
-| 7 | POST | `/api/v1/stocks/advice` | AI 멀티 에이전트 투자 판단 | 6.4 |
-| 8 | POST | `/api/v1/stocks/advice/stream` | 위와 동일 + SSE 단계 스트리밍 | 6.4 |
+| 5 | GET | `/api/v1/stocks/fundamentals` | 재무 · 밸류에이션 | 6.3 |
+| 6 | GET | `/api/v1/stocks/suggestions` | 종목명 · 코드 · 초성 자동완성 | 6.2 |
+| 7 | GET | `/api/v1/stocks/listed-companies` | 상장사 목록 준비 상태 | 6.2 |
+| 8 | POST | `/api/v1/stocks/advice` | AI 멀티 에이전트 투자 판단 | 6.4 |
+| 9 | POST | `/api/v1/stocks/advice/stream` | 위와 동일 + SSE 단계 스트리밍 | 6.4 |
 
-OpenAPI 태그는 `meta`(1), `markets`(2), `stocks`(3–8)이다.
+`/api/v1/markets/movers`(등락률 랭킹)와 `/api/v1/markets/ranking`(탐색 목록)도 구현돼 있으나
+이 문서에는 아직 개별 절이 없다. 두 엔드포인트의 화면 계약은
+[`api-screens.md`](api-screens.md) §2.2·§2.2b 에 있다.
+
+`ranking` 은 `movers` 와 **같은 스냅샷**을 다르게 자른다 — 시총순/등락률순 정렬,
+`board` 로 KOSPI/KOSDAQ 필터(심볼 접미사 `.KS`/`.KQ` 기준), `total`/`rank`/`market_cap` 포함.
+DB 의 `market` 컬럼은 `유가`·`코스닥` 같은 한글이라 필터에 쓸 수 없다.
+
+OpenAPI 태그는 `meta`(1), `markets`(2), `stocks`(3–9)이다.
 
 ### 1.3 공통 오류 응답
 
@@ -92,6 +104,9 @@ FastAPI 파라미터 검증 실패(422)만 `fields`가 추가된다.
 | 최종 판단 LLM 실패·거절 | 규칙 기반 판단 | `decision_source == "fallback"` |
 | 뉴스 조회 실패 | 빈 배열 | `news == []` |
 | 리포트 조회 실패 | 빈 배열 | `reports == []` |
+| 재무 항목별 조회 실패 | 해당 필드만 `null` | `per == null` 등 |
+| 재무 갱신 실패 (캐시 만료 후) | 직전 스냅샷 유지 | (응답에 드러나지 않음, 로그만) |
+| AI 판단 경로의 재무 조회 실패 | 컨텍스트에서 제외 | (응답에 드러나지 않음, 로그만) |
 | 상장사 수집 실패 | KRX → KIND → 내부 기본 목록 | `source`, `steps[]` |
 | 시가총액 배치 실패 | 랭킹이 폴백 정렬로 하향 | (응답에 드러나지 않음, 로그만) |
 
@@ -347,7 +362,7 @@ GET /api/v1/stocks/history?symbol=AAPL&start_date=2026-01-01&end_date=2026-07-29
 | `reports` | AnalystReport[] | `include_content=false`면 `[]` |
 | `metrics` | StockMetrics \| null | 유효 봉이 하나도 없으면 `null` |
 
-`rows[]`와 `metrics` 필드는 [9장 스키마 사전](#9-스키마-사전) 참고.
+`rows[]`와 `metrics` 필드는 [10장 스키마 사전](#10-스키마-사전) 참고.
 
 지표를 응답에 함께 담는 이유: 계산 소유자를 백엔드 한 곳으로 두어 프런트가 같은 계산을
 TypeScript로 재구현하지 않게 한다.
@@ -432,7 +447,92 @@ GET /api/v1/stocks/content?symbol=005930.KS
 
 ---
 
-## 6. GET /api/v1/stocks/suggestions
+## 6. GET /api/v1/stocks/fundamentals
+
+재무 · 밸류에이션 (명세 6.3).
+
+**요청**
+
+```http
+GET /api/v1/stocks/fundamentals?symbol=005930.KS
+```
+
+**쿼리 파라미터**
+
+| 이름 | 필수 | 기본값 | 제한 |
+|---|---:|---:|---|
+| `symbol` | 예 | — | 1~80자 |
+
+**`/stocks/history`의 `symbol` 값을 그대로 넘긴다.** `/stocks/content`와 같은 계약으로,
+후보 심볼 탐색을 하지 않는다. 별칭(`삼성전자`)을 넘기면 조회가 실패해 전 필드가 `null`인
+응답이 돌아온다(오류가 아니다).
+
+**주가·뉴스와 분리한 이유**는 비용이다. `ticker.info` 한 번이 0.5~1.5초이고 여기에
+밸류에이션·손익계산서 호출이 붙어 종목당 1~2초가 든다. `/history`의 차트 경로(0.13초)가
+이걸 기다리면 안 된다.
+
+**동작**
+
+- **PER·PBR은 `get_valuation_measures()`가 1차 소스다.** 국내 종목은
+  `info["trailingPE"]`/`["priceToBook"]`가 **항상 `null`**이다 (실측: 005930.KS ·
+  000660.KS · 247540.KQ 전부). 이 API는 **yfinance ≥ 1.5**에만 있으므로
+  `pyproject.toml`의 핀을 낮추면 국내 전 종목의 PER/PBR이 조용히 빈다. `AttributeError`가
+  나면 WARNING 로그를 남긴다.
+- **`roe_pct`와 `dividend_yield_pct`는 단위 규약이 다르다.** 같은 `info` dict에서 오는데도
+  `returnOnEquity`는 소수(0.30792)라 ×100 해서 담고, `dividendYield`는 공급자가 이미
+  백분율(0.57 = 0.57%)로 주므로 그대로 담는다. 화면에 배당수익률 57%가 뜨면 여기를 본다.
+- **`next_earnings_date`는 `earningsTimestampStart` 기준이다.** `earningsTimestamp`는
+  **직전** 발표일이라 쓰지 않는다 (실측 2026-08-04 기준 005930.KS: 전자 2026-07-29,
+  후자 2026-10-28 — 후자가 `calendar["Earnings Date"]`와 일치).
+- `ex_dividend_date`는 원본 epoch를 **UTC**로 변환한다. yfinance의 `calendar`는 naive
+  `datetime.fromtimestamp()`를 써서 서버 타임존에 따라 하루가 밀리므로 폴백으로만 쓴다.
+- **`eps`/`bps`는 국내 종목에서 `현재가 ÷ PER`, `현재가 ÷ PBR` 역산값이다.** 공급자가
+  `trailingEps`/`bookValue`를 주지 않기 때문이다. 화면의 PER·PBR과 곱셈이 맞아떨어지는
+  값이지만 **사업보고서의 공시 EPS와는 다르다.**
+- `market_cap`은 `info["marketCap"]`을 우선한다. 밸류에이션 표의 `Market Cap`은 야후의
+  다른 가격 기준이라 10% 가까이 어긋나며, 앱의 다른 곳(`krx/market_cap.py`)도 전자를 쓴다.
+- 종목당 `STOCK_FUNDAMENTALS_TTL_SECONDS`(기본 900초) 캐시가 붙는다. 미스는 1~2초,
+  히트는 즉시다. 같은 종목의 동시 요청은 종목별 락으로 한 번의 조회로 합쳐진다.
+  캐시는 프로세스 메모리에만 있고 `STOCK_FUNDAMENTALS_CACHE_SIZE`(기본 512)를 넘으면
+  가장 오래된 항목부터 버린다.
+- **부분 실패는 `null`로 흡수한다 — 전 필드가 `null`이어도 200이다.** 갱신에 실패했는데
+  직전 값이 있으면 그 값을 낸다.
+
+**응답 200** — `StockFundamentals`
+
+```json
+{
+  "symbol": "005930.KS",
+  "currency": "KRW",
+  "per": 21.06,
+  "pbr": 3.64,
+  "eps": 11396.01,
+  "bps": 65934.07,
+  "roe_pct": 30.79,
+  "market_cap": 1575975166935040.0,
+  "dividend_yield_pct": 0.57,
+  "dividend_per_share": 1496.0,
+  "ex_dividend_date": "2026-06-29",
+  "next_earnings_date": "2026-10-28",
+  "annual": [
+    { "fiscal_year": 2025, "revenue": 333605938000000.0, "operating_income": 43601051000000.0 },
+    { "fiscal_year": 2024, "revenue": 300870903000000.0, "operating_income": 32725961000000.0 }
+  ]
+}
+```
+
+필드 설명은 [10장 스키마 사전](#10-스키마-사전) 참고.
+
+**오류**
+
+| HTTP | code | 조건 |
+|---:|---|---|
+| 422 | `validation_error` | `symbol` 길이 위반 |
+| 503 | `provider_unavailable` | yfinance 미설치 |
+
+---
+
+## 7. GET /api/v1/stocks/suggestions
 
 종목명 · 코드 · 초성 자동완성 (명세 6.2).
 
@@ -456,7 +556,7 @@ GET /api/v1/stocks/suggestions?query=005930
 1. **첫 호출은 느릴 수 있다.** 저장된 상장사가 임계값(`LISTED_COMPANY_MIN_COUNT`, 기본 100)
    미만이면 외부 수집(KRX CSV → KIND HTML → 내부 기본 종목)을 먼저 수행한다. 동시 요청이
    같은 수집을 중복 실행하지 않도록 락으로 감싼다. 프런트는 이 지연 동안
-   [`/stocks/listed-companies`](#7-get-apiv1stockslisted-companies)를 폴링해 안내 배너를 띄운다.
+   [`/stocks/listed-companies`](#8-get-apiv1stockslisted-companies)를 폴링해 안내 배너를 띄운다.
 2. 시가총액 갱신(랭킹 가중치)은 하루 1회, **백그라운드 태스크**로 던지고 기다리지 않는다.
    이번 검색은 기존(또는 비어 있는) 시총으로 랭킹된다.
 3. 입력을 검색어와 초성으로 각각 정규화한다. 둘 다 비면 `[]`를 반환한다.
@@ -509,7 +609,7 @@ GET /api/v1/stocks/suggestions?query=005930
 
 ---
 
-## 7. GET /api/v1/stocks/listed-companies
+## 8. GET /api/v1/stocks/listed-companies
 
 상장사 목록 준비 상태 (명세 6.2).
 
@@ -558,9 +658,9 @@ GET /api/v1/stocks/listed-companies
 
 ---
 
-## 8. AI 투자 판단
+## 9. AI 투자 판단
 
-### 8.1 공통 오케스트레이션
+### 9.1 공통 오케스트레이션
 
 `/stocks/advice`와 `/stocks/advice/stream`은 같은 흐름을 공유한다.
 
@@ -617,7 +717,7 @@ GET /api/v1/stocks/listed-companies
 
 ---
 
-### 8.2 POST /api/v1/stocks/advice
+### 9.2 POST /api/v1/stocks/advice
 
 **요청**
 
@@ -687,7 +787,7 @@ LLM 실패는 오류가 아니다 — 200으로 응답하고 `decision_source`/`
 
 ---
 
-### 8.3 POST /api/v1/stocks/advice/stream
+### 9.3 POST /api/v1/stocks/advice/stream
 
 `/advice`와 같은 결과를 4단계로 나눠 흘린다 (SSE).
 
@@ -809,7 +909,7 @@ while (true) {
 
 ---
 
-## 9. 스키마 사전
+## 10. 스키마 사전
 
 ### StockRow
 
@@ -870,6 +970,32 @@ while (true) {
 | `summary` | string | `" · "`로 이어붙인 세부 정보 |
 | `url` | string | 심볼의 Yahoo Finance analysis 페이지 |
 
+### StockFundamentals
+
+| 필드 | 타입 | 비고 |
+|---|---|---|
+| `symbol` | string | 요청한 심볼 그대로 |
+| `currency` | string \| null | `KRW` · `USD` |
+| `per` / `pbr` | number \| null | `get_valuation_measures()` 우선, `info` 폴백. **국내 종목은 전자만 값이 있다** |
+| `eps` / `bps` | number \| null | 공급자 값이 없으면 `현재가 ÷ PER`, `현재가 ÷ PBR` **역산**. 공시 EPS가 아니다 |
+| `roe_pct` | number \| null | **소수를 ×100 한 값** (0.30792 → 30.79) |
+| `market_cap` | number \| null | `info["marketCap"]` 우선 |
+| `dividend_yield_pct` | number \| null | **공급자가 이미 백분율로 준다** (0.57 = 0.57%). 위 ROE와 규약이 반대다 |
+| `dividend_per_share` | number \| null | 연간 forward DPS |
+| `ex_dividend_date` | string \| null | `YYYY-MM-DD`. 원본 epoch를 UTC로 변환 |
+| `next_earnings_date` | string \| null | `YYYY-MM-DD`. **`earningsTimestampStart` 기준** (`earningsTimestamp`는 직전 발표일이라 쓰지 않는다). 공급자 추정치일 수 있다 |
+| `annual` | AnnualFinancial[] | 최신 회계연도부터 내림차순, 최대 4개년 |
+
+전 필드가 `null`일 수 있다. 그래도 200이다.
+
+### AnnualFinancial
+
+| 필드 | 타입 | 비고 |
+|---|---|---|
+| `fiscal_year` | number | 2025 |
+| `revenue` | number \| null | `TotalRevenue` → `OperatingRevenue` |
+| `operating_income` | number \| null | `OperatingIncome` → `TotalOperatingIncomeAsReported`. **음수(영업손실)가 정상적으로 나온다** |
+
 ### AgentOpinion
 
 | 필드 | 타입 | 비고 |
@@ -886,7 +1012,7 @@ Pydantic 정의는 `app/schemas/`에 있고, 서버 기동 후 `http://127.0.0.1
 
 ---
 
-## 10. 프런트 호출 시나리오
+## 11. 프런트 호출 시나리오
 
 **홈 화면**
 
@@ -905,10 +1031,16 @@ GET /api/v1/stocks/suggestions?query=삼성      # 입력 디바운스 후
 
 ```
 GET /api/v1/stocks/history?symbol=005930.KS&include_content=false   # 빠름 — 차트·지표
-GET /api/v1/stocks/content?symbol=005930.KS                          # 위 응답의 symbol을 그대로
+# 아래 둘은 서로 독립이라 병렬로 던진다. 위 응답의 symbol을 그대로 넘긴다.
+GET /api/v1/stocks/content?symbol=005930.KS                          # 뉴스·리포트
+GET /api/v1/stocks/fundamentals?symbol=005930.KS                     # 재무 탭·밸류에이션
 ```
 
 한 번에 받아도 되면 `include_content`를 생략(기본 `true`)하고 `/history`만 호출한다.
+`/fundamentals`는 `/history`에 합쳐지지 않는다 — 종목당 1~2초라 차트를 잡아둔다.
+
+프런트는 `/content`와 `/fundamentals`의 실패를 모두 삼킨다(빈 목록 · `null`). 재무 한 칸
+때문에 상세 페이지가 에러 화면이 되면 안 되기 때문이다.
 
 **AI 판단**
 
@@ -922,7 +1054,7 @@ POST /api/v1/stocks/advice           # 결과만 필요할 때
 
 ---
 
-## 11. 참고: 현재 없는 기능
+## 12. 참고: 현재 없는 기능
 
 `docs/product-plan.md` 7.5의 `POST /conversations/{id}/stock-advice`(인증된 대화방 투자 판단)는
 현재 백엔드에 구현돼 있지 않다. 라우터에 인증·대화방 관련 엔드포인트는 존재하지 않는다.

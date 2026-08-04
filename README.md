@@ -10,9 +10,9 @@
 
 | 디렉터리 | 스택 | 역할 |
 |---|---|---|
-| [`back/`](back/) | FastAPI · SQLAlchemy(async) · Pydantic v2 · Anthropic SDK | 시세·검색·지표·AI 판단 API |
+| [`back/`](back/) | FastAPI · SQLAlchemy(async) · Pydantic v2 · OpenAI SDK | 시세·검색·지표·AI 판단 API |
 | [`front/`](front/) | Next.js 16 (App Router · Cache Components) · Tailwind v4 · axios | SSR 리서치 화면 |
-| [`docs/`](docs/) | — | 제품·사업 기획서 ([사주 통합 기획](docs/saju-integration-plan.md) · [초기 제품 기획](docs/product-plan.md)) |
+| [`docs/`](docs/) | — | [작업 노트](docs/작업노트.md)(변경 이력·현재 상태) · 기획서([사주 통합](docs/saju-integration-plan.md) · [초기 제품](docs/product-plan.md)) |
 
 ## 실행
 
@@ -22,7 +22,7 @@
 # 1) 백엔드 → http://127.0.0.1:8000  (문서: /docs)
 cd back
 uv sync --all-groups
-cp .env.example .env          # ANTHROPIC_API_KEY 입력 (없으면 규칙 기반으로 동작)
+cp .env.example .env          # OPENAI_API_KEY 입력 (없으면 규칙 기반으로 동작)
 uv run fastapi dev
 
 # 2) 프런트 → http://localhost:3000
@@ -37,7 +37,7 @@ npm run dev
 | 화면 | 경로 | 사용하는 API |
 |---|---|---|
 | 시장 현황 | `/` | `GET /api/v1/markets/overview` |
-| 종목 상세 | `/stocks/[symbol]` | `GET /api/v1/stocks/history` |
+| 종목 상세 | `/stocks/[symbol]` | `GET /api/v1/stocks/history` · `/stocks/content` · `/stocks/fundamentals` |
 | AI 투자 판단 | `/stocks/[symbol]/advice` | `POST /api/v1/stocks/advice` |
 | 종목 자동완성 | 헤더 검색창 | `GET /api/v1/stocks/suggestions` (Next BFF 경유) |
 | 설계 문서 | `/wireframes` | — |
@@ -45,8 +45,8 @@ npm run dev
 ## 검증
 
 ```bash
-cd back  && uv run ruff check . && uv run pytest      # 린트 + 테스트 41개
-cd front && npx tsc --noEmit && npm run lint && npm run build
+cd back  && uv run ruff check . && uv run pytest                    # 린트 + 테스트 97개
+cd front && npx tsc --noEmit && npm run lint && npm test && npm run build   # + 테스트 43개
 ```
 
 ## 설계 메모
@@ -66,7 +66,12 @@ cd front && npx tsc --noEmit && npm run lint && npm run build
 전환은 전부 WARNING 로그를 남긴다.
 
 **지표 계산의 소유자는 백엔드** — `/stocks/history` 응답에 `metrics`가 포함되므로
-프런트는 같은 공식을 다시 구현하지 않는다.
+프런트는 같은 공식을 다시 구현하지 않는다. 재무·밸류에이션(`/stocks/fundamentals`)도
+단위 정규화까지 백엔드에서 끝내고 내려준다.
+
+**재무는 별도 엔드포인트** — 밸류에이션·배당 조회가 종목당 1~2초라 `/history`(차트 0.13초)에
+합치면 차트가 그걸 기다린다. 종목당 15분 TTL 캐시가 붙어 있고, 프런트는 실패를 `null`로
+삼켜 재무 한 칸 때문에 상세 페이지가 죽지 않게 한다.
 
 ## 알아두어야 할 것
 
@@ -74,5 +79,5 @@ cd front && npx tsc --noEmit && npm run lint && npm run build
   두 저장소로 갈지 정하고 첫 커밋을 만드는 편이 좋다 — 지금은 되돌릴 수단이 없다.
 - `back/_legacy/`는 `app/`으로 이관이 끝난 원본 보관소다. 실행되지 않으며 대조가 끝나면
   폴더째 지우면 된다.
-- 아직 쓰이지 않는 의존성이 있다: `alembic`, `bcrypt`, `pyjwt`, `fastapi-pagination`,
-  `openai`. 마이그레이션·인증·페이지네이션 도입 시점에 함께 정리한다.
+- 아직 쓰이지 않는 의존성이 있다: `bcrypt`, `pyjwt`, `fastapi-pagination`.
+  인증·페이지네이션 도입 시점에 함께 정리한다.

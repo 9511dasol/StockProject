@@ -7,7 +7,7 @@ FastAPI · 비동기 · Pydantic v2 · 멀티 에이전트 투자 판단.
 
 ```bash
 uv sync --all-groups
-cp .env.example .env          # ANTHROPIC_API_KEY 채우기 (없으면 규칙 기반으로 동작)
+cp .env.example .env          # OPENAI_API_KEY 채우기 (없으면 규칙 기반으로 동작)
 uv run fastapi dev            # 개발 (자동 리로드)
 uv run fastapi run            # 운영
 ```
@@ -27,6 +27,8 @@ uv run ruff format .   # 포맷
 ## 엔드포인트
 
 전체 파라미터 · 응답 필드 · 오류 코드는 [`docs/api-spec.md`](docs/api-spec.md)에 있다.
+화면을 새로 짤 때는 [`docs/api-screens.md`](docs/api-screens.md) — 화면별 호출 순서 · 성능 예산 ·
+아직 없는 API를 정리했다.
 
 | 메서드 | 경로 | 명세 | 설명 |
 |---|---|---|---|
@@ -35,6 +37,7 @@ uv run ruff format .   # 포맷
 | GET | `/api/v1/stocks/listed-companies` | 6.2 | 상장사 목록 준비 상태 (첫 호출 지연 배너용) |
 | GET | `/api/v1/stocks/history?symbol=` | 6.3 | OHLCV + SMA/볼린저밴드/교차신호 + 지표 + 뉴스 + 리포트 |
 | GET | `/api/v1/stocks/content?symbol=` | 6.3 | 뉴스 · 애널리스트 리포트만 (차트 우선 로딩용) |
+| GET | `/api/v1/stocks/fundamentals?symbol=` | 6.3 | PER · PBR · ROE · 배당 · 연간 실적 (종목당 15분 캐시) |
 | POST | `/api/v1/stocks/advice` | 6.4 | 에이전트 3인 병렬 분석 → 최종 판단 |
 | POST | `/api/v1/stocks/advice/stream` | 6.4 | 위와 동일 + 4단계 SSE 스트리밍 |
 | GET | `/health` | — | 헬스체크 |
@@ -90,19 +93,22 @@ FastAPI 없이 테스트할 수 있다.
 
 ## LLM 설정
 
-기본 모델은 `claude-opus-5`. 최종 판단은 `messages.parse(output_format=InvestmentDecision)`로
-스키마가 검증된 구조화 출력을 받는다.
+프로바이더는 **OpenAI**, 기본 모델은 `gpt-5.4`, API는 **Responses**다. 최종 판단은
+`responses.parse(text_format=InvestmentDecision)`로 스키마가 검증된 구조화 출력을 받는다.
 
 **앱에서 LLM SDK를 import하는 파일은 `app/integrations/llm.py` 하나뿐이다.** 에이전트
 계층은 `ask_text` / `ask_structured` 두 함수만 보므로 프로바이더 교체 시 이 파일만
-바꾸면 된다.
+바꾸면 된다 — Anthropic → OpenAI 교체 때 실제로 이 파일과 설정 4줄만 바뀌었다.
 
-`ANTHROPIC_API_KEY`를 비워두면 SDK가 `ANTHROPIC_AUTH_TOKEN` → `ant auth login` 프로필
-순서로 자격 증명을 찾는다. 아무것도 없으면 에이전트 호출이 실패하고 규칙 기반 판단으로
-자동 폴백한다(응답은 200).
+`OPENAI_API_KEY`를 비워두면 SDK가 같은 이름의 환경 변수를 읽는다. 아무것도 없으면
+에이전트 호출이 실패하고 규칙 기반 판단으로 자동 폴백한다(응답은 200).
 
-`LLM_SERVER_SIDE_FALLBACK`은 안전 분류기 거절 시 서버 측 대체 모델로 재실행하는 베타
-기능이다. 조직별로 사용 가능 여부가 달라 400이 발생하면 `false`로 두면 된다.
+`LLM_EFFORT`는 추론 강도이며 **gpt-5 계열·o 시리즈에서만 유효하다.** 비추론 모델을
+`OPENAI_MODEL`에 넣으면 400이 날 수 있다. 추론 토큰도 `LLM_MAX_TOKENS`를 함께 쓰므로
+이 값을 낮추면 본문이 빈 채로 `incomplete`가 되고 WARNING 로그가 남는다.
+
+키를 넣은 뒤 `uv run python -m scripts.verify_llm`으로 자격 증명 → 자유 서술 →
+구조화 출력 3단계를 한 번에 확인할 수 있다.
 
 ### LLM 경로 검증
 
@@ -115,7 +121,7 @@ FastAPI 없이 테스트할 수 있다.
 uv run python -m scripts.verify_llm
 ```
 
-4단계가 각각 독립적으로 실패 원인을 좁힌다 (자격 증명 → 기본 요청 형태 → 폴백 베타 →
+3단계가 각각 독립적으로 실패 원인을 좁힌다 (자격 증명·모델 접근 → 요청 형태 →
 구조화 출력). 통과하면 마지막으로 실제 엔드포인트에서 `agents[*].status`가 모두
 `"done"`인지 확인한다 — `"fallback"`이면 LLM이 아니라 규칙 기반으로 답한 것이다.
 
@@ -136,4 +142,4 @@ Postgres를 쓰려면 `uv sync --extra postgres` 후 `DATABASE_URL`을
 - `_legacy/` — `app/`으로 이관이 끝난 원본 보관소. 실행되지 않으며 이관 매핑은
   [`_legacy/README.md`](_legacy/README.md)에 있다. 대조가 끝나면 폴더째 삭제.
 - alembic 도입 (현재는 기동 시 `create_all`).
-- 미사용 의존성 정리: `alembic`, `bcrypt`, `pyjwt`, `fastapi-pagination`, `openai`.
+- 미사용 의존성 정리: `bcrypt`, `pyjwt`, `fastapi-pagination` (인증·페이지네이션 도입 시점에).
