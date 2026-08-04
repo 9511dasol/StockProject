@@ -97,6 +97,28 @@ async def ask_text(system_prompt: str, user_content: str) -> str:
     return response.output_text.strip()
 
 
+async def embed_texts(texts: list[str]) -> list[list[float]]:
+    """임베딩 벡터. 입력 순서 그대로 돌려준다.
+
+    RAG 색인·검색이 쓰는 유일한 임베딩 경로다. 이 함수도 여기 있어야 하는 이유는
+    파일 상단의 원칙과 같다 — SDK를 import하는 파일을 하나로 유지한다.
+
+    차원(`dimensions`)을 명시하는 것은 의도적이다. 테이블의 `vector(N)`이 설정값으로
+    만들어지므로, 모델 기본 차원이 바뀌어도 색인과 어긋나지 않는다.
+    """
+    if not texts:
+        return []
+
+    client = get_client()
+    response = await client.embeddings.create(
+        model=settings.embedding_model,
+        input=texts,
+        dimensions=settings.embedding_dimensions,
+    )
+    # SDK가 순서를 보장하지만 index로 다시 정렬해 계약을 코드로 못박는다.
+    return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]
+
+
 async def ask_structured[ModelT: BaseModel](
     system_prompt: str,
     user_content: str,

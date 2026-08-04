@@ -565,6 +565,8 @@ mono 문자열로 바뀐다.
 | 요소 | 내용 |
 |---|---|
 | `AgentCard` | 순번 `01` · 에이전트명 · 영문 부제 · 요약. `status==="fallback"` 이면 "실패" 배지 |
+| 성향 배지 | `stance`(긍정·중립·부정). LLM 구조화 출력에서 오며 폴백 의견에는 없다 |
+| 근거 목록 | `sources[]` — RAG 로 검색·인용된 문서 제목(+출처). URL 이 있으면 새 탭 링크 |
 | `FinalDecision` | 판단 라벨 34px · 신뢰도(5칸, 20%p 단위) · 답변 · ＋매수조건/－리스크 · 면책 |
 | 규칙 기반 배지 | `source === "fallback"` 일 때 점선 테두리 + "규칙 기반 판단" + 재시도 버튼 + `fallback_decision` 캡션 |
 | 오류 블록 | 판단 없이 에러만 온 경우 "AI 분석을 불러오지 못했습니다" + 재시도 |
@@ -704,7 +706,6 @@ E-05 는 예외를 던지지 않으므로 렌더가 살아 있다 — 빈 화면
 | S-02 | 리포트 의견·목표가 | `AnalystReport` 에 `opinion`/`targetFrom`/`targetTo` 확장 |
 | S-04 | 관심종목 전체 | `GET /watchlist`, `PATCH /watchlist/order`, `PATCH /watchlist/{code}/alert`, `DELETE /watchlist/{code}` |
 | O-01 | 후보 시세·영문명 | `/stocks/suggestions` 응답 확장 또는 시세 병합 |
-| O-02 | 에이전트 stance(긍정/중립/부정) | `AgentOpinion` 에 `stance`·`source` 확장 |
 | 전역 | 로그인 | NextAuth v5 배선만 있고 `providers` 가 비어 있다 — 현재 모든 경로 공개 |
 
 검색 팔레트의 ⇥(관심 추가)는 지금 `localStorage` 에만 쌓인다. 관심종목 저장소가

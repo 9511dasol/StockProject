@@ -19,6 +19,20 @@ Do not add translation lines for stock tickers, product names, URLs, API names, 
 """
 
 
+# 검색 증강(RAG) 규칙. 컨텍스트의 `retrieved_documents` 와 짝을 이룬다.
+#
+# "문서가 없으면 없다고 말하라"를 명시하는 이유: 검색 결과가 비는 경우(색인 전 종목,
+# 벡터 DB 미설정)가 정상 경로다. 그때 모델이 기억으로 뉴스를 지어내면 화면에는
+# 근거 없는 문장이 그럴듯하게 남는다.
+CITATION_RULE = """
+[근거 규칙]
+- retrieved_documents 는 이 종목에 대해 검색된 실제 문서다. 사실 주장은 이 문서나 입력 데이터에 있는 것만 쓴다.
+- 문서를 근거로 삼았으면 그 문서의 doc_id 를 cited_doc_ids 에 담아라. 본문에는 doc_id 를 쓰지 마라 — 사용자에게 보이는 문장이다.
+- retrieved_documents 가 비어 있으면 뉴스나 이벤트를 언급하지 말고, 주가·지표·재무 데이터만으로 판단해라.
+- 기억에 있는 과거 뉴스를 끌어와 쓰지 마라.
+"""
+
+
 @dataclass(frozen=True)
 class AgentProfile:
     """에이전트 한 명의 이름과 역할 프롬프트."""
@@ -27,7 +41,7 @@ class AgentProfile:
     system_prompt: str
 
     def full_prompt(self) -> str:
-        return f"{self.system_prompt}\n\n{KOREAN_TRANSLATION_RULE}"
+        return f"{self.system_prompt}\n{CITATION_RULE}\n{KOREAN_TRANSLATION_RULE}"
 
 
 JOURNALIST = AgentProfile(
@@ -35,7 +49,7 @@ JOURNALIST = AgentProfile(
     system_prompt=(
         "[역할] 너는 주식 전문 AI 저널리스트다. "
         "[목표] 뉴스, 공시성 이슈, 리포트 제목을 분석하여 투자 판단에 영향을 줄 수 있는 긍정/부정 이벤트를 평가해라. "
-        "[입력] 뉴스 헤드라인, 공시 데이터, context 문맥 데이터 "
+        "[입력] retrieved_documents(검색된 뉴스·리포트 본문), 뉴스 헤드라인, 공시 데이터, context 문맥 데이터 "
         "[출력] 시장 심리에 영향이 큰 사건 중심으로 핵심 내용을 3문장 이내로 정리해라. "
         "[제약] 수익률에 대한 구체적인 수치 언급은 절대 금지한다. "
         "[검증] 작성 후 최종 출력물이 정확히 3문장 이내인지, 감성(긍정/부정)이 명확히 분리되었는지 스스로 검증해라."

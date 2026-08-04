@@ -1,14 +1,20 @@
 import Link from "next/link";
+import { SearchTrigger } from "@/features/search";
 import { Icon, type IconName } from "@/shared/ui";
 
 /**
- * "어떤 종목을 볼까요" 진입구 3개.
+ * 홈 최상단 "종목 찾기" 밴드 — 검색 히어로 + 이름을 모를 때의 진입구 3개.
  *
- * 홈에서만 쓰고 데이터가 하나도 없어(순수 링크) 라우트 전용 `_components/` 에 둔다.
- * 실시간 수치가 붙게 되면 그때 features/ 로 승격한다.
+ * 원래 검색은 마스트헤드 가운데 250px 버튼이었고, 그 아래 별도 섹션으로
+ * 진입구 3개(BeginnerGuide)가 있었다. 문제가 둘이었다.
+ *  1) 마스트헤드 안에서는 검색이 테마 토글·관심종목과 같은 크기 위계로 읽힌다.
+ *     이 서비스에서 가장 많이 쓰는 동작이 부가 기능처럼 보인다.
+ *  2) `hidden md:block` 이라 모바일에서는 아예 없었다 — 하단 탭바까지
+ *     시선을 내려야 검색을 만난다.
+ * 둘을 한 밴드로 합쳐 본문 첫 블록에 둔다. "종목을 고른다" 는 한 가지 결정을
+ * 한 곳에서 끝내게 하는 것이 목적이라, 검색과 진입구를 떼어 놓지 않는다.
  *
- * 이 블록이 필요한 이유: 지수와 등락률 랭킹만으로는 종목 이름을 모르는 사람이
- * 다음에 뭘 눌러야 할지 알 수 없다. 검색(⌘K)은 이미 답을 아는 사람의 도구다.
+ * 데이터가 하나도 없어(순수 링크·클라이언트 트리거) 라우트 전용 `_components/` 에 둔다.
  *
  * '큰 회사부터' 를 첫 타일로 두는 것은 의도적이다 — 시가총액순은 가장 덜 흔들리는
  * 정렬이고, 급등 종목을 첫인상으로 주면 초보자에게 추격 매수를 가르치는 셈이 된다.
@@ -46,14 +52,17 @@ const ENTRIES: Entry[] = [
   },
 ];
 
-export function BeginnerGuide() {
+export function FindBand() {
   return (
-    <section className="flex flex-col gap-2.5">
+    <section aria-label="종목 찾기" className="flex flex-col gap-3">
+      <SearchTrigger variant="hero" />
+
+      {/* 진입구는 검색의 대안이지 동급이 아니다 — 라벨로 종속 관계를 밝힌다 */}
       <h2
-        className="border-b border-line-20 pb-2 font-mono font-medium uppercase tracking-label"
+        className="border-b border-line-20 pb-2 font-mono font-medium uppercase tracking-label text-muted-55"
         style={{ fontSize: 11 }}
       >
-        어떤 종목을 볼까요
+        이름이 떠오르지 않는다면
       </h2>
 
       {/* gap-px + 배경으로 1px 헤어라인을 만든다 (IndexCards 와 같은 관용구) —

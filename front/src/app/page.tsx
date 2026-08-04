@@ -6,7 +6,7 @@ import { masthead } from "@/lib/format";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
 import Link from "next/link";
-import { BeginnerGuide } from "./_components/BeginnerGuide";
+import { FindBand } from "./_components/FindBand";
 
 /**
  * 요청 시 렌더한다. 데이터 캐시는 fetch 단위의 `revalidate: 60` 이 담당하므로
@@ -40,13 +40,10 @@ export default async function MarketHomePage() {
   return (
     <>
       <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-[22px] px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+        {/* 홈만 마스트헤드 검색을 비운다 — 바로 아래 히어로가 같은 일을 더 크게 한다.
+            둘을 다 두면 같은 동작이 12px 간격으로 두 번 나와 어느 쪽이 본체인지 흐려진다. */}
         <Masthead
           caption={caption}
-          search={
-            <span className="hidden md:block">
-              <SearchTrigger />
-            </span>
-          }
           action={
             <Link
               href="/watchlist"
@@ -58,10 +55,11 @@ export default async function MarketHomePage() {
           }
         />
 
-        <IndexCards indices={market.indices} />
+        {/* 본문 첫 블록 — 홈에서 가장 많이 하는 일이 "종목을 고른다" 이므로
+            지수보다 먼저 온다. 지수는 읽는 정보고 이 밴드는 하는 일이다. */}
+        <FindBand />
 
-        {/* 지수 바로 아래 전체 폭 — 이 밴드가 사실상 내비게이션이라 본문보다 먼저 온다 */}
-        <BeginnerGuide />
+        <IndexCards indices={market.indices} />
 
         {/* 전체 폭을 쓴다. 예전에는 우측 328px 레일(업종 등락·오늘의 뉴스)이 있어
             `xl:grid-cols-[1fr_328px]` 였는데, 그 둘을 걷어낸 뒤로는 레일에 API 메모

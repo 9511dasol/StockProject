@@ -27,7 +27,7 @@ from app.schemas.advice import (
     resolve_decision_label,
 )
 from app.schemas.stock import KrxListing, StockHistoryParams
-from app.services import fundamentals_service, stock_service
+from app.services import fundamentals_service, rag_service, stock_service
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +59,19 @@ async def stream_advice(
         stock_data = stock_data.model_copy(
             update={"news": content.news, "reports": content.reports}
         )
+        # 색인은 방금 받은 뉴스에 의존하므로 위 gather 뒤에 온다. 실패·지연은
+        # rag_service 가 삼키고 빈 목록을 준다 — 이 단계가 판단을 막으면 안 된다.
+        documents = await rag_service.documents_for_advice(
+            stock_data.symbol, stock_data.name, content
+        )
         yield AdviceStreamEvent(stage=2)
 
         # 3) 에이전트 3인 병렬 — 먼저 끝난 것부터 내보낸다.
-        context = build_context(stock_data, metrics, fundamentals=fundamentals)
+        context = build_context(
+            stock_data, metrics, fundamentals=fundamentals, documents=documents
+        )
         tasks = [
-            asyncio.create_task(invoke_one(profile, context, metrics))
+            asyncio.create_task(invoke_one(profile, context, metrics, documents))
             for profile in ANALYST_PROFILES
         ]
         opinions = []
@@ -80,7 +87,7 @@ async def stream_advice(
 
         # 4) 최종 판단
         decision, used_fallback = await decide(
-            stock_data, metrics, opinions, fundamentals=fundamentals
+            stock_data, metrics, opinions, fundamentals=fundamentals, documents=documents
         )
         yield AdviceStreamEvent(
             stage=4,

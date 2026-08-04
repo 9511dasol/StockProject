@@ -6,6 +6,7 @@ import logging
 from app.agents.prompts import DECISION_PROFILE
 from app.integrations.llm import ask_structured
 from app.schemas.advice import AgentOpinion, InvestmentDecision
+from app.schemas.rag import RetrievedDoc
 from app.schemas.stock import StockFundamentals, StockHistory, StockMetrics
 from app.utils.numbers import format_percent, is_number
 
@@ -87,12 +88,25 @@ def _decision_context(
     metrics: StockMetrics,
     opinions: list[AgentOpinion],
     fundamentals: StockFundamentals | None,
+    documents: list[RetrievedDoc] | None = None,
 ) -> str:
     return json.dumps(
         {
             "stock": {"name": stock_data.name, "symbol": stock_data.symbol},
             "metrics": metrics.model_dump(),
             "fundamentals": fundamentals.model_dump() if fundamentals else None,
+            # 하위 의견의 요약만 읽고 원문을 못 보면, 세 의견이 엇갈릴 때 판정할
+            # 근거가 없다. 같은 문서를 함께 주어 직접 확인하게 한다.
+            "retrieved_documents": [
+                {
+                    "doc_id": doc.doc_id,
+                    "title": doc.title,
+                    "publisher": doc.publisher,
+                    "published_at": doc.published_at,
+                    "content": doc.snippet,
+                }
+                for doc in (documents or [])
+            ],
             "agent_opinions": [opinion.model_dump() for opinion in opinions],
         },
         ensure_ascii=False,
@@ -106,6 +120,7 @@ async def decide(
     opinions: list[AgentOpinion],
     *,
     fundamentals: StockFundamentals | None = None,
+    documents: list[RetrievedDoc] | None = None,
 ) -> tuple[InvestmentDecision, bool]:
     """최종 판단을 만든다.
 
@@ -116,7 +131,7 @@ async def decide(
     Returns:
         (판단, 규칙 기반으로 대체했는지 여부)
     """
-    context = _decision_context(stock_data, metrics, opinions, fundamentals)
+    context = _decision_context(stock_data, metrics, opinions, fundamentals, documents)
 
     try:
         decision = await ask_structured(DECISION_PROFILE.full_prompt(), context, InvestmentDecision)

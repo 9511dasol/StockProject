@@ -30,6 +30,13 @@ interface WireAdviceEvent {
     status: "done" | "fallback";
     summary: string;
     error?: string | null;
+    stance?: "긍정" | "중립" | "부정" | null;
+    sources?: {
+      title: string;
+      publisher?: string;
+      url?: string;
+      published_at?: string;
+    }[];
   };
   decision?: {
     verdict: "BUY" | "WATCH" | "AVOID";
@@ -47,13 +54,21 @@ interface WireAdviceEvent {
 function toEvent(wire: WireAdviceEvent): AdviceStreamEvent {
   return {
     stage: Math.max(0, Math.min(4, wire.stage)) as AdviceStreamEvent["stage"],
-    // stance·source(근거)는 백엔드에 없다 — 카드에서 해당 요소가 빠진다.
     agent: wire.agent
       ? {
           agent: wire.agent.agent,
           status: wire.agent.status,
           summary: wire.agent.summary,
           error: wire.agent.error ?? null,
+          // 규칙 기반 폴백 의견은 둘 다 비어 온다 — 그대로 undefined 로 흘려보내
+          // 카드가 근거·성향 자리를 그리지 않게 한다.
+          stance: wire.agent.stance ?? undefined,
+          sources: wire.agent.sources?.map((doc) => ({
+            title: doc.title,
+            publisher: doc.publisher ?? "",
+            url: doc.url ?? "",
+            publishedAt: doc.published_at ?? "",
+          })),
         }
       : undefined,
     decision: wire.decision

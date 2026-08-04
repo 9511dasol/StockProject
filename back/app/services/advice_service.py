@@ -10,8 +10,8 @@ from datetime import UTC, datetime
 from app.agents.analysts import build_context, collect_opinions
 from app.agents.decision import decide
 from app.schemas.advice import StockAdviceResponse, StockRef, resolve_decision_label
-from app.schemas.stock import KrxListing, StockHistoryParams
-from app.services import fundamentals_service, stock_service
+from app.schemas.stock import KrxListing, StockContent, StockHistoryParams
+from app.services import fundamentals_service, rag_service, stock_service
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +37,20 @@ async def generate_advice(
     # 죽으면 안 된다.
     fundamentals = await fundamentals_service.get_fundamentals_or_none(stock_data.symbol)
 
-    context = build_context(stock_data, metrics, fundamentals=fundamentals)
-    opinions = await collect_opinions(context, metrics)
+    # 검색 증강. 스트리밍 경로와 달리 뉴스를 따로 조회하지 않으므로 `get_history` 가
+    # 이미 실어 온 것을 그대로 넘긴다. 미설정·실패면 빈 목록이라 아래는 그대로 돈다.
+    documents = await rag_service.documents_for_advice(
+        stock_data.symbol,
+        stock_data.name,
+        StockContent(symbol=stock_data.symbol, news=stock_data.news, reports=stock_data.reports),
+    )
+
+    context = build_context(
+        stock_data, metrics, fundamentals=fundamentals, documents=documents
+    )
+    opinions = await collect_opinions(context, metrics, documents)
     decision, used_fallback = await decide(
-        stock_data, metrics, opinions, fundamentals=fundamentals
+        stock_data, metrics, opinions, fundamentals=fundamentals, documents=documents
     )
 
     if used_fallback:

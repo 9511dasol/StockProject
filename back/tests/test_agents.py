@@ -11,7 +11,8 @@ import pytest
 
 from app.agents import analysts, decision
 from app.agents.prompts import ANALYST_PROFILES
-from app.schemas.advice import AgentOpinion, InvestmentDecision
+from app.schemas.advice import AgentOpinion, AnalystOutput, InvestmentDecision
+from app.schemas.rag import RetrievedDoc
 from app.schemas.stock import NewsItem, StockHistory, StockMetrics, StockRow
 
 _METRICS = StockMetrics(
@@ -33,6 +34,36 @@ _HISTORY = StockHistory(
     news=[NewsItem(title="뉴스 제목", publisher="출처", published_at="2026-07-29")],
 )
 
+_DOCS = [
+    RetrievedDoc(
+        doc_id="D1",
+        title="3분기 영업이익 컨센서스 상회",
+        publisher="매일경제",
+        url="https://example.com/a",
+        published_at="2026-07-28",
+        snippet="영업이익이 시장 기대를 넘었다.",
+    ),
+    RetrievedDoc(
+        doc_id="D2",
+        title="메모리 가격 반등",
+        publisher="한국경제",
+        published_at="2026-07-27",
+        snippet="DRAM 고정거래가격이 올랐다.",
+    ),
+]
+
+
+def _fake_analyst(summary: str = "  분석 결과입니다.  ", **kwargs):
+    """`ask_structured` 대역. 하위 에이전트는 AnalystOutput 을 돌려준다."""
+    output = AnalystOutput(summary=summary, stance=kwargs.get("stance", "중립"),
+                           cited_doc_ids=kwargs.get("cited_doc_ids", []))
+
+    async def _call(system_prompt: str, user_content: str, output_model):
+        assert output_model is AnalystOutput
+        return output
+
+    return _call
+
 
 # --- 하위 에이전트 3인 -------------------------------------------------------
 
@@ -40,11 +71,11 @@ _HISTORY = StockHistory(
 async def test_opinions_are_marked_done_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[str] = []
 
-    async def fake_ask_text(system_prompt: str, user_content: str) -> str:
+    async def fake_ask_structured(system_prompt: str, user_content: str, output_model):
         seen.append(system_prompt)
-        return "  분석 결과입니다.  "
+        return AnalystOutput(summary="  분석 결과입니다.  ", stance="중립")
 
-    monkeypatch.setattr(analysts, "ask_text", fake_ask_text)
+    monkeypatch.setattr(analysts, "ask_structured", fake_ask_structured)
 
     opinions = await analysts.collect_opinions("{}", _METRICS)
 
@@ -66,11 +97,11 @@ async def test_opinions_run_concurrently(monkeypatch: pytest.MonkeyPatch) -> Non
     """
     barrier = asyncio.Barrier(3)
 
-    async def fake_ask_text(system_prompt: str, user_content: str) -> str:
+    async def fake_ask_structured(system_prompt: str, user_content: str, output_model):
         await barrier.wait()
-        return "동시 실행"
+        return AnalystOutput(summary="동시 실행", stance="중립")
 
-    monkeypatch.setattr(analysts, "ask_text", fake_ask_text)
+    monkeypatch.setattr(analysts, "ask_structured", fake_ask_structured)
 
     opinions = await asyncio.wait_for(analysts.collect_opinions("{}", _METRICS), timeout=5)
 
@@ -78,10 +109,10 @@ async def test_opinions_run_concurrently(monkeypatch: pytest.MonkeyPatch) -> Non
 
 
 async def test_agent_failure_degrades_to_rule_based(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def failing_ask_text(system_prompt: str, user_content: str) -> str:
+    async def failing_ask_structured(system_prompt: str, user_content: str, output_model):
         raise RuntimeError("auth 실패")
 
-    monkeypatch.setattr(analysts, "ask_text", failing_ask_text)
+    monkeypatch.setattr(analysts, "ask_structured", failing_ask_structured)
 
     opinions = await analysts.collect_opinions("{}", _METRICS)
 
@@ -94,10 +125,7 @@ async def test_agent_failure_degrades_to_rule_based(monkeypatch: pytest.MonkeyPa
 
 
 async def test_empty_response_degrades_to_rule_based(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def empty_ask_text(system_prompt: str, user_content: str) -> str:
-        return "   "
-
-    monkeypatch.setattr(analysts, "ask_text", empty_ask_text)
+    monkeypatch.setattr(analysts, "ask_structured", _fake_analyst("   "))
 
     opinions = await analysts.collect_opinions("{}", _METRICS)
 
@@ -106,12 +134,12 @@ async def test_empty_response_degrades_to_rule_based(monkeypatch: pytest.MonkeyP
 
 
 async def test_one_failure_does_not_break_the_others(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def flaky_ask_text(system_prompt: str, user_content: str) -> str:
+    async def flaky_ask_structured(system_prompt: str, user_content: str, output_model):
         if "경제학자" in system_prompt:
             raise RuntimeError("일시 오류")
-        return "정상 응답"
+        return AnalystOutput(summary="정상 응답", stance="긍정")
 
-    monkeypatch.setattr(analysts, "ask_text", flaky_ask_text)
+    monkeypatch.setattr(analysts, "ask_structured", flaky_ask_structured)
 
     opinions = await analysts.collect_opinions("{}", _METRICS)
     by_agent = {o.agent: o for o in opinions}
@@ -119,6 +147,46 @@ async def test_one_failure_does_not_break_the_others(monkeypatch: pytest.MonkeyP
     assert by_agent["AI 경제학자"].status == "fallback"
     assert by_agent["AI 저널리스트"].status == "done"
     assert by_agent["AI 애널리스트"].status == "done"
+
+
+# --- 근거(RAG 인용) ---------------------------------------------------------
+
+
+async def test_stance_and_sources_are_carried_from_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        analysts,
+        "ask_structured",
+        _fake_analyst("실적이 좋다.", stance="긍정", cited_doc_ids=["D2", "D1"]),
+    )
+
+    opinions = await analysts.collect_opinions("{}", _METRICS, _DOCS)
+    first = opinions[0]
+
+    assert first.stance == "긍정"
+    # 인용 순서를 그대로 따른다 — 모델이 가장 먼저 든 근거가 앞에 온다.
+    assert [s.title for s in first.sources] == ["메모리 가격 반등", "3분기 영업이익 컨센서스 상회"]
+    assert first.sources[1].url == "https://example.com/a"
+
+
+def test_unknown_citations_are_dropped() -> None:
+    """검색 결과에 없는 ID는 버린다.
+
+    모델이 D9 를 지어내는 일이 실제로 있다. 그대로 통과시키면 화면에 '근거'라는
+    이름으로 존재하지 않는 출처가 뜬다 — 없는 편이 낫다.
+    """
+    sources = analysts.resolve_sources(["D9", "d1", "D1", ""], _DOCS)
+
+    assert [s.title for s in sources] == ["3분기 영업이익 컨센서스 상회"]  # 소문자 허용, 중복 제거
+
+
+def test_fallback_opinion_has_no_stance_or_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    """규칙 기반 의견에는 근거 문서가 없다. 빈 값이어야 화면이 거짓말을 하지 않는다."""
+    opinion = AgentOpinion(
+        agent="AI 애널리스트", status="fallback", summary="규칙 기반", error="llm 실패"
+    )
+
+    assert opinion.stance is None
+    assert opinion.sources == []
 
 
 # --- 컨텍스트 ---------------------------------------------------------------
@@ -129,11 +197,35 @@ def test_context_excludes_ohlcv_rows() -> None:
 
     context = json.loads(analysts.build_context(_HISTORY, _METRICS))
 
-    assert set(context) == {"stock", "metrics", "fundamentals", "news", "analyst_reports"}
+    assert set(context) == {
+        "stock",
+        "metrics",
+        "fundamentals",
+        "retrieved_documents",
+        "news",
+        "analyst_reports",
+    }
     assert context["stock"]["symbol"] == "005930.KS"
     assert context["metrics"]["trend"] == "상승 우위"
     assert context["news"][0]["title"] == "뉴스 제목"
     assert "rows" not in context  # 봉 데이터는 토큰만 먹고 판단에 쓰이지 않는다
+
+
+def test_context_always_carries_retrieved_documents_key() -> None:
+    """검색 문서가 없어도 키는 남는다 (fundamentals 와 같은 이유).
+
+    프롬프트의 근거 규칙이 `retrieved_documents` 를 참조한다. 키가 사라지면 규칙이
+    가리킬 대상이 없어지고, 모델은 기억 속 뉴스를 끌어다 쓰기 시작한다.
+    """
+    import json
+
+    without = json.loads(analysts.build_context(_HISTORY, _METRICS))
+    assert without["retrieved_documents"] == []
+
+    with_docs = json.loads(analysts.build_context(_HISTORY, _METRICS, documents=_DOCS))
+    assert [doc["doc_id"] for doc in with_docs["retrieved_documents"]] == ["D1", "D2"]
+    # 본문은 스니펫만 — 원문 전체를 넣으면 컨텍스트가 봉 데이터만큼 커진다.
+    assert with_docs["retrieved_documents"][0]["content"] == "영업이익이 시장 기대를 넘었다."
 
 
 def test_context_always_carries_fundamentals_key() -> None:
@@ -195,12 +287,12 @@ async def test_decision_falls_back_on_failure(monkeypatch: pytest.MonkeyPatch) -
 
 async def test_advice_response_prefers_canonical_label(monkeypatch: pytest.MonkeyPatch) -> None:
     """LLM이 준 라벨보다 표준 라벨 매핑이 우선한다."""
-    from app.services import advice_service, fundamentals_service, stock_service
+    from app.services import advice_service, fundamentals_service, rag_service, stock_service
 
     async def fake_history(params, **kwargs) -> StockHistory:
         return _HISTORY
 
-    async def fake_opinions(context, metrics) -> list[AgentOpinion]:
+    async def fake_opinions(context, metrics, documents=None) -> list[AgentOpinion]:
         return [AgentOpinion(agent="AI 저널리스트", status="done", summary="요약")]
 
     async def fake_decide(stock_data, metrics, opinions, **kwargs):
@@ -217,9 +309,14 @@ async def test_advice_response_prefers_canonical_label(monkeypatch: pytest.Monke
     async def fake_fundamentals(symbol: str) -> None:
         return None
 
+    async def no_documents(symbol, name, content):
+        return []
+
     monkeypatch.setattr(stock_service, "get_history", fake_history)
     monkeypatch.setattr(advice_service, "collect_opinions", fake_opinions)
     monkeypatch.setattr(advice_service, "decide", fake_decide)
+    # 개발자 .env 에 VECTOR_DATABASE_URL 이 있으면 이 테스트가 Supabase 를 친다.
+    monkeypatch.setattr(rag_service, "documents_for_advice", no_documents)
     # 이걸 막지 않으면 generate_advice 가 실제 야후를 친다 — 실패가 아니라
     # 느리게 통과하다 네트워크 없는 환경에서만 드러나는 종류의 누수다.
     monkeypatch.setattr(fundamentals_service, "get_fundamentals_or_none", fake_fundamentals)

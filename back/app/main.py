@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import create_all, dispose_engine
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.vector_database import dispose_vector_engine
 from app.integrations.llm import close_client
 from app.repositories.listed_company import ListedCompanyRepository
 from app.services import listed_company_service, market_service
@@ -63,6 +64,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     warm_up.cancel()
     await close_client()
     await dispose_engine()
+    await dispose_vector_engine()
     logger.info("%s 종료", settings.app_name)
 
 

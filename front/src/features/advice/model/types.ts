@@ -6,11 +6,24 @@ export type Verdict = "BUY" | "WATCH" | "AVOID";
 export type AgentStatus = "done" | "fallback";
 
 /**
+ * 에이전트가 근거로 인용한 문서. 백엔드 RAG 검색 결과 중 그 에이전트가 실제로
+ * 인용한 것만 온다 — 검색됐지만 안 쓴 문서는 넘어오지 않는다.
+ */
+export interface DocRef {
+  title: string;
+  publisher?: string;
+  url?: string;
+  /** ISO 날짜 (YYYY-MM-DD). 모르면 빈 문자열 */
+  publishedAt?: string;
+}
+
+/**
  * 하위 에이전트 1인의 의견. 백엔드 AgentOpinion 대응.
  *
- * nameEn / stance 는 백엔드에 없다 — 디자인의 에이전트 카드가 요구하는 표시 항목이다.
- * nameEn 은 AGENT_META 로 프런트에서 채우고, stance(긍정·중립·부정)는 LLM 출력이
- * 필요하므로 백엔드 확장 대상이다.
+ * nameEn 은 백엔드에 없다 — AGENT_META 로 프런트에서 채우는 표시용 부제다.
+ *
+ * stance·sources 는 LLM 경로에서만 온다. 규칙 기반 폴백 의견(status="fallback")은
+ * 근거 문서가 없으므로 비어 있고, 카드는 그 자리에 아무것도 그리지 않는다.
  */
 export interface AgentOpinion {
   /** "AI 저널리스트" — 백엔드 프로필 이름 그대로 */
@@ -19,7 +32,9 @@ export interface AgentOpinion {
   summary: string;
   error?: string | null;
   stance?: "긍정" | "중립" | "부정";
-  /** 근거로 삼은 데이터 출처 한 줄 */
+  /** RAG 로 검색·인용된 근거 문서 */
+  sources?: DocRef[];
+  /** 근거 한 줄 요약. 목 데이터가 쓰는 형태로, sources 가 있으면 그쪽이 우선한다 */
   source?: string;
 }
 

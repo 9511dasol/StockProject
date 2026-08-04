@@ -4,11 +4,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.rag import DocRef
 from app.schemas.stock import StockHistory, StockMetrics
 
 Verdict = Literal["BUY", "WATCH", "AVOID"]
 AgentStatus = Literal["done", "fallback"]
 DecisionSource = Literal["llm", "fallback"]
+Stance = Literal["긍정", "중립", "부정"]
 
 VERDICT_LABELS: dict[str, str] = {
     "BUY": "매수 가능",
@@ -37,11 +39,36 @@ class InvestmentDecision(BaseModel):
     risk_notes: list[str] = Field(default_factory=list)
 
 
+class AnalystOutput(BaseModel):
+    """하위 에이전트 1인의 구조화 출력 스키마.
+
+    자유 서술(`ask_text`)에서 구조화로 바꾼 이유가 둘 있다.
+
+    * `stance` — 화면의 에이전트 카드에 긍정/중립/부정 배지 자리가 원래 있었는데
+      백엔드가 값을 주지 않아 비어 있었다. 본문에서 감성을 추론하는 것보다 모델에게
+      직접 받는 편이 정확하다.
+    * `cited_doc_ids` — 어떤 문서를 근거로 삼았는지 받아야 화면에 '근거'를 띄우고,
+      우리가 그 ID가 실제 검색 결과에 있는지 검증할 수 있다. 본문에서 정규식으로
+      캐내는 방식은 모델이 형식을 조금만 어겨도 조용히 빈손이 된다.
+    """
+
+    summary: str = Field(description="역할 프롬프트가 요구한 분석. 3문장 이내")
+    stance: Stance = Field(description="이 종목에 대한 이 관점의 평가")
+    cited_doc_ids: list[str] = Field(
+        default_factory=list,
+        description="근거로 삼은 retrieved_documents 의 doc_id (예: D1). 없으면 빈 배열",
+    )
+
+
 class AgentOpinion(BaseModel):
     agent: str
     status: AgentStatus
     summary: str
     error: str | None = None
+    # 아래 둘은 LLM 경로에서만 채워진다. 규칙 기반 폴백 의견은 근거 문서가 없고,
+    # 없는 것을 있는 것처럼 보이게 하면 그게 더 나쁘다.
+    stance: Stance | None = None
+    sources: list[DocRef] = Field(default_factory=list)
 
 
 class StockRef(BaseModel):

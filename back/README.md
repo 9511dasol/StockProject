@@ -82,7 +82,12 @@ KRX/KIND 수집은 `httpx.AsyncClient`로 네이티브 비동기다.
 **폴백 체인** — 각 단계가 실패해도 응답은 나온다.
 상장사 목록: KRX CSV → KIND HTML → 내부 기본 종목.
 투자 판단: LLM 에이전트 → 지표 규칙 기반(`agents/decision.fallback_decision`).
+검색 증강: 하이브리드 검색 → 문서 없이 진행(`services/rag_service`).
 모든 폴백 전환은 WARNING 로그를 남긴다 — 조용히 삼키지 않는다.
+
+**벡터 DB 분리** — RAG는 `VECTOR_DATABASE_URL`(Supabase pgvector)을 쓰고 주 DB와 엔진을
+공유하지 않는다. 로컬 주 DB는 SQLite라 `vector` 확장을 올릴 수 없고, 벡터 테이블을 같은
+`Base.metadata`에 얹으면 개발용 `create_all()`이 깨진다.
 
 **예외 처리** — 서비스·통합 계층은 `HTTPException`을 던지지 않는다. `core/exceptions.py`의
 도메인 예외를 던지고 HTTP 매핑은 등록된 핸들러가 담당한다. 덕분에 서비스 계층을
@@ -124,6 +129,50 @@ uv run python -m scripts.verify_llm
 3단계가 각각 독립적으로 실패 원인을 좁힌다 (자격 증명·모델 접근 → 요청 형태 →
 구조화 출력). 통과하면 마지막으로 실제 엔드포인트에서 `agents[*].status`가 모두
 `"done"`인지 확인한다 — `"fallback"`이면 LLM이 아니라 규칙 기반으로 답한 것이다.
+
+## RAG (검색 증강)
+
+에이전트에게 넘길 뉴스·리포트를 **최신순이 아니라 관련도순**으로 고른다. 최신 3건을
+그대로 넣던 방식은 지수 편입 공지가 실적 악화 기사를 밀어내는 문제가 있었다.
+
+```
+수집(yfinance) → 청킹 → 임베딩 → pgvector 적재
+                                      ↓
+질의 ──┬─ 벡터 검색(의미)   ─┐
+       └─ 키워드 검색(어휘) ─┴─ RRF 융합 → 상위 K → 프롬프트 + 인용
+```
+
+두 검색기를 함께 쓰는 이유는 맹점이 서로 다르기 때문이다. 벡터는 "실적 부진"과
+"어닝 쇼크"를 묶지만 종목코드·수치에 약하고, 트라이그램은 그 반대다. 점수 스케일이
+전혀 다르므로 정규화해 더하지 않고 **순위만 쓰는 RRF**로 합친다.
+
+| 설정 | 뜻 |
+|---|---|
+| `VECTOR_DATABASE_URL` | Supabase URI. **비우면 RAG만 꺼지고 나머지는 그대로 동작한다** |
+| `EMBEDDING_MODEL` · `EMBEDDING_DIMENSIONS` | 테이블의 `vector(N)`이 후자로 만들어진다 |
+| `RAG_CANDIDATE_K` → `RAG_TOP_K` | 검색기별 후보 수 → 융합 후 프롬프트에 넣는 수 |
+| `RAG_RECENCY_DAYS` | 이보다 오래된 문서는 검색하지 않는다 |
+| `RAG_TIMEOUT_SECONDS` | 색인+검색 전체 예산. 넘기면 문서 없이 판단한다 |
+
+Supabase URI는 **그대로 붙여넣으면 된다**. `postgres://` 접두, `?sslmode=require`,
+6543 풀러(프리페어드 스테이트먼트 금지)는 `core/vector_database.py`가 정규화한다.
+
+최초 1회 실행이 스키마 생성(확장·테이블·HNSW 인덱스)까지 겸한다:
+
+```bash
+uv run python -m scripts.verify_rag            # 기본 종목(005930)
+uv run python -m scripts.verify_rag 000660     # 종목 지정
+```
+
+5단계가 실패 지점을 좁힌다 (설정 → 연결·스키마 → 임베딩 → 색인 → 검색). 통과 뒤
+`POST /stocks/advice`의 `agents[*].sources`가 비어 있지 않으면 근거가 붙은 것이다.
+
+**인용은 검증한다.** 에이전트는 `AnalystOutput.cited_doc_ids`로 doc_id를 돌려주고,
+`analysts.resolve_sources()`가 실제 검색 결과에 없는 ID를 버린다 — 모델이 지어낸
+출처가 화면에 "근거"로 뜨는 것이 근거가 없는 것보다 나쁘다.
+
+**RAG 실패는 판단 실패가 아니다.** 미설정·연결 실패·타임아웃 모두 빈 문서 목록으로
+흡수되고, 그때 프롬프트의 근거 규칙이 "문서가 없으면 뉴스를 언급하지 말라"로 작동한다.
 
 ## 운영
 

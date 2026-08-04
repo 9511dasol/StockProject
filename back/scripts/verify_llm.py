@@ -32,7 +32,7 @@ _PROBE_CONTEXT = """{
 
 
 def _ok(label: str, detail: str = "") -> None:
-    print(f"  [PASS] {label}" + (f" — {detail}" if detail else ""))
+    print(f"  [PASS] {label}" + (f" - {detail}" if detail else ""))
 
 
 def _fail(label: str, exc: BaseException, hint: str) -> None:
@@ -76,7 +76,7 @@ async def check_text() -> bool:
         return False
 
     if not text:
-        print("  [WARN] ask_text — 빈 응답. 추론 토큰이 LLM_MAX_TOKENS를 다 썼을 수 있다.")
+        print("  [WARN] ask_text - 빈 응답. 추론 토큰이 LLM_MAX_TOKENS를 다 썼을 수 있다.")
         return False
 
     _ok("ask_text", f"{len(text)}자 · {text[:60]}...")
@@ -106,6 +106,8 @@ async def check_structured() -> bool:
 
 
 async def main() -> int:
+    # 윈도우 기본 콘솔(cp949)에서 못 찍는 기호로 죽지 않게 한다.
+    sys.stdout.reconfigure(errors="replace")
     configure_logging()
     print(f"모델: {settings.openai_model} (effort={settings.llm_effort})\n")
 

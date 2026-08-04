@@ -77,6 +77,38 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=300.0, gt=0)
     llm_max_retries: int = Field(default=2, ge=0)
 
+    # --- RAG (벡터 검색) ---
+    # 주 DB(`database_url`)와 분리한다. 벡터 검색은 pgvector 확장이 필요한데 로컬
+    # 개발 DB는 SQLite라 확장을 못 올린다. 비워 두면 **RAG 계층만** 꺼지고 나머지는
+    # 그대로 동작한다 — 에이전트는 예전처럼 최신 뉴스 3건을 직접 받는다.
+    # Supabase의 URI를 그대로 붙여넣으면 된다 (postgres:// · sslmode · 6543 포트
+    # 풀러 모두 vector_database.py 가 정규화한다).
+    vector_database_url: str | None = None
+    embedding_model: str = "text-embedding-3-small"
+    # 테이블 DDL의 `vector(N)`이 이 값으로 만들어진다. 색인을 만든 뒤 모델을 바꾸면
+    # 차원이 어긋나 검색이 실패한다 — 그때는 테이블을 지우고 다시 적재해야 한다.
+    embedding_dimensions: int = Field(default=1536, ge=64)
+
+    # 청크 길이. 뉴스 요약은 대개 한 청크에 들어가고, 긴 리포트만 쪼개진다.
+    rag_chunk_chars: int = Field(default=900, ge=200)
+    rag_chunk_overlap: int = Field(default=150, ge=0)
+    # 벡터·키워드 검색기가 **각각** 뽑는 후보 수. 융합 뒤 rag_top_k만 남는다.
+    rag_candidate_k: int = Field(default=24, ge=1)
+    rag_top_k: int = Field(default=6, ge=1)
+    # 이보다 오래된 문서는 검색 대상에서 뺀다. 3개월 지난 뉴스로 오늘의 매수 판단을
+    # 하면 근거처럼 보이는 헛소리가 된다.
+    rag_recency_days: int = Field(default=120, ge=1)
+    # 판단 요청이 들어올 때 그 종목의 새 뉴스를 색인할지. 끄면 배치·스크립트로만 채운다.
+    rag_ingest_on_advice: bool = True
+    # 색인+검색 전체 예산. 초과하면 문서 없이 진행한다 — RAG 때문에 판단이
+    # 늦어지거나 실패하면 안 된다.
+    rag_timeout_seconds: float = Field(default=15.0, gt=0)
+
+    @property
+    def rag_enabled(self) -> bool:
+        """접속 정보가 있어야 RAG를 켠다. 그 외에는 조용히 비활성이다."""
+        return bool(self.vector_database_url)
+
 
 @lru_cache
 def get_settings() -> Settings:
