@@ -20,6 +20,7 @@ import {
   BiSolidStar,
   BiSortDown,
   BiStar,
+  BiUser,
   BiX,
 } from "react-icons/bi";
 import type { IconType } from "react-icons";
@@ -66,6 +67,8 @@ const REGISTRY = {
   filter: BiFilterAlt,
   /** 순서를 바꾸는 축. 이 서비스의 정렬은 전부 내림차순이라 down 하나면 된다 */
   "sort-desc": BiSortDown,
+  /** 계정 — 제호 우측의 로그인 표시 */
+  user: BiUser,
 } as const satisfies Record<string, IconType>;
 
 /** 레지스트리에 있는 이름만 허용한다 — 새 아이콘은 위에 등록해야 쓸 수 있다. */

@@ -67,10 +67,40 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         # SQLite 는 ALTER TABLE 지원이 좁아 테이블 재생성(batch)이 필요하다.
         render_as_batch=settings.database_url.startswith("sqlite"),
+        include_object=_include_object,
     )
 
     with context.begin_transaction():
         context.run_migrations()
+
+
+#: alembic 이 **건드리면 안 되는** 테이블 — ORM 메타데이터에 없지만 살아 있어야 하는 것들.
+#:
+#: 이 목록이 없으면 `--autogenerate` 가 "메타데이터에 없다" 며 **drop_table 을 제안한다.**
+#: 그대로 실행하면 데이터가 통째로 사라진다. 실제로 탐침을 돌려 확인한 위험이다.
+#:
+#: 둘로 나뉜다.
+#:   * NextAuth(Auth.js) 계약 — 프런트의 `@auth/pg-adapter` 가 읽고 쓴다.
+#:     스키마는 `b3f1c2d47a90` 마이그레이션이 만든다.
+#:   * `document_chunks` — `repositories/document_chunk.ensure_schema()` 가 **원시 SQL**로
+#:     만든다. pgvector 의 `vector(N)` 타입과 HNSW·트라이그램 인덱스는 SQLAlchemy 모델로
+#:     표현할 수 없어 그렇게 둔 것이고, 그 대가로 여기 예외가 필요하다.
+_FOREIGN_TABLES = {
+    "users",
+    "accounts",
+    "sessions",
+    "verification_token",
+    "document_chunks",
+}
+
+
+def _include_object(obj, name, type_, reflected, compare_to) -> bool:
+    """자동 생성 대상에서 남의 테이블을 뺀다."""
+    if type_ == "table" and name in _FOREIGN_TABLES:
+        return False
+    # 그 테이블에 달린 인덱스·제약도 함께 뺀다.
+    parent = getattr(obj, "table", None)
+    return not (parent is not None and parent.name in _FOREIGN_TABLES)
 
 
 def do_run_migrations(connection: Connection) -> None:
@@ -78,6 +108,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         render_as_batch=settings.database_url.startswith("sqlite"),
+        include_object=_include_object,
     )
 
     with context.begin_transaction():

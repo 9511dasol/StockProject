@@ -388,3 +388,67 @@ async def test_removing_a_missing_item_is_not_an_error(
     )
 
     assert response.status_code == 200
+
+
+# ── 로그인 승계 엔드포인트 (12회차) ─────────────────────────────────────
+
+
+async def test_claim_moves_anonymous_items_to_the_account(
+    client: AsyncClient, seeded: ListedCompanyRepository
+) -> None:
+    """로그인 직후 한 번 부르는 경로. 받는 쪽은 **헤더**이고 본문은 내놓는 쪽뿐이다.
+
+    받는 쪽까지 본문으로 받으면 아무 계정으로나 옮길 수 있게 된다.
+    """
+    anon = {"X-Owner-Key": "anon:browser-1"}
+    user = {"X-Owner-Key": "user:42"}
+
+    await client.post("/api/v1/watchlist", json={"symbol": "005930"}, headers=anon)
+    await client.post("/api/v1/watchlist", json={"symbol": "000660"}, headers=anon)
+
+    claimed = await client.post(
+        "/api/v1/watchlist/claim", json={"from_key": "anon:browser-1"}, headers=user
+    )
+
+    assert claimed.status_code == 200
+    assert sorted(row["code"] for row in claimed.json()["items"]) == ["000660", "005930"]
+
+    # **복사가 아니라 이동이다.** 익명 쪽에 남아 있으면 로그아웃 후 같은 목록이
+    # 두 벌로 보이고, 한쪽을 고쳐도 다른 쪽은 그대로다.
+    left = await client.get("/api/v1/watchlist", headers=anon)
+    assert left.json()["items"] == []
+
+
+async def test_claiming_to_self_is_rejected(
+    client: AsyncClient, seeded: ListedCompanyRepository
+) -> None:
+    """유니크 제약 때문에 아무것도 안 옮겨지지만, 그 호출이 오는 것 자체가 배선이
+    잘못됐다는 신호라 조용히 넘어가지 않게 막는다."""
+    response = await client.post(
+        "/api/v1/watchlist/claim",
+        json={"from_key": _ALICE},
+        headers={"X-Owner-Key": _ALICE},
+    )
+
+    assert response.status_code == 400
+
+
+async def test_claim_keeps_items_the_account_already_had(
+    client: AsyncClient, seeded: ListedCompanyRepository
+) -> None:
+    """계정에 이미 있는 종목은 유니크 제약에 걸린다 — 겹치지 않는 것만 옮긴다."""
+    anon = {"X-Owner-Key": "anon:browser-2"}
+    user = {"X-Owner-Key": "user:99"}
+
+    await client.post("/api/v1/watchlist", json={"symbol": "005930"}, headers=anon)
+    await client.post("/api/v1/watchlist", json={"symbol": "000660"}, headers=anon)
+    await client.post("/api/v1/watchlist", json={"symbol": "005930"}, headers=user)
+
+    claimed = await client.post(
+        "/api/v1/watchlist/claim", json={"from_key": "anon:browser-2"}, headers=user
+    )
+
+    assert sorted(row["code"] for row in claimed.json()["items"]) == ["000660", "005930"]
+    # 겹친 005930 은 익명 쪽에 그대로 남는다 — 옮길 수 없었다는 사실이 드러나야 한다.
+    left = await client.get("/api/v1/watchlist", headers=anon)
+    assert [row["code"] for row in left.json()["items"]] == ["005930"]

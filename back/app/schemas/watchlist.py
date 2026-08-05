@@ -83,6 +83,17 @@ class WatchlistOrderRequest(BaseModel):
     codes: list[str] = Field(min_length=1, max_length=500)
 
 
+class WatchlistClaimRequest(BaseModel):
+    """익명으로 모은 목록을 로그인 계정으로 승계한다.
+
+    받는 쪽(`to`)은 헤더의 `X-Owner-Key` 다 — 본문으로 받으면 아무 계정으로나 옮길 수
+    있게 된다. 본문에는 **내놓는 쪽만** 담는다.
+    """
+
+    #: 익명 소유자 키(`anon:<uuid>`). 프런트 BFF 가 httpOnly 쿠키에서 읽어 넣는다.
+    from_key: str = Field(min_length=1, max_length=80)
+
+
 class WatchlistItemPatch(BaseModel):
     """그룹·알림·보유 부분 수정.
 

@@ -78,6 +78,21 @@ def rag_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def advice_lock_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AI 판단 자물쇠도 기본은 꺼진 상태로 둔다.
+
+    같은 부류의 사고를 두 번째로 겪었다. 개발자가 `.env` 에 `ADVICE_API_KEY` 를 넣는
+    순간, 그 값을 읽은 테스트 3개가 빨개졌다 — **테스트가 로컬 환경 파일에 의존하고
+    있었다는 뜻**이다. 남의 기계에서 초록인지 여부가 그 사람 `.env` 에 달려 있으면
+    테스트가 아니다.
+
+    자물쇠를 검사하는 테스트는 `locked` 픽스처로 **명시적으로 켠다**
+    (`test_advice_auth.py`).
+    """
+    monkeypatch.setattr(settings, "advice_api_key", None)
+
+
+@pytest.fixture(autouse=True)
 def reset_advice_cache() -> Iterator[None]:
     """AI 판단 캐시도 모듈 전역이다.
 

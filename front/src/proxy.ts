@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createOwnerKey, isOwnerKey, OWNER_COOKIE } from "@/lib/watchlist/owner";
+import { createOwnerKey, isOwnerKey, OWNER_COOKIE } from "@/lib/watchlist/anon-cookie";
 
 /**
  * 관심종목 소유자 쿠키를 발급한다.
