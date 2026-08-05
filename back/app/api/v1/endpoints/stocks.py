@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import ListedCompanyRepo
@@ -21,6 +21,7 @@ from app.schemas.stock import (
     StockSuggestion,
 )
 from app.services import (
+    advice_cache,
     advice_service,
     advice_stream,
     fundamentals_service,
@@ -116,7 +117,11 @@ async def create_stock_advice(
     repo: ListedCompanyRepo, payload: StockAdviceRequest
 ) -> StockAdviceResponse:
     listing = await listed_company_service.resolve_listing(repo, payload.symbol)
-    return await advice_service.generate_advice(payload.symbol, listing=listing)
+    try:
+        async with advice_cache.reserve_slot():
+            return await advice_service.generate_advice(payload.symbol, listing=listing)
+    except advice_cache.AdviceBusyError as exc:
+        raise _busy(exc) from exc
 
 
 @router.post(
@@ -136,9 +141,24 @@ async def stream_stock_advice(
     # 수십 초 동안 세션이 붙잡힌다.
     listing = await listed_company_service.resolve_listing(repo, payload.symbol)
 
+    # 슬롯도 스트림을 열기 **전에** 잡는다. 제너레이터 안에서 잡으면 상한 초과를
+    # 알릴 때 이미 200 + text/event-stream 헤더가 나간 뒤라, 클라이언트는 429 대신
+    # "빈 스트림"을 받는다 — 거절인지 장애인지 구분할 수 없다.
+    try:
+        advice_cache.reserve_slot_now()
+    except advice_cache.AdviceBusyError as exc:
+        raise _busy(exc) from exc
+
     async def events() -> AsyncIterator[bytes]:
-        async for event in advice_stream.stream_advice(payload.symbol, listing=listing):
-            yield f"data: {event.model_dump_json()}\n\n".encode()
+        try:
+            async for event in advice_stream.stream_advice(
+                payload.symbol, listing=listing
+            ):
+                yield f"data: {event.model_dump_json()}\n\n".encode()
+        finally:
+            # 소비자가 중간에 끊어도(GeneratorExit) 반드시 반납한다. 안 그러면
+            # 사용자가 드로어를 몇 번 여닫는 것만으로 상한이 영구히 차 버린다.
+            advice_cache.release_slot()
 
     return StreamingResponse(
         events(),
@@ -148,4 +168,17 @@ async def stream_stock_advice(
             # nginx 등 리버스 프록시가 SSE를 버퍼링하지 않도록.
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+def _busy(exc: Exception) -> HTTPException:
+    """동시 실행 상한 초과 → 429.
+
+    503(일시적 장애)이 아니라 429(요청이 너무 많음)인 이유: 서버는 멀쩡하고, 잠시 뒤
+    다시 보내면 되는 상황이라는 뜻이 정확하다. `Retry-After` 로 그 '잠시'를 명시한다.
+    """
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail=str(exc),
+        headers={"Retry-After": "20"},
     )

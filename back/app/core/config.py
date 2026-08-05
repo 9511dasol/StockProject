@@ -65,6 +65,21 @@ class Settings(BaseSettings):
     # 캐시에 담아 둘 종목 수 상한. 임의 심볼이 키라 상한이 없으면 무한히 증가한다.
     stock_fundamentals_cache_size: int = Field(default=512, ge=1)
 
+    # --- AI 판단 캐시·상한 ---
+    # 종목 하나를 분석하면 LLM 4회(에이전트 3 + 판단 1)가 나간다. 여기 있는 값들이
+    # 이 프로젝트에서 **유일하게 돈이 새는 경로**의 수도꼭지다.
+    #
+    # 이 시간 안에는 같은 종목을 다시 물어도 **뉴스 조회조차 하지 않고** 캐시를 낸다.
+    # 만료 뒤에는 뉴스 지문만 비교해서, 기사가 그대로면 LLM 없이 수명을 연장하고
+    # 새 기사가 있을 때만 다시 분석한다 (advice_cache.py).
+    advice_cache_ttl_seconds: int = Field(default=600, ge=0)
+    # 캐시에 담아 둘 종목 수 상한. 임의 심볼이 키라 상한이 없으면 무한히 증가한다.
+    advice_cache_size: int = Field(default=256, ge=1)
+    # 동시에 돌릴 수 있는 분석 수. 초과 요청은 429다 — 큐에 쌓아 두면 상한이 아니라
+    # 지연이 되고, LLM 호출 총량은 그대로 나간다.
+    # 프런트 일괄 분석이 3개씩 여는 것을 감안한 값이다 (useBulkAdvice MAX_CONCURRENT).
+    advice_max_concurrent: int = Field(default=4, ge=1)
+
     # --- LLM (OpenAI) ---
     # 미설정 시 SDK가 OPENAI_API_KEY 환경 변수를 읽는다.
     openai_api_key: str | None = None

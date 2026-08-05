@@ -27,12 +27,44 @@ from app.schemas.advice import (
     resolve_decision_label,
 )
 from app.schemas.stock import KrxListing, StockHistoryParams
-from app.services import fundamentals_service, rag_service, stock_service
+from app.services import advice_cache, fundamentals_service, rag_service, stock_service
 
 logger = logging.getLogger(__name__)
 
 _ADVICE_ROW_LIMIT = 504
 _ADVICE_TIMEFRAME = "day"
+
+
+def _replay(
+    stock_data_ref: StockRef, outcome: advice_cache.AdviceOutcome
+) -> list[AdviceStreamEvent]:
+    """캐시된 결과를 스트림 계약(4단계)에 맞춰 그대로 재생한다.
+
+    프런트와의 계약은 "이벤트 4단계" 지 "매번 새로 계산" 이 아니다. 그래서 캐시 적중
+    시에도 단계를 건너뛰지 않고 같은 순서로 즉시 내보낸다 — 화면 코드는 캐시였는지
+    아닌지 알 필요가 없고, 사용자에게는 진행 바가 순식간에 끝난 것으로 보인다.
+    """
+    events = [AdviceStreamEvent(stage=1), AdviceStreamEvent(stage=2)]
+    events += [AdviceStreamEvent(stage=3, agent=opinion) for opinion in outcome.opinions]
+    events.append(
+        AdviceStreamEvent(
+            stage=4,
+            decision=AdviceStreamDecision(
+                stock=stock_data_ref,
+                verdict=outcome.decision.verdict,
+                decision_label=resolve_decision_label(
+                    outcome.decision.verdict, outcome.decision.decision_label
+                ),
+                confidence=outcome.decision.confidence,
+                answer=outcome.decision.answer,
+                buy_conditions=outcome.decision.buy_conditions,
+                risk_notes=outcome.decision.risk_notes,
+                decision_source="fallback" if outcome.used_fallback else "llm",
+                updated_at=datetime.now(UTC).isoformat(timespec="seconds"),
+            ),
+        )
+    )
+    return events
 
 
 async def stream_advice(
@@ -48,6 +80,20 @@ async def stream_advice(
             params, include_content=False, listing=listing
         )
         metrics = stock_service.get_metrics(stock_data)
+
+        stock_ref = StockRef(
+            name=stock_data.name, symbol=stock_data.symbol, query=stock_data.query
+        )
+
+        # TTL 안이면 뉴스 조회조차 하지 않는다 (advice_cache 흐름 ①). 주가는 이미
+        # 받았으므로 여기까지가 이 요청의 전부다 — LLM 0회, 뉴스 조회 0회.
+        cached = advice_cache.peek(stock_data.symbol)
+        if cached is not None:
+            logger.info("%s AI 판단을 캐시에서 재생합니다", stock_data.symbol)
+            for event in _replay(stock_ref, cached):
+                yield event
+            return
+
         yield AdviceStreamEvent(stage=1)
 
         # 2) 뉴스·리포트 + 재무 — 둘 다 네트워크 대기라 병렬로 묶는다. 재무를 여기에
@@ -64,6 +110,18 @@ async def stream_advice(
         documents = await rag_service.documents_for_advice(
             stock_data.symbol, stock_data.name, content
         )
+
+        # TTL 은 지났지만 기사가 그대로면 다시 분석할 이유가 없다 (흐름 ②).
+        # 뉴스 조회 비용은 이미 치렀고, 여기서 아끼는 것은 LLM 4회다.
+        unchanged = advice_cache.reuse_if_unchanged(stock_data.symbol, content)
+        if unchanged is not None:
+            logger.info(
+                "%s 기사가 그대로라 직전 AI 판단을 유지합니다", stock_data.symbol
+            )
+            for event in _replay(stock_ref, unchanged)[1:]:
+                yield event
+            return
+
         yield AdviceStreamEvent(stage=2)
 
         # 3) 에이전트 3인 병렬 — 먼저 끝난 것부터 내보낸다.
@@ -89,14 +147,21 @@ async def stream_advice(
         decision, used_fallback = await decide(
             stock_data, metrics, opinions, fundamentals=fundamentals, documents=documents
         )
+
+        # 방금 만든 판단을 그 기사 묶음의 지문과 함께 넣는다. 다음 요청은 새 기사가
+        # 없는 한 여기까지 오지 않는다. (폴백은 캐시하지 않는다 — advice_cache 주석)
+        advice_cache.store(
+            stock_data.symbol,
+            content,
+            opinions=opinions,
+            decision=decision,
+            used_fallback=used_fallback,
+        )
+
         yield AdviceStreamEvent(
             stage=4,
             decision=AdviceStreamDecision(
-                stock=StockRef(
-                    name=stock_data.name,
-                    symbol=stock_data.symbol,
-                    query=stock_data.query,
-                ),
+                stock=stock_ref,
                 verdict=decision.verdict,
                 decision_label=resolve_decision_label(decision.verdict, decision.decision_label),
                 confidence=decision.confidence,

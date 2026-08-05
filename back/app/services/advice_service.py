@@ -11,7 +11,7 @@ from app.agents.analysts import build_context, collect_opinions
 from app.agents.decision import decide
 from app.schemas.advice import StockAdviceResponse, StockRef, resolve_decision_label
 from app.schemas.stock import KrxListing, StockContent, StockHistoryParams
-from app.services import fundamentals_service, rag_service, stock_service
+from app.services import advice_cache, fundamentals_service, rag_service, stock_service
 
 logger = logging.getLogger(__name__)
 
@@ -37,24 +37,46 @@ async def generate_advice(
     # 죽으면 안 된다.
     fundamentals = await fundamentals_service.get_fundamentals_or_none(stock_data.symbol)
 
-    # 검색 증강. 스트리밍 경로와 달리 뉴스를 따로 조회하지 않으므로 `get_history` 가
-    # 이미 실어 온 것을 그대로 넘긴다. 미설정·실패면 빈 목록이라 아래는 그대로 돈다.
-    documents = await rag_service.documents_for_advice(
-        stock_data.symbol,
-        stock_data.name,
-        StockContent(symbol=stock_data.symbol, news=stock_data.news, reports=stock_data.reports),
+    # 스트리밍 경로와 달리 뉴스를 따로 조회하지 않는다 — `get_history` 가 이미 실어 왔다.
+    content = StockContent(
+        symbol=stock_data.symbol, news=stock_data.news, reports=stock_data.reports
     )
 
-    context = build_context(
-        stock_data, metrics, fundamentals=fundamentals, documents=documents
-    )
-    opinions = await collect_opinions(context, metrics, documents)
-    decision, used_fallback = await decide(
-        stock_data, metrics, opinions, fundamentals=fundamentals, documents=documents
+    # LLM 산출물만 캐시에서 온다. 봉·지표·재무는 각자 캐시가 있거나 싸므로 위에서
+    # 이미 새로 만들었다 (advice_cache.AdviceOutcome 주석).
+    #
+    # `peek` 과 `reuse_if_unchanged` 를 잇달아 부르는 스트리밍 경로와 달리 여기서는
+    # 지문 비교 한 번으로 끝난다. 이 경로는 뉴스를 어차피 손에 들고 시작하기 때문에
+    # "뉴스 조회를 아끼는" 1단계가 성립하지 않는다.
+    outcome = advice_cache.peek(stock_data.symbol) or advice_cache.reuse_if_unchanged(
+        stock_data.symbol, content
     )
 
-    if used_fallback:
-        logger.info("%s 판단을 규칙 기반으로 생성했습니다", stock_data.symbol)
+    if outcome is None:
+        # 검색 증강. 미설정·실패면 빈 목록이라 아래는 그대로 돈다.
+        documents = await rag_service.documents_for_advice(
+            stock_data.symbol, stock_data.name, content
+        )
+        context = build_context(
+            stock_data, metrics, fundamentals=fundamentals, documents=documents
+        )
+        opinions = await collect_opinions(context, metrics, documents)
+        decision, used_fallback = await decide(
+            stock_data, metrics, opinions, fundamentals=fundamentals, documents=documents
+        )
+
+        if used_fallback:
+            logger.info("%s 판단을 규칙 기반으로 생성했습니다", stock_data.symbol)
+
+        outcome = advice_cache.store(
+            stock_data.symbol,
+            content,
+            opinions=opinions,
+            decision=decision,
+            used_fallback=used_fallback,
+        )
+    else:
+        logger.info("%s AI 판단을 캐시에서 냅니다", stock_data.symbol)
 
     return StockAdviceResponse(
         stock=StockRef(
@@ -64,13 +86,15 @@ async def generate_advice(
         ),
         stock_data=stock_data,
         metrics=metrics,
-        agents=opinions,
-        verdict=decision.verdict,
-        decision_label=resolve_decision_label(decision.verdict, decision.decision_label),
-        confidence=decision.confidence,
-        answer=decision.answer,
-        buy_conditions=decision.buy_conditions,
-        risk_notes=decision.risk_notes,
-        decision_source="fallback" if used_fallback else "llm",
+        agents=outcome.agents,
+        verdict=outcome.decision.verdict,
+        decision_label=resolve_decision_label(
+            outcome.decision.verdict, outcome.decision.decision_label
+        ),
+        confidence=outcome.decision.confidence,
+        answer=outcome.decision.answer,
+        buy_conditions=outcome.decision.buy_conditions,
+        risk_notes=outcome.decision.risk_notes,
+        decision_source="fallback" if outcome.used_fallback else "llm",
         updated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )

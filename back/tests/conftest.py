@@ -12,7 +12,7 @@ from app.core.database import get_db
 from app.main import create_app
 from app.models.base import Base
 from app.repositories.listed_company import ListedCompanyRepository
-from app.services import fundamentals_service
+from app.services import advice_cache, fundamentals_service
 
 
 @pytest.fixture(autouse=True)
@@ -23,6 +23,20 @@ def reset_fundamentals_cache() -> Iterator[None]:
     yield
     fundamentals_service._cache.clear()
     fundamentals_service._locks.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_advice_cache() -> Iterator[None]:
+    """AI 판단 캐시도 모듈 전역이다.
+
+    비우지 않으면 **한 테스트가 다른 테스트를 통과시킨다** — 앞 테스트가 넣어 둔
+    판단을 뒤 테스트가 캐시에서 받아 LLM 대역을 한 번도 안 부르고 초록이 된다.
+    동시 실행 카운터도 함께 되돌린다: 429 를 확인하는 테스트가 상한을 채운 채
+    끝나면 그 뒤 advice 테스트가 전부 429 가 된다.
+    """
+    advice_cache.reset_for_tests()
+    yield
+    advice_cache.reset_for_tests()
 
 
 @pytest_asyncio.fixture

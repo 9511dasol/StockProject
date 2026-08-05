@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useMemo, useState } from "react";
 import { Icon } from "@/shared/ui";
-import { useBulkAdvice } from "@/features/advice";
+import { MAX_BULK_SYMBOLS, useBulkAdvice } from "@/features/advice";
 import {
   ALL_GROUP,
   BulkActionBar,
@@ -174,6 +174,20 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
           style={{ fontSize: 12 }}
         >
           {notice}
+        </p>
+      ) : null}
+
+      {/* 상한에 걸려 빠진 종목이 있으면 반드시 밝힌다. 20개를 골랐는데 10개만 도는
+          것을 말없이 하면 사용자는 그걸 고장으로 읽는다. */}
+      {bulk.skipped > 0 ? (
+        <p
+          role="status"
+          className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
+          style={{ fontSize: 12 }}
+        >
+          한 번에 {MAX_BULK_SYMBOLS}종목까지 분석합니다 — {bulk.skipped}종목은 이번에
+          제외했습니다. 종목당 AI 호출이 4회라 둔 상한입니다. 남은 종목은 분석이 끝난
+          뒤 다시 눌러 주세요.
         </p>
       ) : null}
 
