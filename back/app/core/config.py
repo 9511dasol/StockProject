@@ -6,6 +6,8 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.db_url import is_postgres
+
 EffortLevel = Literal["low", "medium", "high", "xhigh", "max"]
 
 
@@ -125,9 +127,25 @@ class Settings(BaseSettings):
     rag_timeout_seconds: float = Field(default=15.0, gt=0)
 
     @property
+    def vector_database_dsn(self) -> str | None:
+        """벡터 저장소가 **실제로** 쓸 접속 문자열.
+
+        `VECTOR_DATABASE_URL` 을 따로 두는 것은 이제 선택이다. 주 DB 가 Postgres 면
+        그것을 그대로 쓴다 — 같은 Supabase 인스턴스가 앱 테이블과 pgvector 테이블을
+        함께 담을 수 있고, 두 곳에 같은 주소를 적어 두면 한쪽만 바꿔 어긋난다.
+
+        분리가 필요했던 이유는 **주 DB 가 SQLite 였기 때문**이다(확장을 못 올린다).
+        주 DB 가 Postgres 인 지금은 그 이유가 없어졌다. 그래도 변수를 남겨 두는 것은
+        벡터만 다른 인스턴스로 빼고 싶을 때를 위해서다 — 있으면 그쪽이 이긴다.
+        """
+        if self.vector_database_url:
+            return self.vector_database_url
+        return self.database_url if is_postgres(self.database_url) else None
+
+    @property
     def rag_enabled(self) -> bool:
         """접속 정보가 있어야 RAG를 켠다. 그 외에는 조용히 비활성이다."""
-        return bool(self.vector_database_url)
+        return bool(self.vector_database_dsn)
 
     @property
     def advice_auth_enabled(self) -> bool:

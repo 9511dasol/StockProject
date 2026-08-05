@@ -14,69 +14,37 @@ Supabase가 주는 URI를 **그대로** 붙여넣을 수 있게 정규화를 여
 """
 
 import logging
-import ssl
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
+from app.core.db_url import normalize_url
 
 logger = logging.getLogger(__name__)
 
 _engine: AsyncEngine | None = None
 _engine_failed = False
 
-# 트랜잭션 풀러(PgBouncer). 세션마다 백엔드가 바뀌므로 프리페어드 스테이트먼트를
-# 캐시하면 "prepared statement _pg_N already exists"로 깨진다.
-_POOLER_PORTS = {"6543"}
-_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
-# asyncpg가 모르는 libpq 전용 파라미터. 남겨 두면 연결 시 TypeError가 난다.
-_LIBPQ_ONLY_PARAMS = {"sslmode", "pgbouncer", "options", "target_session_attrs", "channel_binding"}
-
-
-def normalize_url(raw: str) -> tuple[str, dict[str, object]]:
-    """접속 문자열을 asyncpg용으로 고치고 connect_args를 함께 만든다.
-
-    Returns:
-        (SQLAlchemy URL, create_async_engine 에 넘길 connect_args)
-    """
-    parts = urlsplit(raw.strip())
-
-    scheme = parts.scheme
-    if scheme in {"postgres", "postgresql"}:
-        scheme = "postgresql+asyncpg"
-
-    query = [(key, value) for key, value in parse_qsl(parts.query) if key not in _LIBPQ_ONLY_PARAMS]
-
-    connect_args: dict[str, object] = {}
-
-    # TLS — 원격은 항상 켠다. Supabase는 공인 인증서라 기본 컨텍스트로 검증된다.
-    host = (parts.hostname or "").lower()
-    if host and host not in _LOCAL_HOSTS:
-        connect_args["ssl"] = ssl.create_default_context()
-
-    # 풀러 뒤에서는 양쪽 캐시를 모두 끈다 — asyncpg 자체 캐시(statement_cache_size)와
-    # SQLAlchemy asyncpg 방언의 캐시(prepared_statement_cache_size)는 별개다.
-    if str(parts.port or "") in _POOLER_PORTS:
-        connect_args["statement_cache_size"] = 0
-        query.append(("prepared_statement_cache_size", "0"))
-
-    url = urlunsplit((scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
-    return url, connect_args
-
 
 def get_engine() -> AsyncEngine | None:
-    """벡터 DB 엔진. 미설정이거나 생성에 실패하면 None (= RAG 비활성)."""
+    """벡터 DB 엔진. 미설정이거나 생성에 실패하면 None (= RAG 비활성).
+
+    주소는 `settings.vector_database_dsn` 이 정한다 — `VECTOR_DATABASE_URL` 이 없으면
+    **주 DB(Postgres)를 그대로 쓴다.** 엔진은 그래도 따로 만든다: 벡터 쿼리는 원시 SQL
+    이고 실패를 이 경계 안에 가둬야 하는데, 주 엔진을 공유하면 여기서 난 오류가
+    앱 세션까지 흔든다. NullPool 이라 커넥션을 붙들고 있지도 않는다.
+    """
     global _engine, _engine_failed
 
+    dsn = settings.vector_database_dsn
     if _engine is not None:
         return _engine
-    if _engine_failed or not settings.vector_database_url:
+    if _engine_failed or not dsn:
         return None
 
     try:
-        url, connect_args = normalize_url(settings.vector_database_url)
+        url, connect_args = normalize_url(dsn)
         _engine = create_async_engine(
             url,
             echo=settings.db_echo,

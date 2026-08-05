@@ -3,14 +3,38 @@
 from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
+from app.core.db_url import is_pooler, is_postgres, normalize_url
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.db_echo,
-    pool_pre_ping=True,
-)
+
+def _create_engine():
+    """주 DB 엔진.
+
+    로컬 SQLite 는 예전 그대로 만들고, Postgres 면 접속 문자열을 정규화해서 만든다
+    (`core/db_url.py`). 정규화 없이 Supabase 풀러 URI 를 그대로 넘기면 `sslmode` 에서
+    TypeError 가 나거나 프리페어드 스테이트먼트 충돌로 깨진다 — 붙여넣기만으로
+    돌아가야 하는 값이라 그 처리를 여기서 흡수한다.
+    """
+    if not is_postgres(settings.database_url):
+        return create_async_engine(
+            settings.database_url, echo=settings.db_echo, pool_pre_ping=True
+        )
+
+    url, connect_args = normalize_url(settings.database_url)
+    return create_async_engine(
+        url,
+        echo=settings.db_echo,
+        # 풀러가 이미 커넥션을 관리한다. 여기서 또 풀을 잡으면 유휴 커넥션이 이중으로
+        # 쌓여 Supabase 무료 티어의 연결 상한에 먼저 닿는다.
+        poolclass=NullPool if is_pooler(settings.database_url) else None,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
+
+
+engine = _create_engine()
 
 AsyncSessionLocal = async_sessionmaker(
     engine,

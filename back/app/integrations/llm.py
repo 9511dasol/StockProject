@@ -49,13 +49,32 @@ async def close_client() -> None:
         _client = None
 
 
-def _reasoning() -> dict:
-    """추론 강도. gpt-5 계열·o 시리즈에서만 유효하다.
+#: 추론 파라미터를 받는 모델 계열. `reasoning` 은 여기에만 붙는다.
+_REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
 
-    비추론 모델을 `OPENAI_MODEL`에 넣으면 이 파라미터에서 400이 날 수 있다 —
-    그럴 때는 `LLM_EFFORT`가 아니라 모델 선택을 되돌아본다.
+
+def supports_reasoning(model: str) -> bool:
+    """이 모델이 `reasoning` 파라미터를 받는가.
+
+    gpt-5 계열·o 시리즈만 받는다. `gpt-4o-mini` 같은 비추론 모델에 붙여 보내면
+    **요청 자체가 400** 이라 응답을 한 줄도 못 받는다.
     """
-    return {"effort": settings.llm_effort}
+    name = model.strip().lower()
+    return name.startswith(_REASONING_MODEL_PREFIXES)
+
+
+def _extra_params() -> dict:
+    """모델이 받는 것만 골라 넘긴다.
+
+    예전에는 `reasoning` 을 무조건 실었다. 그러면 `OPENAI_MODEL` 을 비추론 모델로
+    바꾸는 순간 전 호출이 400 이 되고, 화면에는 "AI 판단 실패" 로만 보여 원인이
+    모델 선택에 있다는 것을 알기 어렵다.
+
+    `LLM_EFFORT` 를 무시하는 것이 아니라 **그 모델에서 뜻이 없을 때만** 뺀다.
+    """
+    if not supports_reasoning(settings.openai_model):
+        return {}
+    return {"reasoning": {"effort": settings.llm_effort}}
 
 
 def _refusal_of(response: Response) -> str | None:
@@ -90,7 +109,7 @@ async def ask_text(system_prompt: str, user_content: str) -> str:
         # Responses API 는 system 역할 대신 instructions 를 쓴다.
         instructions=system_prompt,
         input=user_content,
-        reasoning=_reasoning(),
+        **_extra_params(),
     )
 
     _guard(response)
@@ -136,7 +155,7 @@ async def ask_structured[ModelT: BaseModel](
         instructions=system_prompt,
         input=user_content,
         text_format=output_model,
-        reasoning=_reasoning(),
+        **_extra_params(),
     )
 
     _guard(response)
