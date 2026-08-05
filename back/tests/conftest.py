@@ -7,13 +7,49 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.agents import analysts
+from app.agents import decision as decision_agent
 from app.api.deps import get_listed_company_repository
 from app.core.config import settings
 from app.core.database import get_db
+from app.integrations import llm
 from app.main import create_app
 from app.models.base import Base
 from app.repositories.listed_company import ListedCompanyRepository
 from app.services import advice_cache, fundamentals_service
+
+
+@pytest.fixture(autouse=True)
+def no_live_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """**어떤 테스트도 실제 LLM 을 부르지 못하게 한다.**
+
+    이 가드가 없어서 실제로 두 번 당했다. 그래프에 `rewrite_query` 노드가 생기면서,
+    그 노드가 부르는 `ask_text` 를 아무도 대역으로 세우지 않았고 — 테스트가 조용히
+    **실제 Gemini API 를 쳤다.** 무료 티어 한도(모델당 하루 20회)를 테스트 한 번에
+    태우고, 429 를 받고서야 알았다.
+
+    실패가 아니라 **예외**로 만드는 것이 핵심이다. 조용히 폴백으로 흡수되면(에이전트
+    계층이 그렇게 되어 있다) 테스트는 초록인데 네트워크는 나간 상태가 그대로 유지된다.
+
+    LLM 을 쓰는 테스트는 자기가 필요한 지점을 명시적으로 대역으로 세운다.
+    """
+
+    async def _blocked(*args: object, **kwargs: object):
+        raise AssertionError(
+            "테스트에서 실제 LLM 을 호출했습니다. 필요한 지점을 대역으로 세우세요 "
+            "(analysts.ask_structured · decision.ask_structured · llm.ask_text 등)."
+        )
+
+    # 지연 import(`from app.integrations.llm import ask_text` 를 함수 안에서 하는 곳)는
+    # 호출 시점에 모듈 속성을 읽으므로 여기 패치가 그대로 먹는다. 모듈 최상단에서
+    # 이름을 가져간 곳(analysts·decision)은 그쪽 모듈도 함께 막는다.
+    for module, names in (
+        (llm, ("ask_text", "ask_structured", "embed_texts")),
+        (analysts, ("ask_structured",)),
+        (decision_agent, ("ask_structured",)),
+    ):
+        for name in names:
+            monkeypatch.setattr(module, name, _blocked, raising=False)
 
 
 @pytest.fixture(autouse=True)

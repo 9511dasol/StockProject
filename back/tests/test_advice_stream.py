@@ -10,6 +10,7 @@
 import pytest
 
 from app.agents import analysts, decision
+from app.core.config import settings
 from app.schemas.advice import AnalystOutput, InvestmentDecision
 from app.schemas.rag import RetrievedDoc
 from app.schemas.stock import (
@@ -60,8 +61,16 @@ def wired(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_fundamentals(symbol: str):
         return None
 
-    async def fake_documents(symbol: str, name: str, content):
+    # 그래프는 `documents_for_advice` 가 아니라 색인·검색을 **따로** 부른다 —
+    # 질의를 고쳐 다시 검색할 때 같은 기사를 또 색인하지 않기 위해서다. 그래서
+    # 대역도 그 두 지점에 세운다.
+    async def fake_retrieve(symbol: str, query: str):
         return [_DOC]
+
+    async def fake_index(symbol: str, content):
+        from app.schemas.rag import IngestResult
+
+        return IngestResult()
 
     async def fake_analyst(system_prompt: str, user_content: str, output_model):
         return AnalystOutput(summary="분석 결과", stance="긍정", cited_doc_ids=["D1"])
@@ -74,7 +83,11 @@ def wired(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(stock_service, "get_history", fake_history)
     monkeypatch.setattr(stock_service, "get_content", fake_content)
     monkeypatch.setattr(fundamentals_service, "get_fundamentals_or_none", fake_fundamentals)
-    monkeypatch.setattr(rag_service, "documents_for_advice", fake_documents)
+    monkeypatch.setattr(rag_service, "retrieve", fake_retrieve)
+    monkeypatch.setattr(rag_service, "index_content", fake_index)
+    # 그래프는 rag_enabled 를 보고 검색 루프에 들어갈지 정한다. conftest 가
+    # 기본으로 꺼 두므로 이 테스트는 명시적으로 켠다.
+    monkeypatch.setattr(settings, "vector_database_url", "postgresql://x:y@h:6543/db")
     monkeypatch.setattr(analysts, "ask_structured", fake_analyst)
     monkeypatch.setattr(decision, "ask_structured", fake_decision)
 
@@ -119,10 +132,10 @@ async def test_rag_failure_does_not_stop_the_stream(
     깨졌을 때 스트림이 stage 0 으로 떨어지는지까지 여기서 잡는다.
     """
 
-    async def no_documents(symbol: str, name: str, content):
+    async def no_documents(symbol: str, query: str):
         return []
 
-    monkeypatch.setattr(rag_service, "documents_for_advice", no_documents)
+    monkeypatch.setattr(rag_service, "retrieve", no_documents)
 
     events = [event async for event in advice_stream.stream_advice("005930")]
     agents = [event.agent for event in events if event.agent]
