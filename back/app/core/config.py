@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     # 지연이 되고, LLM 호출 총량은 그대로 나간다.
     # 프런트 일괄 분석이 3개씩 여는 것을 감안한 값이다 (useBulkAdvice MAX_CONCURRENT).
     advice_max_concurrent: int = Field(default=4, ge=1)
+    # AI 판단 엔드포인트 2개를 여는 공유 비밀키. 프런트 BFF 만 알고 있고 브라우저에는
+    # 나가지 않는다. **비워 두면 인증이 꺼진다** — 로컬 개발이 키 없이 돌아야 하기
+    # 때문인데, 그 상태로 외부에 노출하면 누구나 토큰을 태울 수 있으므로 기동 시
+    # 경고를 남긴다 (main.py lifespan).
+    advice_api_key: str | None = None
 
     # --- LLM (OpenAI) ---
     # 미설정 시 SDK가 OPENAI_API_KEY 환경 변수를 읽는다.
@@ -123,6 +128,15 @@ class Settings(BaseSettings):
     def rag_enabled(self) -> bool:
         """접속 정보가 있어야 RAG를 켠다. 그 외에는 조용히 비활성이다."""
         return bool(self.vector_database_url)
+
+    @property
+    def advice_auth_enabled(self) -> bool:
+        """키가 있어야 AI 판단 엔드포인트를 잠근다.
+
+        `rag_enabled`와 달리 비활성이 **조용하지 않다** — 이건 기능이 아니라 자물쇠라,
+        꺼져 있다는 사실을 기동 로그가 알려야 한다 (main.py).
+        """
+        return bool(self.advice_api_key)
 
 
 @lru_cache

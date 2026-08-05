@@ -152,9 +152,14 @@ export async function apiPost<T>(
 export async function apiPostStream(
   path: string,
   body: unknown,
-  options: { timeoutMs?: number; signal?: AbortSignal } = {},
+  options: {
+    timeoutMs?: number;
+    signal?: AbortSignal;
+    /** 추가 요청 헤더. AI 판단의 공유 비밀키가 이 자리로 온다 */
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<Response> {
-  const { timeoutMs, signal } = options;
+  const { timeoutMs, signal, headers } = options;
   const timeout = timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined;
   const combined =
     signal && timeout
@@ -165,7 +170,7 @@ export async function apiPostStream(
   try {
     response = await fetch(buildUrl(path), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
       cache: "no-store",
       signal: combined,

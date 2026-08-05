@@ -6,7 +6,7 @@ import {
 } from "@/features/advice/model/mock";
 import type { AdviceStreamEvent } from "@/features/advice/model/types";
 import { apiPostStream, ApiError } from "@/lib/api";
-import { AI_TIMEOUT_MS, USE_MOCK } from "@/lib/config/env";
+import { ADVICE_API_KEY, AI_TIMEOUT_MS, USE_MOCK } from "@/lib/config/env";
 
 /**
  * AI 판단 스트리밍 (BFF). 브라우저는 FastAPI 를 직접 부르지 않는다.
@@ -209,7 +209,14 @@ export async function POST(request: Request) {
     const upstream = await apiPostStream(
       "/stocks/advice/stream",
       { symbol },
-      { signal, timeoutMs: AI_TIMEOUT_MS },
+      {
+        signal,
+        timeoutMs: AI_TIMEOUT_MS,
+        // 공유 비밀키는 **여기서만** 붙는다. 이 라우트 핸들러는 서버에서만 돌므로
+        // 브라우저는 이 헤더도, 값도 보지 못한다. 비어 있으면 헤더를 붙이지 않고,
+        // 백엔드도 미설정이면 통과시킨다 — 로컬 개발이 키 없이 그대로 돈다.
+        headers: ADVICE_API_KEY ? { "X-Advice-Key": ADVICE_API_KEY } : undefined,
+      },
     );
     return new Response(proxyStream(upstream, signal), { headers });
   } catch (error) {

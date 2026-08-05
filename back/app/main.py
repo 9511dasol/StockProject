@@ -56,6 +56,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await create_all()
     logger.info("%s 시작 (model=%s)", settings.app_name, settings.openai_model)
 
+    # 조용히 열려 있는 것이 가장 나쁘다 — 자물쇠가 꺼져 있으면 매 기동마다 말한다.
+    if not settings.advice_auth_enabled:
+        logger.warning(
+            "ADVICE_API_KEY 가 없어 AI 판단 엔드포인트가 공개 상태입니다 — "
+            "외부에 노출하면 누구나 LLM 토큰을 태울 수 있습니다"
+        )
+
     warm_up = asyncio.create_task(_warm_up())
 
     yield

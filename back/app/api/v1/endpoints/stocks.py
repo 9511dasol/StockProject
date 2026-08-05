@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import ListedCompanyRepo
+from app.api.deps import AdviceKeyGuard, ListedCompanyRepo
 from app.schemas.advice import StockAdviceRequest, StockAdviceResponse
 from app.schemas.stock import (
     ListedCompaniesStatus,
@@ -114,7 +114,7 @@ async def get_listed_companies_status(repo: ListedCompanyRepo) -> ListedCompanie
 
 @router.post("/advice", response_model=StockAdviceResponse, summary="AI 멀티 에이전트 판단")
 async def create_stock_advice(
-    repo: ListedCompanyRepo, payload: StockAdviceRequest
+    repo: ListedCompanyRepo, payload: StockAdviceRequest, _: AdviceKeyGuard = None
 ) -> StockAdviceResponse:
     listing = await listed_company_service.resolve_listing(repo, payload.symbol)
     try:
@@ -130,7 +130,7 @@ async def create_stock_advice(
     response_class=StreamingResponse,
 )
 async def stream_stock_advice(
-    repo: ListedCompanyRepo, payload: StockAdviceRequest
+    repo: ListedCompanyRepo, payload: StockAdviceRequest, _: AdviceKeyGuard = None
 ) -> StreamingResponse:
     """`/advice`와 같은 결과를 4단계로 나눠 흘린다.
 

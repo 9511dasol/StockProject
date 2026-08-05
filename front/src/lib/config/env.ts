@@ -29,5 +29,15 @@ export const API_TIMEOUT_MS = Number(process.env.STOCK_API_TIMEOUT_MS ?? 20_000)
 /** AI 판단은 종목당 LLM 4회라 별도로 길게 잡는다 (백엔드 기본 300s). */
 export const AI_TIMEOUT_MS = Number(process.env.STOCK_AI_TIMEOUT_MS ?? 300_000);
 
+/**
+ * AI 판단 엔드포인트를 여는 공유 비밀키 (백엔드 `ADVICE_API_KEY` 와 같은 값).
+ *
+ * **`NEXT_PUBLIC_` 을 절대 붙이지 않는다.** 붙이는 순간 이 키가 클라이언트 번들에
+ * 인라인되어 자물쇠가 무의미해진다 — 브라우저에 있는 키는 키가 아니다. 이 값을
+ * 읽는 곳은 `app/api/stocks/advice/route.ts`(BFF) 하나뿐이고, 그 파일은 서버에서만
+ * 돈다. 비어 있으면 헤더를 아예 붙이지 않는다(백엔드도 미설정이면 통과시킨다).
+ */
+export const ADVICE_API_KEY = process.env.ADVICE_API_KEY ?? "";
+
 /** 서버 컴포넌트 fetch 재검증 주기 (README 데이터 페칭 절: 짧게) */
 export const REVALIDATE_SECONDS = 60;
