@@ -42,6 +42,37 @@ def is_postgres(raw: str | None) -> bool:
     return urlsplit(raw).scheme.split("+", 1)[0] in {"postgres", "postgresql"}
 
 
+def _tls_for(sslmode: str | None, host: str) -> object | None:
+    """`sslmode` 를 asyncpg 의 ssl 인자로 옮긴다.
+
+    **libpq 의 의미를 그대로 따른다.** 예전에는 원격이면 무조건 검증 컨텍스트를
+    만들었는데, 그건 libpq 보다 엄격해서 Supabase 가 준 URL 을 그대로 붙여넣으면
+    연결이 실패했다:
+
+        sslmode=require 인데 CERTIFICATE_VERIFY_FAILED: self-signed certificate
+
+    Supabase 풀러는 **자체 서명 CA** 를 쓴다. libpq 에서 `require` 는 "암호화하되
+    인증서는 검증하지 않는다" 는 뜻이고, 검증까지 원하면 `verify-ca`/`verify-full`
+    을 쓰는 것이 규약이다. 우리가 그 규약을 바꿔서 쓸 이유가 없다.
+
+    검증이 필요하면 URL 에 `sslmode=verify-full` 을 적고, 필요하면 Supabase 가
+    배포하는 CA 인증서를 시스템 신뢰 저장소에 넣는다.
+    """
+    mode = (sslmode or "").strip().lower()
+
+    if mode == "disable":
+        return None
+    if mode in {"verify-ca", "verify-full"}:
+        return ssl.create_default_context()
+    if mode in {"allow", "prefer", "require"}:
+        # asyncpg 는 문자열 "require" 를 "암호화하되 검증하지 않음" 으로 받는다.
+        return "require"
+
+    # sslmode 가 없을 때. 로컬은 대개 TLS 를 안 켜므로 끄고, 원격은 켜되 검증까지
+    # 요구하지는 않는다 — 원격 DB 를 평문으로 두는 것이 더 나쁘다.
+    return None if not host or host in _LOCAL_HOSTS else "require"
+
+
 def normalize_url(raw: str) -> tuple[str, dict[str, object]]:
     """접속 문자열을 asyncpg용으로 고치고 connect_args를 함께 만든다.
 
@@ -65,10 +96,10 @@ def normalize_url(raw: str) -> tuple[str, dict[str, object]]:
 
     connect_args: dict[str, object] = {}
 
-    # TLS — 원격은 항상 켠다. Supabase 는 공인 인증서라 기본 컨텍스트로 검증된다.
     host = (parts.hostname or "").lower()
-    if host and host not in _LOCAL_HOSTS:
-        connect_args["ssl"] = ssl.create_default_context()
+    tls = _tls_for(dict(parse_qsl(parts.query)).get("sslmode"), host)
+    if tls is not None:
+        connect_args["ssl"] = tls
 
     # 풀러 뒤에서는 양쪽 캐시를 모두 끈다 — asyncpg 자체 캐시(statement_cache_size)와
     # SQLAlchemy asyncpg 방언의 캐시(prepared_statement_cache_size)는 별개다.

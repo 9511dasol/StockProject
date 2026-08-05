@@ -57,15 +57,23 @@ def _masked(url: str) -> str:
 
 def check_settings() -> bool:
     print("1. 설정")
-    if not settings.vector_database_url:
-        print("  [FAIL] VECTOR_DATABASE_URL 이 비어 있습니다")
-        print("         → Supabase 대시보드 > Project Settings > Database > Connection string")
-        print("           의 URI 를 back/.env 의 VECTOR_DATABASE_URL 에 넣는다.")
+    # 주소는 `vector_database_dsn` 이 정한다 — VECTOR_DATABASE_URL 이 없으면 주
+    # DB(Postgres)를 그대로 쓴다. 여기서 settings.vector_database_url 만 보면
+    # 실제로는 켜져 있는 RAG 를 "꺼져 있다" 고 보고한다.
+    dsn = settings.vector_database_dsn
+    if not dsn:
+        print("  [FAIL] 벡터 저장소 주소가 없습니다")
+        print("         → DATABASE_URL 을 Supabase Postgres 로 두면 그것을 그대로 쓴다.")
+        print("           벡터만 다른 인스턴스로 뺄 때만 VECTOR_DATABASE_URL 을 채운다.")
         print("           (연결 풀러 6543 포트를 권장 - 서버리스/재시작에 강하다)")
         return False
 
-    url, connect_args = normalize_url(settings.vector_database_url)
-    _ok("VECTOR_DATABASE_URL", _masked(url))
+    source = (
+        "VECTOR_DATABASE_URL" if settings.vector_database_url else "DATABASE_URL (주 DB 공유)"
+    )
+    url, connect_args = normalize_url(dsn)
+    _ok("주소 출처", source)
+    _ok("접속", _masked(url))
     _ok("connect_args", ", ".join(sorted(connect_args)) or "(없음)")
     _ok("임베딩", f"{settings.embedding_model} · {settings.embedding_dimensions}차원")
     return True

@@ -25,6 +25,7 @@ dependencies = [
     "fastapi-pagination>=0.15.16",
     "openai>=2.50.0",
     "pykrx>=1.2.8",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.optional-dependencies]

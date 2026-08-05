@@ -45,13 +45,52 @@ def test_explicit_driver_is_not_overwritten() -> None:
 def test_sslmode_is_stripped_but_tls_is_kept() -> None:
     """`sslmode` 는 libpq 전용이다 — asyncpg 에 넘기면 TypeError 가 난다.
 
-    그렇다고 TLS 를 끄면 안 되므로 파라미터는 버리고 **컨텍스트로 바꿔** 넘긴다.
+    그렇다고 TLS 를 끄면 안 되므로 파라미터는 버리고 **ssl 인자로 바꿔** 넘긴다.
     이 둘을 함께 하지 않으면 "연결은 되는데 평문" 이거나 "아예 안 붙거나" 둘 중 하나다.
     """
     url, connect_args = normalize_url(_TRANSACTION_POOLER)
 
     assert "sslmode" not in url
     assert connect_args["ssl"] is not None
+
+
+def test_require_encrypts_without_verifying() -> None:
+    """`sslmode=require` 는 libpq 에서 "암호화하되 CA 는 검증하지 않는다" 는 뜻이다.
+
+    예전에는 원격이면 무조건 검증 컨텍스트를 만들었다. 그건 libpq 보다 엄격해서
+    Supabase 가 준 URL 을 그대로 붙여넣으면 실패했다 — 풀러가 **자체 서명 CA** 를
+    쓰기 때문이다(실측: CERTIFICATE_VERIFY_FAILED: self-signed certificate).
+    규약을 우리가 바꿔 쓸 이유가 없다.
+    """
+    _, connect_args = normalize_url(_TRANSACTION_POOLER)
+
+    assert connect_args["ssl"] == "require"
+
+
+def test_verify_full_uses_a_verifying_context() -> None:
+    """검증까지 원하면 그렇게 적는다 — 그때는 진짜로 검증한다."""
+    import ssl as ssl_module
+
+    _, connect_args = normalize_url(
+        _TRANSACTION_POOLER.replace("sslmode=require", "sslmode=verify-full")
+    )
+
+    assert isinstance(connect_args["ssl"], ssl_module.SSLContext)
+
+
+def test_sslmode_disable_turns_tls_off() -> None:
+    _, connect_args = normalize_url(
+        _TRANSACTION_POOLER.replace("sslmode=require", "sslmode=disable")
+    )
+
+    assert "ssl" not in connect_args
+
+
+def test_remote_without_sslmode_still_encrypts() -> None:
+    """원격 DB 를 평문으로 두는 것이 검증을 건너뛰는 것보다 나쁘다."""
+    _, connect_args = normalize_url("postgresql://u:p@db.example.com:5432/postgres")
+
+    assert connect_args["ssl"] == "require"
 
 
 def test_transaction_pooler_disables_prepared_statements() -> None:
