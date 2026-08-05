@@ -7,6 +7,7 @@
 
 import re
 
+from app.domain.symbols import board_of
 from app.models.listed_company import ListedCompany
 
 # 등급 — 낮을수록 먼저.
@@ -20,17 +21,28 @@ RANK_NONE = 99  # 매칭 없음 — 결과에서 제외
 _PREFERRED_SUFFIX = re.compile(r"(우[BC]?|\(전환\)|\(신형\))$")
 _NON_COMMON_KEYWORDS = ("리츠", "스팩", "기업인수목적")
 
-# KRX CSV 는 시장을 한글('코스피')로, KIND·내부 목록은 영문('KOSPI')으로 준다.
-# 한쪽만 적어두면 실제 DB(한글)에서 이 우선순위가 통째로 무시된다.
-_MARKET_PRIORITY = {
-    "KOSPI": 0,
-    "코스피": 0,
-    "KOSDAQ": 1,
-    "코스닥": 1,
-    "KONEX": 2,
-    "코넥스": 2,
-}
+# 시장 우선순위 — 낮을수록 먼저.
+_BOARD_PRIORITY = {"KOSPI": 0, "KOSDAQ": 1, "KONEX": 2}
 _MARKET_PRIORITY_DEFAULT = 3
+
+# `market` 컬럼의 실제 값은 수집 소스마다 다르다. **실측(2,748행)은 이랬다:**
+#
+#     코스닥 1806 · 유가 833 · 코넥스 109      ← `코스피` 는 0건, `KOSPI` 도 0건
+#
+# 예전에는 `{"KOSPI": 0, "코스피": 0, ...}` 만 있어서 유가증권시장 833종목이 전부
+# 기본값(3)으로 떨어졌다. 코스닥이 1 이므로 **코스피가 코스닥보다 뒤로 밀렸다** —
+# 폴백 순서를 정해 두고 정반대로 동작한 셈이다. 라벨을 열거로 고정한다.
+_MARKET_LABEL_BOARDS = {
+    "KOSPI": "KOSPI",
+    "코스피": "KOSPI",
+    "유가": "KOSPI",
+    "유가증권": "KOSPI",
+    "유가증권시장": "KOSPI",
+    "KOSDAQ": "KOSDAQ",
+    "코스닥": "KOSDAQ",
+    "KONEX": "KONEX",
+    "코넥스": "KONEX",
+}
 
 
 def is_common_stock(name: str) -> bool:
@@ -60,6 +72,26 @@ def match_rank(company: ListedCompany, keyword: str, initials: str) -> int:
     return RANK_NONE
 
 
+def market_priority(company: ListedCompany) -> int:
+    """이 종목이 속한 시장의 폴백 우선순위. 낮을수록 먼저.
+
+    **라벨을 먼저 보고, 모르는 라벨이면 심볼 접미사로 떨어진다.**
+
+    순서를 이렇게 둔 이유는 코넥스 때문이다. `krx_symbol_to_yfinance` 가 코넥스에도
+    `.KQ` 를 붙이므로 `board_of` 는 코넥스를 코스닥으로 본다(그 함수 주석에 적혀 있는
+    의도적 단순화다). 랭킹에서는 셋을 구분할 수 있어야 하고, 그 정보는 라벨에만 있다.
+
+    반대로 라벨이 없거나(접미사만 있는 행) 처음 보는 표기면 접미사가 답이다 —
+    접미사는 실제로 공급자에게 물어본 심볼 그 자체라 그 행과 어긋날 수 없다.
+    """
+    label = (company.market or "").strip()
+    board = _MARKET_LABEL_BOARDS.get(label) or _MARKET_LABEL_BOARDS.get(label.upper())
+    if board is None:
+        board = board_of(company.symbol)
+
+    return _BOARD_PRIORITY.get(board or "", _MARKET_PRIORITY_DEFAULT)
+
+
 def _fallback_key(company: ListedCompany) -> tuple[int, int, int, str]:
     """시가총액이 없을 때의 대체 순서.
 
@@ -68,7 +100,7 @@ def _fallback_key(company: ListedCompany) -> tuple[int, int, int, str]:
     """
     return (
         0 if is_common_stock(company.name) else 1,
-        _MARKET_PRIORITY.get(company.market or "", _MARKET_PRIORITY_DEFAULT),
+        market_priority(company),
         len(company.name),
         company.name,
     )

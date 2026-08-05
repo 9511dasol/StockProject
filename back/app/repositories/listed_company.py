@@ -116,11 +116,21 @@ class ListedCompanyRepository:
         """아직 시총이 없는 종목 심볼. yfinance 폴백이 한 번에 처리할 만큼만 가져온다.
 
         KOSPI 를 먼저 채운다 — 대형주가 몰려 있어 랭킹 개선 효과가 가장 크다.
+
+        **`market == "KOSPI"` 로 정렬하면 안 된다.** 그 컬럼의 실제 값은 한글이고
+        (실측: 코스닥 1806 · 유가 833 · 코넥스 109) `KOSPI` 문자열은 **0건**이라,
+        이 비교는 모든 행에서 거짓이 된다 — 정렬 항이 통째로 죽어 심볼 오름차순만
+        남는다. 조용히 틀리는 종류라 오래 살아남았다: 배치는 정상 동작하고 채우는
+        순서만 무작위에 가까웠다.
+
+        대신 심볼 접미사를 쓴다. `krx_symbol_to_yfinance` 가 시장 구분을 보고 붙인
+        값이고 **실제로 공급자에게 물어본 심볼 그 자체**라 그 행과 어긋날 수 없다
+        (`domain/symbols.board_of` 주석과 같은 근거).
         """
         stmt = (
             select(ListedCompany.symbol)
             .where(ListedCompany.market_cap.is_(None))
-            .order_by((ListedCompany.market == "KOSPI").desc(), ListedCompany.symbol)
+            .order_by(ListedCompany.symbol.like("%.KS").desc(), ListedCompany.symbol)
             .limit(limit)
         )
         result = await self._db.execute(stmt)

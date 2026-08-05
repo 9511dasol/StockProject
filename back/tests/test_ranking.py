@@ -140,6 +140,69 @@ def test_korean_market_labels_are_recognised() -> None:
     assert [c.market for c in ranked] == ["코스피", "코스닥"]
 
 
+def test_real_db_label_yuga_is_treated_as_kospi() -> None:
+    """**실측 DB 는 '코스피'가 아니라 '유가'로 저장한다.**
+
+    2,748행 실측: `코스닥 1806 · 유가 833 · 코넥스 109`. `코스피`·`KOSPI` 는 0건이다.
+    위 `test_korean_market_labels_are_recognised` 가 초록이면서도 운영 데이터에서는
+    유가증권 833종목이 전부 기본값(3)으로 떨어져 **코스닥(1)보다 뒤로 밀렸다** —
+    테스트가 실제 값이 아닌 표기를 쓰면 이렇게 거짓 안심을 준다.
+
+    심볼에 접미사를 **일부러 빼서** 라벨 경로만 남긴다. `.KS`/`.KQ` 를 붙이면
+    라벨 표를 통째로 지워도 `board_of` 폴백이 받아내 이 테스트가 초록으로 남는다 —
+    두 겹으로 막아 둔 것은 좋지만, 그러면 어느 겹이 살아 있는지 확인할 수 없다.
+    """
+    companies = [
+        _company("310210", "대신종목", "코스닥", None),
+        _company("000000", "대신종목", "유가", None),
+    ]
+    ranked = rank_companies(companies, "대신", "")
+
+    assert [c.market for c in ranked] == ["유가", "코스닥"]
+
+
+def test_konex_sorts_after_kosdaq() -> None:
+    """코넥스는 접미사가 `.KQ` 라 board_of 로는 코스닥과 구분되지 않는다.
+
+    셋을 가르는 정보는 라벨에만 있으므로, 라벨을 먼저 보는 순서가 지켜져야 한다.
+    """
+    companies = [
+        _company("111111.KQ", "대신종목", "코넥스", None),
+        _company("310210.KQ", "대신종목", "코스닥", None),
+        _company("000000.KS", "대신종목", "유가", None),
+    ]
+    ranked = rank_companies(companies, "대신", "")
+
+    assert [c.market for c in ranked] == ["유가", "코스닥", "코넥스"]
+
+
+def test_unknown_label_falls_back_to_symbol_suffix() -> None:
+    """처음 보는 표기가 와도 접미사가 답을 준다.
+
+    접미사는 `krx_symbol_to_yfinance` 가 시장 구분을 보고 붙인 값이라 그 행의
+    시세와 어긋날 수 없다. 수집 소스가 하나 더 늘어 라벨이 또 바뀌어도
+    (이 버그가 바로 그 사례다) 순서가 통째로 죽지는 않는다.
+    """
+    companies = [
+        _company("310210.KQ", "대신종목", "처음보는표기", None),
+        _company("000000.KS", "대신종목", "처음보는표기", None),
+    ]
+    ranked = rank_companies(companies, "대신", "")
+
+    assert [c.symbol for c in ranked] == ["000000.KS", "310210.KQ"]
+
+
+def test_missing_label_falls_back_to_symbol_suffix() -> None:
+    """`market` 이 비어 있어도(실측 44행) 접미사로 갈린다."""
+    companies = [
+        _company("310210.KQ", "대신종목", "", None),
+        _company("000000.KS", "대신종목", "", None),
+    ]
+    ranked = rank_companies(companies, "대신", "")
+
+    assert [c.symbol for c in ranked] == ["000000.KS", "310210.KQ"]
+
+
 def test_initials_query_ranks_by_cap() -> None:
     """초성 검색도 같은 규칙을 탄다."""
     names = _rank("ㅅㅅㅈㅈ", with_caps=True)
