@@ -8,6 +8,7 @@ import {
   BiCheck,
   BiChevronDown,
   BiCompass,
+  BiFilterAlt,
   BiGridVertical,
   BiHome,
   BiLeftArrowAlt,
@@ -17,6 +18,7 @@ import {
   BiRightArrowAlt,
   BiSearch,
   BiSolidStar,
+  BiSortDown,
   BiStar,
   BiX,
 } from "react-icons/bi";
@@ -60,6 +62,10 @@ const REGISTRY = {
   retry: BiRefresh,
   chart: BiBarChartAlt2,
   compass: BiCompass,
+  /** 모집단을 자르는 축 (종목 탐색의 '시장' 필터) */
+  filter: BiFilterAlt,
+  /** 순서를 바꾸는 축. 이 서비스의 정렬은 전부 내림차순이라 down 하나면 된다 */
+  "sort-desc": BiSortDown,
 } as const satisfies Record<string, IconType>;
 
 /** 레지스트리에 있는 이름만 허용한다 — 새 아이콘은 위에 등록해야 쓸 수 있다. */

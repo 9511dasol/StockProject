@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { parseBoard, parseSort, rankingHref } from "./ranking.ts";
+import {
+  boardOptions,
+  parseBoard,
+  parseRankingQuery,
+  parseSort,
+  rankingHref,
+  sortOptions,
+  SORTED_COLUMN,
+} from "./ranking.ts";
 
 /**
  * 탐색 화면은 필터를 URL 로 들고 있다. 즉 사용자가 손으로 고친 문자열이 그대로
@@ -54,5 +62,67 @@ describe("ranking · 링크 생성", () => {
       rankingHref({ sort: "change", board: "KOSPI" }, { board: "ALL" }),
       "/stocks?sort=change",
     );
+  });
+});
+
+describe("ranking · searchParams 한 벌 파싱", () => {
+  test("두 축을 함께 좁힌다", () => {
+    assert.deepEqual(parseRankingQuery({ sort: "change", board: "KOSDAQ" }), {
+      sort: "change",
+      board: "KOSDAQ",
+    });
+  });
+
+  test("빈 searchParams 는 기본 조합이다", () => {
+    assert.deepEqual(parseRankingQuery({}), {
+      sort: "market_cap",
+      board: "ALL",
+    });
+  });
+});
+
+describe("ranking · 필터 칩 옵션", () => {
+  const current = { sort: "change", board: "KOSPI" } as const;
+
+  test("시장 칩은 정렬을 유지한 채 시장만 바꾼다", () => {
+    // 코스피를 보다가 코스닥을 눌렀는데 정렬이 시총순으로 돌아가면,
+    // 사용자는 자기가 무엇을 눌렀는지 알 수 없게 된다.
+    assert.deepEqual(
+      boardOptions(current).map((option) => [option.value, option.href]),
+      [
+        ["ALL", "/stocks?sort=change"],
+        ["KOSPI", "/stocks?sort=change&board=KOSPI"],
+        ["KOSDAQ", "/stocks?sort=change&board=KOSDAQ"],
+      ],
+    );
+  });
+
+  test("정렬 칩은 시장을 유지한 채 정렬만 바꾼다", () => {
+    assert.deepEqual(
+      sortOptions(current).map((option) => [option.value, option.href]),
+      [
+        ["market_cap", "/stocks?board=KOSPI"],
+        ["change", "/stocks?sort=change&board=KOSPI"],
+      ],
+    );
+  });
+
+  test("각 축에서 선택된 것은 정확히 하나다", () => {
+    assert.deepEqual(
+      boardOptions(current).filter((option) => option.selected).map((o) => o.value),
+      ["KOSPI"],
+    );
+    assert.deepEqual(
+      sortOptions(current).filter((option) => option.selected).map((o) => o.value),
+      ["change"],
+    );
+  });
+});
+
+describe("ranking · 정렬 기준 열", () => {
+  test("정렬마다 표식이 붙는 열이 하나씩 대응한다", () => {
+    // 백엔드가 두 정렬 모두 내림차순이라 방향은 값으로 들지 않는다.
+    assert.equal(SORTED_COLUMN.market_cap, "marketCap");
+    assert.equal(SORTED_COLUMN.change, "change");
   });
 });

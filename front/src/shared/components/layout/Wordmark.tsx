@@ -41,17 +41,21 @@ export function Wordmark({
     <Link
       href="/"
       aria-label="종목 원장 홈으로"
-      className="-my-1 flex min-h-[var(--tap)] flex-col justify-center gap-[3px] py-1 text-ink"
+      // min-w-0: 마스트헤드 우측 덩어리(검색·토글·액션)와 폭을 다툴 때 이쪽이
+      // 먼저 줄어들 수 있게 한다. 없으면 캡션 길이만큼 헤더가 밀려 나간다.
+      className="-my-1 flex min-w-0 min-h-[var(--tap)] flex-col justify-center gap-[3px] py-1 text-ink"
     >
-      <span className="font-serif-kr font-bold leading-none tracking-[-0.01em] text-[20px] md:text-[24px]">
+      <span className="whitespace-nowrap font-serif-kr font-bold leading-none tracking-[-0.01em] text-[20px] md:text-[24px]">
         종목 원장<span className="text-up">.</span>{" "}
         <span className="font-serif-en tracking-[0.02em] text-muted-50 text-[13px] md:text-[15px]">
           The Stock Ledger
         </span>
       </span>
       {caption ? (
+        // 캡션은 잘려도 되는 부가 정보다 — 시세 지연 고지가 길어져도 제호가 접히거나
+        // 우측 컨트롤을 화면 밖으로 밀지 않는다.
         <span
-          className="font-mono uppercase leading-none tracking-label-wide text-muted-50"
+          className="truncate font-mono uppercase leading-none tracking-label-wide text-muted-50"
           style={{ fontSize: 10.5 }}
         >
           {caption}

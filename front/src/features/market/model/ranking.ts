@@ -2,12 +2,22 @@
 //
 // URL 이 곧 상태다 — 필터가 클라이언트 state 가 아니라 searchParams 라, 검증되지 않은
 // 문자열이 그대로 백엔드 쿼리에 실릴 수 있다. 그 경계를 여기서 막는다.
+//
+// 링크 생성·옵션 목록도 전부 여기 있다. 컴포넌트가 `RANKING_BOARDS.map()` 을 돌며
+// 라벨을 찾고 href 를 만들면, 같은 조합 로직이 시장·정렬 두 벌로 복사된다. 순수
+// 함수로 내려 두면 테스트가 되고(ranking.test.ts) 컴포넌트는 그리기만 남는다.
 
 export const RANKING_SORTS = ["market_cap", "change"] as const;
 export const RANKING_BOARDS = ["ALL", "KOSPI", "KOSDAQ"] as const;
 
 export type RankingSort = (typeof RANKING_SORTS)[number];
 export type RankingBoard = (typeof RANKING_BOARDS)[number];
+
+/** 이 화면의 상태 전부. searchParams 와 1:1 이다. */
+export interface RankingQuery {
+  sort: RankingSort;
+  board: RankingBoard;
+}
 
 export const SORT_LABELS: Record<RankingSort, string> = {
   market_cap: "시가총액순",
@@ -22,6 +32,43 @@ export const BOARD_LABELS: Record<RankingBoard, string> = {
 
 /** 탐색 화면 한 페이지 종목 수. 백엔드 상한(100) 안이다. */
 export const RANKING_PAGE_SIZE = 50;
+
+/** 표가 가진 열. 정렬 표식을 어디에 찍을지 정하는 데 쓴다. */
+export type RankingColumn =
+  | "rank"
+  | "name"
+  | "spark"
+  | "price"
+  | "change"
+  | "marketCap";
+
+/** 정렬이 실제로 만드는 열. 그 외 열은 정렬과 무관하다. */
+export type SortedColumn = Extract<RankingColumn, "change" | "marketCap">;
+
+/**
+ * 정렬 기준이 어느 열인지.
+ *
+ * 백엔드는 두 정렬 모두 **내림차순**이다 (`market_service._ranked_rows` — 시총은
+ * 내림차순 정렬, 등락률은 스냅샷이 이미 내림차순). 그래서 방향을 값으로 들 필요가
+ * 없고, 표는 활성 열에 `aria-sort="descending"` 을 고정으로 붙인다.
+ */
+export const SORTED_COLUMN: Record<RankingSort, SortedColumn> = {
+  market_cap: "marketCap",
+  change: "change",
+};
+
+/**
+ * 필터 칩 하나가 필요로 하는 것 전부.
+ *
+ * `value` 를 남겨 두는 것은 React key 와 테스트 때문이다 — 라벨은 번역되면 바뀌지만
+ * value 는 URL 계약이라 바뀌지 않는다.
+ */
+export interface RankingFilterOption<Value extends string> {
+  value: Value;
+  label: string;
+  href: string;
+  selected: boolean;
+}
 
 /**
  * `?sort=` 를 안전한 값으로 좁힌다. 모르는 값은 조용히 기본값으로 떨어뜨린다.
@@ -41,10 +88,18 @@ export function parseBoard(value: string | undefined): RankingBoard {
     : "ALL";
 }
 
+/** searchParams 한 벌을 검증된 상태로. 페이지가 파싱을 두 줄로 나눠 쓰지 않게 한다. */
+export function parseRankingQuery(params: {
+  sort?: string;
+  board?: string;
+}): RankingQuery {
+  return { sort: parseSort(params.sort), board: parseBoard(params.board) };
+}
+
 /** 필터 칩이 거는 링크. 현재 조건에서 한 축만 바꾼다. */
 export function rankingHref(
-  current: { sort: RankingSort; board: RankingBoard },
-  patch: Partial<{ sort: RankingSort; board: RankingBoard }>,
+  current: RankingQuery,
+  patch: Partial<RankingQuery>,
 ): string {
   const next = { ...current, ...patch };
   const params = new URLSearchParams();
@@ -55,4 +110,28 @@ export function rankingHref(
 
   const query = params.toString();
   return query ? `/stocks?${query}` : "/stocks";
+}
+
+/** 시장 축 칩 목록 (전체·코스피·코스닥). */
+export function boardOptions(
+  current: RankingQuery,
+): RankingFilterOption<RankingBoard>[] {
+  return RANKING_BOARDS.map((value) => ({
+    value,
+    label: BOARD_LABELS[value],
+    href: rankingHref(current, { board: value }),
+    selected: value === current.board,
+  }));
+}
+
+/** 정렬 축 칩 목록 (시가총액순·등락률순). */
+export function sortOptions(
+  current: RankingQuery,
+): RankingFilterOption<RankingSort>[] {
+  return RANKING_SORTS.map((value) => ({
+    value,
+    label: SORT_LABELS[value],
+    href: rankingHref(current, { sort: value }),
+    selected: value === current.sort,
+  }));
 }

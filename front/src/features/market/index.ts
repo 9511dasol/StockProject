@@ -11,14 +11,20 @@ export { MarketOverviewList } from "./components/MarketOverviewList";
 export { IndexCards } from "./components/IndexCards";
 export { MoverList } from "./components/MoverList";
 export { MoversTabs } from "./components/MoversTabs";
-export { RankingTable } from "./components/RankingTable";
-export { RankingFilters } from "./components/RankingFilters";
+
+/** 종목 탐색(/stocks) — 필터 바와 표만 내보낸다 (components/browse/index.ts) */
+export {
+  RankingFilterBar,
+  type RankingFilterBarProps,
+  RankingTable,
+  type RankingTableProps,
+} from "./components/browse";
 
 export {
-  parseBoard,
-  parseSort,
+  parseRankingQuery,
   RANKING_PAGE_SIZE,
   type RankingBoard,
+  type RankingQuery,
   type RankingSort,
 } from "./model/ranking";
 

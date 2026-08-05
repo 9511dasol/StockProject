@@ -1,8 +1,7 @@
 import {
   getStockRanking,
-  parseBoard,
-  parseSort,
-  RankingFilters,
+  parseRankingQuery,
+  RankingFilterBar,
   RankingTable,
 } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
@@ -11,6 +10,7 @@ import { masthead } from "@/lib/format";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
 import Link from "next/link";
+import { BrowseHeader } from "./_components/BrowseHeader";
 
 /**
  * 종목 탐색 · 랭킹.
@@ -21,23 +21,28 @@ import Link from "next/link";
  */
 export const dynamic = "force-dynamic";
 
+/** Next 16 은 searchParams 를 Promise 로 준다 — 페이지에서 await 한다. */
+interface StockBrowsePageProps {
+  searchParams: Promise<{ sort?: string; board?: string }>;
+}
+
 /**
  * 필터·정렬 상태를 클라이언트가 아니라 **URL** 이 들고 있다.
  *
  * 관심종목 화면(WatchlistBoard)은 'use client' 로 상태를 들지만 여기는 그럴 이유가
  * 없다: 200행을 브라우저로 내려보낼 필요가 없고, 링크 방식이 공유 가능한 주소와
- * 뒤로가기를 공짜로 준다. 덕분에 이 화면은 전부 서버 컴포넌트다.
+ * 뒤로가기를 공짜로 준다. 덕분에 **이 화면에서 클라이언트로 내려가는 컴포넌트는
+ * 검색 트리거뿐이다** — 마스트헤드·툴바·표·행 전부 서버에서 HTML 로 끝난다.
+ *
+ * 페이지는 조립만 한다 (CONVENTIONS: app/ 은 라우팅만). 데이터는 services 가,
+ * searchParams 검증과 칩 링크 계산은 model 이, 조판은 features/market 의
+ * components/browse 가 소유한다.
  */
 export default async function StockBrowsePage({
   searchParams,
-}: {
-  searchParams: Promise<{ sort?: string; board?: string }>;
-}) {
-  const query = await searchParams;
-  const sort = parseSort(query.sort);
-  const board = parseBoard(query.board);
-
-  const ranking = await getStockRanking({ sort, board });
+}: StockBrowsePageProps) {
+  const query = parseRankingQuery(await searchParams);
+  const ranking = await getStockRanking(query);
 
   const caption = ranking.asOf
     ? `${masthead(`${ranking.asOf}T06:30:00Z`)} · ${MARKET_CAPTION_SUFFIX}`
@@ -45,7 +50,10 @@ export default async function StockBrowsePage({
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+        {/* 검색은 전역 팔레트라 전역 컨트롤(테마 토글·화면 이동)과 같은 덩어리에
+            둔다. 본문 필터 옆에 두면 '타이핑하면 표가 걸러진다' 로 읽힌다
+            (Masthead · RankingFilterBar 주석). */}
         <Masthead
           caption={caption}
           search={
@@ -64,21 +72,15 @@ export default async function StockBrowsePage({
           }
         />
 
-        <div className="flex items-baseline justify-between gap-4 border-b border-line-20 pb-2">
-          <h1
-            className="font-mono font-medium uppercase tracking-label"
-            style={{ fontSize: 11 }}
-          >
-            종목 탐색
-          </h1>
-          {/* 모집단을 그대로 밝힌다 — 전 종목을 훑은 것처럼 읽히면 안 된다 */}
-          <span className="font-mono text-muted-45" style={{ fontSize: 10 }}>
-            {ranking.scope || "랭킹 준비 중"}
-          </span>
-        </div>
+        <BrowseHeader scope={ranking.scope} />
 
-        <RankingFilters sort={sort} board={board} total={ranking.total} />
-        <RankingTable rows={ranking.rows} />
+        <RankingFilterBar query={query} />
+
+        <RankingTable
+          rows={ranking.rows}
+          total={ranking.total}
+          sort={query.sort}
+        />
       </main>
 
       <MobileTabBar current="stocks" search={<SearchTrigger variant="tab" />} />
