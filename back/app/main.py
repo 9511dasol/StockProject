@@ -54,7 +54,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     if settings.db_create_all_on_startup:
         await create_all()
-    logger.info("%s 시작 (model=%s)", settings.app_name, settings.openai_model)
+    logger.info("%s 시작 (model=%s)", settings.app_name, settings.gemini_model)
 
     # 조용히 열려 있는 것이 가장 나쁘다 — 자물쇠가 꺼져 있으면 매 기동마다 말한다.
     if not settings.advice_auth_enabled:

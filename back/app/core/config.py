@@ -87,13 +87,13 @@ class Settings(BaseSettings):
     # 경고를 남긴다 (main.py lifespan).
     advice_api_key: str | None = None
 
-    # --- LLM (OpenAI) ---
-    # 미설정 시 SDK가 OPENAI_API_KEY 환경 변수를 읽는다.
-    openai_api_key: str | None = None
-    # 추론 강도(llm_effort)를 쓰므로 gpt-5 계열이나 o 시리즈여야 한다.
-    # 비추론 모델로 바꾸면 reasoning 파라미터에서 400이 날 수 있다.
-    openai_model: str = "gpt-5.4"
-    # 추론 토큰도 이 상한을 함께 먹는다 — 너무 낮으면 본문이 빈 채로 incomplete 가 된다.
+    # --- LLM (Google Gemini) ---
+    # 미설정 시 SDK가 GOOGLE_API_KEY / GEMINI_API_KEY 환경 변수를 읽는다.
+    gemini_api_key: str | None = None
+    # 구조화 출력(responseSchema)과 thinking 을 함께 받는 계열이어야 한다.
+    # `gemini-flash-latest` 같은 별칭은 thinkingConfig 에서 400 이 날 수 있어 피한다.
+    gemini_model: str = "gemini-2.5-flash"
+    # 생각 토큰도 이 상한을 함께 먹는다 — 너무 낮으면 본문이 빈 채로 MAX_TOKENS 로 끝난다.
     llm_max_tokens: int = Field(default=16000, ge=1024)
     llm_effort: EffortLevel = "medium"
     llm_timeout_seconds: float = Field(default=300.0, gt=0)
@@ -106,7 +106,10 @@ class Settings(BaseSettings):
     # Supabase의 URI를 그대로 붙여넣으면 된다 (postgres:// · sslmode · 6543 포트
     # 풀러 모두 vector_database.py 가 정규화한다).
     vector_database_url: str | None = None
-    embedding_model: str = "text-embedding-3-small"
+    # Gemini 임베딩. `gemini-embedding-001` 은 출력 차원을 지정할 수 있어(MRL) 아래
+    # embedding_dimensions 를 그대로 따른다 — 프로바이더를 바꿔도 이미 적재한
+    # `vector(1536)` 테이블을 다시 만들지 않아도 됐던 이유다.
+    embedding_model: str = "gemini-embedding-001"
     # 테이블 DDL의 `vector(N)`이 이 값으로 만들어진다. 색인을 만든 뒤 모델을 바꾸면
     # 차원이 어긋나 검색이 실패한다 — 그때는 테이블을 지우고 다시 적재해야 한다.
     embedding_dimensions: int = Field(default=1536, ge=64)

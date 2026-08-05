@@ -12,6 +12,7 @@ ORM을 쓰지 않고 원시 SQL을 쓰는 이유:
 """
 
 import logging
+from datetime import date
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -20,6 +21,30 @@ from app.core.config import settings
 from app.schemas.rag import DocumentChunk
 
 logger = logging.getLogger(__name__)
+
+
+def _as_date(value: str | None) -> date | None:
+    """`'2026-08-04'` → `date`. 비었거나 형식이 다르면 None.
+
+    **문자열 그대로 넘기면 안 된다.** SQL 이 `cast(:published_at as date)` 라
+    asyncpg 가 그 파라미터를 date 로 추론하고, 문자열을 받으면 바인딩 단계에서
+    터진다 — `'str' object has no attribute 'toordinal'`. SQL 캐스트는 값이 서버에
+    닿은 **뒤에** 일어나므로 바인딩을 구해 주지 못한다.
+
+    이 경로는 로컬 SQLite 로는 검증되지 않는다(벡터 테이블 자체가 Postgres 전용).
+    그래서 5회차부터 색인이 한 번도 성공한 적 없이 남아 있었다.
+
+    형식이 다르면 예외 대신 None 이다. 공급자가 준 이상한 날짜 하나가 색인 전체를
+    죽이면, 나머지 정상 기사까지 검색에서 사라진다.
+    """
+    text_value = (value or "").strip()
+    if not text_value:
+        return None
+    try:
+        return date.fromisoformat(text_value[:10])
+    except ValueError:
+        logger.debug("published_at 을 날짜로 읽지 못했습니다: %r", value)
+        return None
 
 
 def _vector_literal(embedding: list[float]) -> str:
@@ -125,9 +150,8 @@ class DocumentChunkRepository:
                 "title": chunk.title,
                 "publisher": chunk.publisher,
                 "url": chunk.url,
-                # 빈 문자열을 date 컬럼에 넣을 수 없다 — 날짜를 모르는 기사는 NULL 이고
-                # 최신성 필터에서 제외된다.
-                "published_at": chunk.published_at or None,
+                # 날짜를 모르는 기사는 NULL 이고 최신성 필터에서 제외된다.
+                "published_at": _as_date(chunk.published_at),
                 "content": chunk.content,
                 "embedding": _vector_literal(embedding),
             }

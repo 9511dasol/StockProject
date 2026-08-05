@@ -15,7 +15,7 @@
 각 단계는 독립적으로 실패 원인을 좁힌다:
     1. 설정          VECTOR_DATABASE_URL 이 있는지, 어떻게 정규화됐는지
     2. 연결 + 스키마  Supabase 에 닿는지, vector/pg_trgm 확장을 만들 권한이 있는지
-    3. 임베딩        OPENAI_API_KEY 로 임베딩 모델을 부를 수 있는지, 차원이 맞는지
+    3. 임베딩        GEMINI_API_KEY 로 임베딩 모델을 부를 수 있는지, 차원이 맞는지
     4. 색인          뉴스·리포트가 청크로 저장되는지
     5. 검색          하이브리드 검색이 문서를 돌려주는지
 """
@@ -114,7 +114,7 @@ async def check_embedding() -> bool:
         _fail(
             "embed_texts",
             exc,
-            "OPENAI_API_KEY 를 확인한다. 401 이면 키가 폐기됐거나 다른 계정의 키다.",
+            "GEMINI_API_KEY 를 확인한다. 401/403 이면 키가 폐기됐거나 이 API 권한이 없다.",
         )
         return False
 

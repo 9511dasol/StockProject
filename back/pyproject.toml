@@ -23,9 +23,9 @@ dependencies = [
     "pyjwt>=2.13.0",
     "python-dotenv>=1.2.2",
     "fastapi-pagination>=0.15.16",
-    "openai>=2.50.0",
     "pykrx>=1.2.8",
     "psycopg[binary]>=3.2",
+    "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]

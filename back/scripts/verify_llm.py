@@ -10,7 +10,7 @@
 
 각 단계는 독립적으로 실패 원인을 좁힌다:
     1. 자격 증명 + 모델 접근  → 키가 유효한지, 모델 ID가 맞는지
-    2. ask_text               → 요청 형태(reasoning/max_output_tokens)가 맞는지
+    2. ask_text               → 요청 형태(thinking/max_output_tokens)가 맞는지
     3. ask_structured         → InvestmentDecision 스키마가 컴파일되는지
 """
 
@@ -45,17 +45,21 @@ async def check_credentials() -> bool:
     print("1. 자격 증명 + 모델 접근")
     try:
         client = llm.get_client()
-        model = await client.models.retrieve(settings.openai_model)
+        # 모델 이름을 `models/` 접두 없이 넘겨도 SDK 가 붙여 준다.
+        model = await client.aio.models.get(model=settings.gemini_model)
     except Exception as exc:
         _fail(
-            settings.openai_model,
+            settings.gemini_model,
             exc,
-            "OPENAI_API_KEY를 .env에 넣는다. 키가 유효해도 모델 ID가 틀렸거나 "
-            "그 조직에 권한이 없으면 404가 난다 — OPENAI_MODEL을 확인한다.",
+            "GEMINI_API_KEY를 .env에 넣는다. 401/403 이면 키가 폐기됐거나 이 API 권한이 "
+            "없고, 404 면 모델 ID가 틀렸다 — GEMINI_MODEL을 확인한다.",
         )
         return False
 
-    _ok(model.id, f"owned_by={model.owned_by}")
+    thinking = (
+        "thinking 지원" if llm.supports_thinking(settings.gemini_model) else "thinking 미지원"
+    )
+    _ok(model.name or settings.gemini_model, f"출력상한={model.output_token_limit} · {thinking}")
     return True
 
 
@@ -70,13 +74,14 @@ async def check_text() -> bool:
         _fail(
             "ask_text",
             exc,
-            "reasoning 파라미터에서 400이면 OPENAI_MODEL이 추론 모델이 아니다 "
-            "(gpt-5 계열 또는 o 시리즈여야 한다).",
+            "thinkingConfig 에서 400이면 GEMINI_MODEL이 그 파라미터를 안 받는 모델이다 "
+            "(gemini-2.5/3 정식 모델을 쓴다. -latest 별칭은 400이 날 수 있다). "
+            "503 이면 그 모델이 일시적으로 혼잡한 것이라 잠시 뒤 다시 돌린다.",
         )
         return False
 
     if not text:
-        print("  [WARN] ask_text - 빈 응답. 추론 토큰이 LLM_MAX_TOKENS를 다 썼을 수 있다.")
+        print("  [WARN] ask_text - 빈 응답. 생각 토큰이 LLM_MAX_TOKENS를 다 썼을 수 있다.")
         return False
 
     _ok("ask_text", f"{len(text)}자 · {text[:60]}...")
@@ -109,7 +114,7 @@ async def main() -> int:
     # 윈도우 기본 콘솔(cp949)에서 못 찍는 기호로 죽지 않게 한다.
     sys.stdout.reconfigure(errors="replace")
     configure_logging()
-    print(f"모델: {settings.openai_model} (effort={settings.llm_effort})\n")
+    print(f"모델: {settings.gemini_model} (effort={settings.llm_effort})\n")
 
     if not await check_credentials():
         await llm.close_client()

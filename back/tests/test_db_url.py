@@ -175,16 +175,20 @@ def test_explicit_vector_url_wins(monkeypatch) -> None:
     assert settings.vector_database_dsn == _TRANSACTION_POOLER
 
 
-def test_reasoning_is_only_sent_to_models_that_accept_it() -> None:
-    """`reasoning` 은 gpt-5 계열·o 시리즈만 받는다.
+def test_thinking_is_only_sent_to_models_that_accept_it() -> None:
+    """`thinking_config` 는 gemini-2.5/3 정식 모델만 받는다.
 
-    비추론 모델(gpt-4o-mini 등)에 붙여 보내면 **요청 자체가 400** 이라 응답을 한 줄도
-    못 받고, 화면에는 "AI 판단 실패" 로만 보여 원인이 모델 선택에 있다는 것을 알기 어렵다.
+    안 받는 모델에 붙여 보내면 **요청 자체가 400** 이라 응답을 한 줄도 못 받고,
+    화면에는 "AI 판단 실패" 로만 보여 원인이 모델 선택에 있다는 것을 알기 어렵다.
+    OpenAI 시절 `reasoning` 으로 같은 일이 났었다 — 프로바이더가 바뀌어도 함정은 같다.
+
+    `-latest` 별칭을 빼는 것은 실측 근거다: `gemini-flash-latest` 는 thinkingConfig 와
+    함께 보내면 400(invalid argument)이 났다.
     """
-    from app.integrations.llm import supports_reasoning
+    from app.integrations.llm import supports_thinking
 
-    assert supports_reasoning("gpt-5.4-mini")
-    assert supports_reasoning("gpt-5")
-    assert supports_reasoning("o3-mini")
-    assert not supports_reasoning("gpt-4o-mini")
-    assert not supports_reasoning("gpt-4.1")
+    assert supports_thinking("gemini-2.5-flash")
+    assert supports_thinking("gemini-2.5-pro")
+    assert supports_thinking("gemini-3-pro-preview")
+    assert not supports_thinking("gemini-flash-latest")
+    assert not supports_thinking("gemini-1.5-flash")

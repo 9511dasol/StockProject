@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.deps import get_listed_company_repository
+from app.core.config import settings
 from app.core.database import get_db
 from app.main import create_app
 from app.models.base import Base
@@ -23,6 +24,21 @@ def reset_fundamentals_cache() -> Iterator[None]:
     yield
     fundamentals_service._cache.clear()
     fundamentals_service._locks.clear()
+
+
+@pytest.fixture(autouse=True)
+def rag_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """테스트는 기본적으로 RAG 를 끈다 — **실제 벡터 DB 를 치지 않게 한다.**
+
+    `vector_database_dsn` 이 `VECTOR_DATABASE_URL` 이 없을 때 주 DB 로 폴백하면서,
+    개발자 `.env` 의 Supabase 주소가 그대로 테스트에 새어 들어왔다. 실제로 한 테스트가
+    **닿지 않는 DB 덕분에** 통과하고 있었고(연결 실패 → 문서 0건), 주소를 고쳐 DB 가
+    살아나는 순간 실패로 바뀌었다 — 그때까지 그 테스트는 아무것도 검증하지 않았다.
+
+    RAG 를 쓰는 테스트는 `vector_database_url` 을 직접 설정해 **명시적으로 켠다.**
+    """
+    monkeypatch.setattr(settings, "vector_database_url", None)
+    monkeypatch.setattr(settings, "database_url", "sqlite+aiosqlite:///:memory:")
 
 
 @pytest.fixture(autouse=True)
