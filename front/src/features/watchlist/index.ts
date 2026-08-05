@@ -1,4 +1,8 @@
 export { getWatchlist } from "./services/getWatchlist";
+export {
+  useWatchlistMutations,
+  type WatchlistMutations,
+} from "./hooks/useWatchlistMutations";
 
 export { WatchlistHeader } from "./components/WatchlistHeader";
 export { GroupTabs } from "./components/GroupTabs";

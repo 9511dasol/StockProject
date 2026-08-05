@@ -12,6 +12,7 @@ from alembic import context
 from app.core.config import settings
 from app.models.base import Base
 from app.models.listed_company import ListedCompany  # noqa: F401  (메타데이터 등록)
+from app.models.watchlist import WatchlistItem  # noqa: F401  (메타데이터 등록)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

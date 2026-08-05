@@ -28,6 +28,8 @@ import {
   WatchCard,
   WatchlistHeader,
   WatchRow,
+  useWatchlistMutations,
+  type AlertRule,
   type RowAiStatus,
   type SortKey,
   type WatchItem,
@@ -43,12 +45,17 @@ import {
  * 일이고, 이 컴포넌트는 다른 라우트에서 재사용하지 않는다 (CONVENTIONS 예외 항목).
  */
 export function WatchlistBoard({ initial }: { initial: Watchlist }) {
-  const [items, setItems] = useState(initial.items);
   const [group, setGroup] = useState(ALL_GROUP);
   const [sort, setSort] = useState<SortKey>("order");
   const [selected, setSelected] = useState<string[]>([]);
   const [reordering, setReordering] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // 목록은 더 이상 로컬 state 가 아니다. 변경 API 가 매번 **목록 전체**를 돌려주므로
+  // 서버가 확인해 준 것을 그대로 그린다 — 그룹 집계·알림 수·평가손익 같은 파생값을
+  // 클라이언트가 다시 계산하지 않아 서버와 어긋날 여지가 없다.
+  const store = useWatchlistMutations(initial);
+  const items = store.watchlist.items;
 
   const bulk = useBulkAdvice();
 
@@ -79,28 +86,22 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const previous = items;
     const from = items.findIndex((item) => item.code === active.id);
     const to = items.findIndex((item) => item.code === over.id);
     if (from === -1 || to === -1) return;
 
+    // 드래그만 낙관적으로 반영한다 — 손가락을 떼는 순간 결과가 보여야 한다.
+    // 실패하면 훅이 서버가 확인해 준 마지막 목록으로 되돌린다.
     const next = arrayMove(items, from, to);
-    setItems(next);
-
-    // TODO(백엔드 연결): PATCH /watchlist/order { codes: next.map(i => i.code) }
-    // .catch(() => { setItems(previous); setNotice("순서를 저장하지 못했습니다."); })
-    void previous;
+    store.reorder(
+      next.map((item) => item.code),
+      { ...store.watchlist, items: next },
+    );
   }
 
-  /**
-   * `Parameters<typeof Object.assign>[1]` 을 쓰던 자리다. 그 타입은 제네릭이
-   * 소거돼 사실상 unknown 이라 patchItem("a", 42) 도 통과했다 — 즉 아무 검사도
-   * 받지 않았다. WatchItem 의 부분 집합으로 좁힌다.
-   */
-  function patchItem(code: string, patch: Partial<WatchItem>) {
-    setItems((prev) =>
-      prev.map((item) => (item.code === code ? { ...item, ...patch } : item)),
-    );
+  /** 알림 토글·조건 편집. 서버가 돌려준 목록으로 화면이 갱신된다. */
+  function patchAlert(item: WatchItem, alert: AlertRule) {
+    store.patch(item.code, { alert });
   }
 
   function toggleSelect(code: string, next: boolean) {
@@ -135,10 +136,12 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* 집계는 서버가 준 최신 목록에서 읽는다. `initial` 은 첫 렌더 스냅샷이라
+          종목을 담거나 뺀 뒤에는 낡은 숫자다 — 화면에 남으면 목록과 헤더가 어긋난다. */}
       <WatchlistHeader
-        itemCount={initial.totalCount}
-        groupCount={initial.groupCount}
-        activeAlerts={initial.activeAlerts}
+        itemCount={store.watchlist.totalCount}
+        groupCount={store.watchlist.groupCount}
+        activeAlerts={store.watchlist.activeAlerts}
         reordering={reordering}
         selectedCount={selected.length}
         analyzing={bulk.remaining > 0}
@@ -148,10 +151,14 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <GroupTabs groups={initial.groups} active={group} onChange={setGroup} />
+        <GroupTabs
+          groups={store.watchlist.groups}
+          active={group}
+          onChange={setGroup}
+        />
         <SortControl
           value={sort}
-          totalReturnPercent={initial.totalReturnPercent}
+          totalReturnPercent={store.watchlist.totalReturnPercent}
           onChange={setSort}
         />
       </div>
@@ -174,6 +181,18 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
           style={{ fontSize: 12 }}
         >
           {notice}
+        </p>
+      ) : null}
+
+      {/* 저장 실패는 반드시 말한다. 화면만 바뀐 채 조용히 끝나면 새로고침 한 번에
+          되돌아가고, 사용자는 자기가 무엇을 잃었는지도 모른다. */}
+      {store.error ? (
+        <p
+          role="alert"
+          className="border border-dashed border-up px-3 py-2 text-up"
+          style={{ fontSize: 12 }}
+        >
+          {store.error}
         </p>
       ) : null}
 
@@ -217,12 +236,10 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
                   aiStatus={aiStatus(item.code)}
                   onSelect={(next) => toggleSelect(item.code, next)}
                   onToggleAlert={() =>
-                    patchItem(item.code, {
-                      alert: { ...item.alert, enabled: !item.alert.enabled },
-                    })
+                    patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
                   }
                   onChangeCondition={(condition) =>
-                    patchItem(item.code, { alert: { ...item.alert, condition } })
+                    patchAlert(item, { ...item.alert, condition })
                   }
                 />
               ))
@@ -243,9 +260,7 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
                   aiStatus={aiStatus(item.code)}
                   onSelect={(next) => toggleSelect(item.code, next)}
                   onToggleAlert={() =>
-                    patchItem(item.code, {
-                      alert: { ...item.alert, enabled: !item.alert.enabled },
-                    })
+                    patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
                   }
                 />
               ))
@@ -259,14 +274,14 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
           count={selected.length}
           analyzing={bulk.remaining > 0}
           remaining={bulk.remaining}
-          onMoveGroup={() => setNotice("그룹 이동은 백엔드 저장소가 필요합니다.")}
+          // 그룹 이동·알림 일괄 설정은 저장소는 생겼지만 **어느 그룹으로 옮길지
+          // 고르는 UI** 가 아직 없다. 값을 물어보지 않고 임의로 정하느니 남겨 둔다.
+          onMoveGroup={() => setNotice("옮길 그룹을 고르는 화면이 아직 없습니다.")}
           onBulkAlert={() =>
-            setNotice("알림 일괄 설정은 백엔드 저장소가 필요합니다.")
+            setNotice("알림 조건을 한 번에 입력하는 화면이 아직 없습니다.")
           }
           onDelete={() => {
-            setItems((prev) =>
-              prev.filter((item) => !selected.includes(item.code)),
-            );
+            for (const code of selected) store.remove(code);
             setSelected([]);
           }}
         />

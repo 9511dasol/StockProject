@@ -38,6 +38,13 @@ export interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined | null>;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /**
+   * 추가 요청 헤더.
+   *
+   * 지금 쓰는 곳은 관심종목의 `X-Owner-Key` 하나다. 사용자별 데이터라 소유자를
+   * 실어 보내야 하는데, 그 값이 URL 이나 본문에 있으면 로그·캐시 키에 남는다.
+   */
+  headers?: Record<string, string>;
 }
 
 export function buildUrl(
@@ -129,6 +136,7 @@ export async function apiGet<T>(
     params: toParams(options.query),
     timeout: options.timeoutMs,
     signal: options.signal,
+    headers: options.headers,
   });
   return data;
 }
@@ -141,6 +149,25 @@ export async function apiPost<T>(
   const { data } = await backendApi.post<T>(path, body, {
     timeout: options.timeoutMs,
     signal: options.signal,
+    headers: options.headers,
+  });
+  return data;
+}
+
+/** PATCH·PUT·DELETE. 관심종목처럼 상태를 바꾸는 BFF 라우트가 쓴다. */
+export async function apiSend<T>(
+  method: "put" | "patch" | "delete",
+  path: string,
+  body: unknown,
+  options: Omit<RequestOptions, "query"> = {},
+): Promise<T> {
+  const { data } = await backendApi.request<T>({
+    method,
+    url: path,
+    data: body,
+    timeout: options.timeoutMs,
+    signal: options.signal,
+    headers: options.headers,
   });
   return data;
 }

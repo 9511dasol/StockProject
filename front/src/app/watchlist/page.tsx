@@ -1,18 +1,28 @@
 import { SearchTrigger } from "@/features/search";
 import { getWatchlist } from "@/features/watchlist";
+import { USE_MOCK } from "@/lib/config/env";
 import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
+import { readOwnerKey } from "@/lib/watchlist/owner";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
 import { WatchlistBoard } from "./_components/WatchlistBoard";
 
-export default async function WatchlistPage() {
-  const watchlist = await getWatchlist();
+/**
+ * 관심종목은 **사용자별 데이터**라 캐시하거나 프리렌더할 수 없다.
+ * 소유자마다 응답이 다르므로 URL 을 키로 쓰는 어떤 캐시에도 담기면 안 된다.
+ */
+export const dynamic = "force-dynamic";
 
-  // 이 화면은 아직 전부 목 데이터라 '예시 데이터' 표시를 남긴다. 날짜는 하드코딩돼
-  // 있었는데(2026. 07. 30 고정) 어제 본 화면과 오늘 본 화면이 같은 날짜를 말해
-  // 오히려 신뢰를 깎았다 — 실제 오늘 날짜로 바꾼다.
-  const caption = `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX} · 예시 데이터`;
+export default async function WatchlistPage() {
+  // 소유자 쿠키는 렌더보다 먼저 도는 proxy.ts 가 굽는다 — 서버 컴포넌트는 쿠키를
+  // 읽을 수만 있다(Next 제약). 여기서는 읽어서 서비스에 넘기기만 한다.
+  const ownerKey = await readOwnerKey();
+  const watchlist = await getWatchlist(ownerKey);
+
+  const caption = USE_MOCK
+    ? `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX} · 예시 데이터`
+    : `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX}`;
 
   return (
     <>

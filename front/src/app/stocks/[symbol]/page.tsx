@@ -4,6 +4,7 @@ import { SearchTrigger } from "@/features/search";
 import { getStockDetail } from "@/features/stocks";
 import { getWatchlist } from "@/features/watchlist";
 import { API_BASE_URL } from "@/lib/config/env";
+import { readOwnerKey } from "@/lib/watchlist/owner";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { BackendUnreachable } from "./_components/BackendUnreachable";
 import { ConsoleView } from "./_components/ConsoleView";
@@ -24,10 +25,13 @@ export default async function StockDetailPage({
   // 여러 도메인을 페이지에서 조합한다 — features 끼리는 직접 import 하지 않는다.
   // 이 fetch 들은 뷰(2a/2b)와 무관하게 한 번만 일어난다: 뷰 전환은 클라이언트에서
   // 표시만 바꾸므로 서버로 다시 오지 않는다.
+  // 관심종목은 소유자별 데이터라 쿠키의 신원이 필요하다. proxy.ts 가 렌더보다
+  // 먼저 굽고, 여기서는 읽어서 넘기기만 한다 (app/watchlist/page.tsx 와 같은 형태).
+  const ownerKey = await readOwnerKey();
   const [result, market, watchlist] = await Promise.all([
     getStockDetail(symbol),
     getMarketOverview("home"),
-    getWatchlist(),
+    getWatchlist(ownerKey),
   ]);
 
   // 정규화 실패는 404 가 아니라 '후보 고르기'로 받는다 (와이어프레임 1d).

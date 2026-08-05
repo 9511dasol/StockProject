@@ -39,6 +39,19 @@ class ListedCompanyRepository:
         result = await self._db.execute(stmt)
         return result.scalars().first()
 
+    async def find_by_symbols(self, symbols: Sequence[str]) -> Sequence[ListedCompany]:
+        """여러 심볼을 한 번에. 관심종목처럼 목록 전체의 상호가 필요할 때 쓴다.
+
+        `find_by_code` 를 N번 도는 대신 IN 하나로 끝낸다 — 관심종목 상한이 200이라
+        최악의 경우 쿼리 200개가 왕복한다. 호출부가 순서를 정하므로 정렬은 하지 않는다.
+        """
+        if not symbols:
+            return []
+
+        stmt = select(ListedCompany).where(ListedCompany.symbol.in_(list(symbols)))
+        result = await self._db.execute(stmt)
+        return result.scalars().all()
+
     async def find_candidates(
         self,
         keyword: str,

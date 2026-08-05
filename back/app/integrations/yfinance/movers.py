@@ -31,14 +31,28 @@ _SPARK_POINTS = 24
 _HISTORY_PERIOD = "3mo"
 
 
-def _closes_of(frame: Any, symbol: str, single: bool) -> Any | None:
+def _closes_of(frame: Any, symbol: str) -> Any | None:
     """벌크 프레임에서 한 종목의 종가 시리즈를 꺼낸다.
 
-    `yf.download` 는 종목이 하나면 컬럼에 티커 레벨을 만들지 않는다 — 모집단이
-    1종목까지 줄어든 환경에서 조용히 전부 실패하지 않도록 두 형태를 모두 받는다.
+    **종목 수가 아니라 컬럼 모양을 본다.** 예전에는 `len(symbols) == 1` 이면
+    티커 레벨이 없다고 가정하고 `frame["Close"]` 를 읽었는데, 지금 핀(yfinance>=1.5)
+    은 1종목에도 MultiIndex 를 유지한다 — 실측:
+
+        columns = [('005930.KS', 'Open'), ('005930.KS', 'Close'), …]   nlevels=2
+
+    그래서 그 분기가 항상 KeyError 로 떨어져 **1종목 스캔이 통째로 0건**이 됐다.
+    모집단 200종목인 홈·탐색에서는 이 분기를 타지 않아 드러나지 않다가, 관심종목
+    (담은 것만 조회한다)이 생기면서 나타났다.
+
+    버전에 따라 다시 평평해질 수 있으므로 두 모양을 모두 받되, 개수로 추측하지 않고
+    실제 컬럼을 본다.
     """
     try:
-        series = frame["Close"] if single else frame[symbol]["Close"]
+        columns = getattr(frame, "columns", None)
+        if getattr(columns, "nlevels", 1) > 1:
+            series = frame[symbol]["Close"]
+        else:
+            series = frame["Close"]
     except (KeyError, IndexError):
         return None
     return series.dropna()
@@ -74,11 +88,10 @@ def scan_movers(
         logger.warning("등락률 스캔: 응답이 비었습니다 (모집단 %d종목)", len(symbols))
         return MoversScan(universe_label=universe_label, universe_size=len(symbols))
 
-    single = len(symbols) == 1
     rows: list[MoverRow] = []
 
     for record in universe:
-        closes = _closes_of(frame, record.symbol, single)
+        closes = _closes_of(frame, record.symbol)
         # 전일 종가가 있어야 등락률이 성립한다 — 신규 상장·거래정지는 여기서 빠진다.
         if closes is None or len(closes) < 2:
             continue
