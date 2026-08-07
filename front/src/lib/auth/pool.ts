@@ -10,14 +10,18 @@ import { Pool } from "pg";
  *
  * ## 접속 문자열
  *
- * 백엔드의 `DATABASE_URL` 과 **같은 Supabase** 를 본다. 다만 형태가 다르다.
+ * 백엔드의 `DATABASE_URL` 과 **반드시 같은 Supabase 프로젝트**여야 한다. 갈라지면
+ * 백엔드가 여기 쓰인 사용자를 못 찾고, `back/app/services/orphan_service` 는 그것을
+ * "소유자 없는 행" 으로 읽어 로그인 사용자의 관심종목을 지울 후보로 센다.
+ *
+ * 형태만 다르다.
  *
  *   백엔드  postgresql+asyncpg://...   ← SQLAlchemy 방언 접두가 붙는다
  *   여기    postgresql://...           ← node-postgres 는 그걸 모른다
  *
  * 그래서 `+asyncpg` 를 떼고, libpq 파라미터(`sslmode`)는 **남긴다** — node-postgres 는
- * libpq 규약을 따르므로 백엔드에서 떼어냈던 것이 여기서는 오히려 필요하다
- * (`back/app/core/db_url.py` 의 `to_sync_url` 과 같은 이유).
+ * libpq 규약을 따르므로 백엔드가 asyncpg 를 위해 떼어냈던 것이 여기서는 오히려 필요하다
+ * (`back/app/core/db_url.py` 의 `normalize_url` 이 하는 일의 반대편).
  */
 
 let pool: Pool | null = null;

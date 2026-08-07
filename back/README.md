@@ -211,17 +211,17 @@ uv run alembic check          # 모델과 DB가 어긋났는지
 
 ## 남은 정리 작업
 
-- `_legacy/` — `app/`으로 이관이 끝난 원본 보관소. 실행되지 않으며 이관 매핑은
-  [`_legacy/README.md`](_legacy/README.md)에 있다. 대조가 끝나면 폴더째 삭제.
-- `front/.env.local.example` — `AUTH_DATABASE_URL`이 `back/.env`의 `DATABASE_URL`과
-  같은 Supabase여야 한다는 경고가 back 쪽에만 있다. 반대 방향도 필요하다.
-- `GEMINI_MODEL`이 `gemini-3-flash-preview`다. `-preview` 계열은 `thinkingConfig`와
-  함께 400이 날 수 있어(`.env.example` 참고) `LLM_EFFORT`가 조용히 무시될 수 있다.
-  `uv run python -m scripts.verify_llm`으로 확인할 것.
+지금은 없다. 직전까지 남아 있던 것들:
 
-정리 완료:
-
+- ~~`_legacy/`~~ — `app/`으로 이관이 끝난 원본(`finance.py` 1,331줄) 보관소. 대조가
+  끝나 폴더째 지웠다. 이관 매핑표가 필요하면 git 이력에 있다.
 - ~~alembic 도입~~ — `document_chunks`까지 포함해 alembic이 관리한다.
 - ~~미사용 의존성 정리~~ — `bcrypt`·`pyjwt`·`fastapi-pagination`과 동기 Postgres 드라이버
   3종(`psycopg2-binary`·`psycopg[binary]`·`psycopg2`)을 걷어냈다. 전부 import되는 곳이
-  없었고, 비바이너리 `psycopg2`는 소스 빌드가 필요해 설치를 깨뜨렸다.
+  없었고, 비바이너리 `psycopg2`는 리눅스 휠이 없어 slim 이미지 빌드를 깨뜨렸다.
+- ~~`front/.env.local.example`의 역방향 경고~~ — `AUTH_DATABASE_URL`이 `DATABASE_URL`과
+  같은 Supabase여야 한다는 경고를 양쪽에 넣었다.
+
+`GEMINI_MODEL=gemini-3-flash-preview`는 확인 결과 문제없다 — `verify_llm`이 thinking
+지원(출력 상한 65,536)을 보고했고 `LLM_EFFORT`가 그대로 적용된다. `.env.example`이
+경고하는 것은 `-latest` 같은 **별칭**이고, 이 모델은 거기 해당하지 않는다.

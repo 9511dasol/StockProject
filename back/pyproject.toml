@@ -58,8 +58,6 @@ asyncio_default_test_loop_scope = "session"
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-# _legacy/는 app/으로 이관이 끝난 원본 보관소다. 실행되지 않으므로 린트하지 않는다.
-extend-exclude = ["_legacy"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
