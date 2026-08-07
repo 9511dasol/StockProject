@@ -13,15 +13,17 @@
 2. `returnOnEquity`는 소수(0.30792)인데 `dividendYield`는 백분율(0.57)이다.
    같은 dict, 같은 호출, 단위 규약이 다르다. `_roe_pct`·`_dividend_yield_pct` 주석 참고.
 3. `earningsTimestamp`는 **직전** 발표일이다. 다음 발표일은 `earningsTimestampStart`.
+   이 규칙(과 UTC/KST 구분, calendar 폴백)은 `yfinance/calendar.py` 가 소유한다 —
+   '오늘의 일정' 배치가 같은 날짜를 읽으므로 두 벌로 두면 한쪽만 고쳐 어긋난다.
 """
 
 import logging
-from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
+from app.integrations.yfinance.calendar import extract_calendar_dates
 from app.integrations.yfinance.client import is_empty_frame, load_yfinance
 from app.schemas.stock import AnnualFinancial, StockFundamentals
-from app.utils.numbers import int_or_none, is_number, number_or_none
+from app.utils.numbers import is_number, number_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +39,6 @@ _CURRENT_COLUMN = "Current"
 # 표시용 변환이라 계약으로 삼지 않는다.
 _REVENUE_KEYS = ("TotalRevenue", "OperatingRevenue")
 _OPERATING_INCOME_KEYS = ("OperatingIncome", "TotalOperatingIncomeAsReported")
-
-# ZoneInfo 는 Windows 에서 tzdata 패키지를 따로 요구한다. KST 는 서머타임이 없어
-# 고정 오프셋이 정확하며 의존성도 늘지 않는다.
-_KST = timezone(timedelta(hours=9))
 
 
 def _info(ticker: Any) -> dict:
@@ -121,43 +119,6 @@ def _dividend_yield_pct(info: dict) -> float | None:
     return number_or_none(info.get("dividendYield"))
 
 
-def _date_from_epoch(value: Any, tz: Any) -> str | None:
-    """unix 초 → `YYYY-MM-DD`."""
-    seconds = int_or_none(value)
-    if seconds is None:
-        return None
-
-    try:
-        return datetime.fromtimestamp(seconds, tz=tz).strftime("%Y-%m-%d")
-    except (OverflowError, OSError, ValueError) as exc:
-        logger.debug("epoch 변환 실패 (%r): %s", value, exc)
-        return None
-
-
-def _calendar_dates(ticker: Any) -> tuple[str | None, str | None]:
-    """`(배당락일, 다음 실적발표일)` 폴백. info 에 값이 없을 때만 부른다.
-
-    yfinance 의 `_fetch_calendar` 는 naive `datetime.fromtimestamp()` 를 쓰므로
-    서버 로컬 시간대에 따라 하루가 밀린다. 그래서 1차 경로는 원본 epoch 를 직접
-    변환하고, 여기는 진짜 마지막 수단이다.
-    """
-    try:
-        calendar = ticker.calendar
-    except Exception as exc:
-        logger.debug("calendar 조회 실패: %s", exc)
-        return None, None
-
-    if not isinstance(calendar, dict):
-        return None, None
-
-    def _as_text(value: Any) -> str | None:
-        if isinstance(value, list | tuple):
-            value = value[0] if value else None
-        return value.strftime("%Y-%m-%d") if hasattr(value, "strftime") else None
-
-    return _as_text(calendar.get("Ex-Dividend Date")), _as_text(calendar.get("Earnings Date"))
-
-
 def _first_row(frame: Any, keys: tuple[str, ...]) -> Any:
     for key in keys:
         if key in frame.index:
@@ -226,18 +187,9 @@ def build_fundamentals(ticker: Any, symbol: str) -> StockFundamentals:
     eps = number_or_none(info.get("trailingEps")) or _derive(price, per)
     bps = number_or_none(info.get("bookValue")) or _derive(price, pbr)
 
-    # exDividendDate 의 원본 epoch 는 UTC 자정 정각이다(1782691200 / 86400 = 20633.0).
-    # KST 로 변환하면 09:00 이 되어 날짜가 그대로지만, 의미상 UTC 로 읽는 게 맞다.
-    ex_dividend = _date_from_epoch(info.get("exDividendDate"), UTC)
-    # earningsTimestamp 가 아니다 — 그건 직전 발표일이다(실측: 005930.KS 2026-07-29,
-    # 조회 시점 2026-08-04). 다음 발표일은 earningsTimestampStart(2026-10-28)이며
-    # calendar["Earnings Date"] 와 일치한다.
-    next_earnings = _date_from_epoch(info.get("earningsTimestampStart"), _KST)
-
-    if ex_dividend is None or next_earnings is None:
-        calendar_ex, calendar_earnings = _calendar_dates(ticker)
-        ex_dividend = ex_dividend or calendar_ex
-        next_earnings = next_earnings or calendar_earnings
+    # 날짜 두 개의 규칙(직전/다음 발표일, UTC/KST, calendar 폴백)은 여기가 아니라
+    # `yfinance/calendar.py` 가 단일 출처다 — '오늘의 일정' 배치가 같은 규칙을 쓴다.
+    ex_dividend, next_earnings = extract_calendar_dates(ticker, info)
 
     return StockFundamentals(
         symbol=symbol,

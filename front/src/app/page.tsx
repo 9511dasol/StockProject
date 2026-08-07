@@ -1,4 +1,10 @@
-import { getMarketHome, IndexCards, MoverList, MoversTabs } from "@/features/market";
+import {
+  CalendarList,
+  getMarketHome,
+  IndexCards,
+  MoverList,
+  MoversTabs,
+} from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import { SampleFrame } from "@/shared/components/feedback";
 import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
@@ -83,6 +89,11 @@ export default async function MarketHomePage() {
             <MoversTabs gainers={market.gainers} losers={market.losers} />
           </div>
         </Sample>
+
+        {/* 등락 상위 **다음**이다. 등락률은 "지금 무슨 일이 일어났나"이고 일정은
+            "곧 무슨 일이 일어나나"라, 읽는 순서가 그렇다. `Sample` 로 감싸지 않는
+            이유는 이 블록에 예시 데이터가 없기 때문이다 — 없으면 없다고 말한다. */}
+        <CalendarList block={market.calendar} />
 
         {/* 화면이 소비한 백엔드 메서드. 레일이 사라져 맨 아래 전체 폭 각주로 내렸다 */}
         <p

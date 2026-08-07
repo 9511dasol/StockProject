@@ -52,6 +52,10 @@ export const MOCK_MARKET_HOME: MarketHome = {
   losers: LOSERS,
   // 예시 데이터의 모집단 — 실 연결 시 백엔드가 스캔한 범위로 대체된다.
   moversScope: "KOSPI+KOSDAQ",
+  // **일정만 목 데이터가 없다.** 예시로 채우면 "삼성전자 실적발표 8/11" 같은 틀린
+  // 사실이 화면에 뜬다 — 등락률은 눈대중으로 보는 값이지만 날짜는 사람이 그것을 보고
+  // 일정을 잡는다. USE_MOCK 모드에서는 섹션이 "수집하지 않았습니다" 로 나온다.
+  calendar: null,
   asOf: ASOF,
   apiNotes: [
     "fetch_market_overview_from_yfinance (카테고리별 현재값·변동률·차트)",

@@ -34,6 +34,7 @@
 | 1 | GET | `/health` | 헬스체크 | — |
 | 2 | GET | `/api/v1/markets/overview` | 카테고리별 시장 개요 | 6.1 |
 | 2b | GET | `/api/v1/markets/ranking` | 시가총액 · 등락률 랭킹 (탐색 화면) | 6.1 |
+| 2c | GET | `/api/v1/markets/calendar` | 오늘의 일정 (실적발표 · 배당락) | 6.1 |
 | 3 | GET | `/api/v1/stocks/history` | 주가 히스토리 + 보조지표 (+뉴스·리포트) | 6.3 |
 | 4 | GET | `/api/v1/stocks/content` | 종목 뉴스 · 애널리스트 리포트 | 6.3 |
 | 5 | GET | `/api/v1/stocks/fundamentals` | 재무 · 밸류에이션 | 6.3 |
@@ -49,6 +50,22 @@
 `ranking` 은 `movers` 와 **같은 스냅샷**을 다르게 자른다 — 시총순/등락률순 정렬,
 `board` 로 KOSPI/KOSDAQ 필터(심볼 접미사 `.KS`/`.KQ` 기준), `total`/`rank`/`market_cap` 포함.
 DB 의 `market` 컬럼은 `유가`·`코스닥` 같은 한글이라 필터에 쓸 수 없다.
+
+`calendar` 는 앞의 둘과 **데이터 출처가 다르다.** 요청 시점에 공급자를 부르지 않고
+`listed_companies` 에 적재된 날짜를 읽는다 — yfinance 는 종목당 1회 호출(~1초)이라
+"이번 주 실적발표" 를 실시간으로 찾으려면 전 종목을 훑어야 하기 때문이다. 하루 1회
+배치가 오래된 것부터 채우므로, 초기에는 **일정이 없는 것**과 **아직 안 물어본 것**이
+똑같이 빈 목록으로 보인다. 그래서 응답에 `covered`/`universe_size` 를 함께 낸다 —
+화면이 "예정된 일정 없음" 과 "수집 중" 을 구분하지 못하면 그건 거짓말이 된다.
+
+| 파라미터 | 기본 | 설명 |
+|---|---|---|
+| `kind` | (없음) | `earnings` \| `ex_dividend`. 비우면 둘 다 섞어 날짜순 |
+| `days` | `CALENDAR_DEFAULT_DAYS`(7) | 오늘부터 며칠. 1~90 |
+| `limit` | 20 | 1~100 |
+
+응답 `events[]` 는 종목이 아니라 **일정 하나**가 한 줄이다 — 같은 종목에 실적발표와
+배당락이 모두 있으면 두 줄이 나온다. 한 줄로 합치면 날짜순 정렬이 불가능해진다.
 
 OpenAPI 태그는 `meta`(1), `markets`(2), `stocks`(3–9)이다.
 

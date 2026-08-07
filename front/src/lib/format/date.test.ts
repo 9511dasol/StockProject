@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { clock, masthead, relative, stamp, ymd } from "./date";
+import { clock, masthead, plainDate, relative, stamp, ymd } from "./date";
 
 /**
  * 이 파일이 지키는 것 두 가지.
@@ -75,6 +75,28 @@ describe("date · ymd", () => {
   it("날짜만 있는 문자열은 UTC 자정으로 파싱돼 KST 같은 날이 된다", () => {
     // 09:00 KST 라 하루 밀리지 않는다 — 백엔드가 epoch 를 UTC 로 변환하는 근거다.
     assert.equal(ymd("2026-06-29"), "2026. 06. 29");
+  });
+});
+
+describe("date · plainDate", () => {
+  it("시각 없는 날짜를 요일과 함께 그린다", () => {
+    // 백엔드 markets/calendar 가 주는 형태. 실적발표일·배당락일이다.
+    assert.equal(plainDate("2026-08-11"), "08.11 (화)");
+    assert.equal(plainDate("2026-10-28"), "10.28 (수)");
+  });
+
+  it("실행 환경 타임존이 결과를 바꾸지 않는다", () => {
+    // `new Date("2026-08-11")` 은 UTC 자정이라, 로컬 계열 getter 로 요일을 읽으면
+    // UTC-x 지역에서 하루 앞 요일이 나온다. Date.UTC + getUTCDay 로 못 박은 이유다.
+    assert.equal(plainDate("2026-01-01"), "01.01 (목)");
+    assert.equal(plainDate("2026-12-31"), "12.31 (목)");
+  });
+
+  it("형식이 다르면 표시하지 않는다", () => {
+    // ISO 순간을 넘기는 것도 오용이다 — 이 함수는 날짜 문자열 전용이라 거른다.
+    for (const bad of ["", "2026-8-11", "2026-08-11T00:00:00Z", "not-a-date"]) {
+      assert.equal(plainDate(bad), "—");
+    }
   });
 });
 

@@ -28,6 +28,36 @@ export interface Mover {
   spark: number[];
 }
 
+/** 오늘의 일정 한 줄. 종목이 아니라 **일정 하나**를 가리킨다 — 같은 종목이 두 줄일 수 있다. */
+export interface CalendarEvent {
+  name: string;
+  code: string;
+  board: "KOSPI" | "KOSDAQ" | null;
+  kind: "earnings" | "ex_dividend";
+  /** YYYY-MM-DD */
+  date: string;
+  /** 오늘까지 남은 일수. 0 이면 오늘 */
+  dDay: number;
+}
+
+/** 홈의 '오늘의 일정' 블록에 필요한 전부 */
+export interface CalendarBlock {
+  events: CalendarEvent[];
+  /** 조회 창 (오늘부터 며칠) */
+  days: number;
+  /**
+   * 일정이 채워진 종목 수 / 배치 모집단.
+   *
+   * 이걸 화면에 쓰는 이유가 있다. 배치는 하루 200종목씩 며칠에 걸쳐 채우므로, 초기에는
+   * **일정이 없는 것**과 **아직 안 물어본 것**이 똑같이 빈 목록으로 보인다. 구분하지
+   * 않으면 "이번 주 실적발표 없음" 이라는 거짓말이 된다.
+   */
+  covered: number;
+  universeSize: number;
+  /** 배치가 마지막으로 돈 날 (YYYY-MM-DD). 한 번도 안 돌았으면 null */
+  asOf: string | null;
+}
+
 export interface MarketOverview {
   category: string;
   indices: MarketIndex[];
@@ -54,6 +84,12 @@ export interface MarketHome {
    * 훑은 것처럼 읽힌다.
    */
   moversScope: string;
+  /**
+   * 오늘의 일정. 조회에 실패하면 null 이다 — **목 데이터로 대체하지 않는다.**
+   * 등락률과 달리 사람이 보고 일정을 잡는 날짜라, 예시 값을 섞으면 그건 틀린 사실이
+   * 화면에 뜨는 것이다.
+   */
+  calendar: CalendarBlock | null;
   /** ISO */
   asOf: string;
   apiNotes: string[];

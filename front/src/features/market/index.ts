@@ -1,6 +1,7 @@
 export { getMarketOverview } from "./services/getMarketOverview";
 export { getMarketHome } from "./services/getMarketHome";
 export { getMovers, type MoversBlock } from "./services/getMovers";
+export { getCalendar } from "./services/getCalendar";
 export {
   getStockRanking,
   type RankedStock,
@@ -9,6 +10,7 @@ export {
 
 export { MarketOverviewList } from "./components/MarketOverviewList";
 export { IndexCards } from "./components/IndexCards";
+export { CalendarList } from "./components/CalendarList";
 export { MoverList } from "./components/MoverList";
 export { MoversTabs } from "./components/MoversTabs";
 
@@ -29,6 +31,8 @@ export {
 } from "./model/ranking";
 
 export type {
+  CalendarBlock,
+  CalendarEvent,
   MarketHome,
   MarketIndex,
   MarketOverview,

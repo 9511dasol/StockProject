@@ -20,6 +20,7 @@ LAST` 가 SQL 에 있는지 본다. 데이터가 무엇이든 결과가 같다.
 """
 
 import re
+from datetime import date
 
 import pytest
 from sqlalchemy import or_, select
@@ -186,6 +187,13 @@ async def test_no_repository_query_orders_nullable_desc_without_nulls(
     await listings.find_candidates("삼성", "ㅅㅅ", 50)
     await listings.count()
     await listings.latest_market_cap_update()
+    # 오늘의 일정(P1). 새 읽기 경로를 여기 추가하지 않으면 그 쿼리는 이 규칙 **밖**이다 —
+    # 규칙으로 막는다는 말이 목록을 갱신한다는 뜻이기도 하다.
+    await listings.symbols_for_calendar_refresh(limit=5)
+    await listings.latest_calendar_update()
+    await listings.calendar_coverage()
+    await listings.upcoming_calendar("next_earnings_date", date(2026, 8, 7), date(2026, 8, 14), 5)
+    await listings.count_upcoming_calendar("ex_dividend_date", date(2026, 8, 7), date(2026, 8, 14))
     await watch.list_for_owner("anon:x")
     await watch.find_by_code("anon:x", "005930")
     await watch.count_for_owner("anon:x")

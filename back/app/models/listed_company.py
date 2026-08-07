@@ -1,8 +1,8 @@
 """상장사 ORM 모델."""
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, DateTime, String
+from sqlalchemy import BigInteger, Date, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -33,6 +33,22 @@ class ListedCompany(TimestampMixin, Base):
     market_cap: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     market_cap_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+
+    # 오늘의 일정(실적발표·배당락). 시총과 같은 결의 값이다 — 하루 1회 배치가 채우고,
+    # 아직 안 채웠거나 공급자에 없는 종목은 NULL 로 남는다.
+    #
+    # **날짜 자체를 저장하는 이유**: yfinance 는 종목당 1회 호출(~1초)이라 "이번 주에
+    # 실적발표가 있는 종목" 을 요청 시점에 찾으려면 전 종목을 훑어야 한다. 미리 적재해
+    # 두면 그 질문이 인덱스를 타는 SQL 한 번이 된다.
+    #
+    # 둘 다 인덱스를 건다. 이 컬럼들의 유일한 용도가 "오늘부터 N일" 범위 조회다.
+    next_earnings_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    ex_dividend_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    # 마지막으로 **물어본** 시각이다. 값을 못 받아도 갱신한다 — 그러지 않으면 일정이
+    # 없는 종목(대부분)을 배치가 매번 다시 물어보고 영원히 앞으로 나아가지 못한다.
+    calendar_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
     )
 
     def __repr__(self) -> str:  # pragma: no cover - 디버깅용

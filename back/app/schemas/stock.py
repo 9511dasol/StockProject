@@ -66,6 +66,29 @@ class MarketCapRecord(BaseModel):
     caps: dict[str, int] = Field(default_factory=dict)
 
 
+class CalendarDates(BaseModel):
+    """종목 하나의 일정 두 날짜. 둘 다 `YYYY-MM-DD` 또는 None."""
+
+    ex_dividend_date: str | None = None
+    next_earnings_date: str | None = None
+
+
+class CalendarRecord(BaseModel):
+    """일정 배치 1회분.
+
+    `dates` 는 **yfinance 심볼**(`005930.KS`) 기준이다. 시총 배치가 6자리 코드를 키로
+    쓰는 것은 pykrx 가 그렇게 주기 때문이고, 여기는 우리가 심볼로 물어봤으므로 심볼을
+    그대로 쓴다 — 접미사를 떼고 다시 붙이는 단계가 없으니 "공급자 코드 형식이 바뀌어
+    매칭 0건" 이 되는 경로 자체가 없다 (`update_market_caps` 의 경보 참고).
+    """
+
+    as_of: str | None = None
+    #: **물어본 심볼 전부.** 값이 없는 종목도 포함한다 — 저장 계층이 이것으로
+    #: `calendar_updated_at` 을 찍어야 배치가 다음 종목으로 넘어간다.
+    asked: list[str] = Field(default_factory=list)
+    dates: dict[str, CalendarDates] = Field(default_factory=dict)
+
+
 class StockSuggestion(BaseModel):
     """자동완성 후보 (명세 6.2)."""
 

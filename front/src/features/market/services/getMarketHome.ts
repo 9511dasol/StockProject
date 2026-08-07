@@ -1,6 +1,7 @@
 import { USE_MOCK } from "@/lib/config/env";
 import { MOCK_MARKET_HOME } from "../model/mock";
 import type { MarketHome } from "../model/types";
+import { getCalendar } from "./getCalendar";
 import { getMarketOverview } from "./getMarketOverview";
 import { getMovers } from "./getMovers";
 
@@ -21,9 +22,10 @@ import { getMovers } from "./getMovers";
 export async function getMarketHome(): Promise<MarketHome> {
   if (USE_MOCK) return MOCK_MARKET_HOME;
 
-  const [overview, movers] = await Promise.all([
+  const [overview, movers, calendar] = await Promise.all([
     getMarketOverview("home"),
     getMovers(),
+    getCalendar(),
   ]);
 
   return {
@@ -33,12 +35,21 @@ export async function getMarketHome(): Promise<MarketHome> {
     gainers: movers?.gainers ?? MOCK_MARKET_HOME.gainers,
     losers: movers?.losers ?? MOCK_MARKET_HOME.losers,
     moversScope: movers?.scope ?? MOCK_MARKET_HOME.moversScope,
+    // 목 데이터를 두지 않는다. 일정은 예시로 채우면 "삼성전자 실적발표 8/11" 같은
+    // **틀린 사실**이 화면에 뜬다 — 등락률과 달리 사람이 보고 판단하는 날짜라
+    // 가짜를 섞을 자리가 아니다. 없으면 없다고 말한다 (`CalendarList`).
+    calendar,
     asOf: overview.asOf,
     apiNotes: [
       "fetch_market_overview_from_yfinance (지수 4종 · 실데이터)",
       movers
         ? `scan_movers · ${movers.scope}${movers.asOf ? ` · ${movers.asOf}` : ""} (실데이터)`
         : "등락 상위는 예시 데이터 (랭킹 스냅샷 준비 중)",
+      calendar
+        ? `markets/calendar · ${calendar.covered}/${calendar.universeSize}종목 수집${
+            calendar.asOf ? ` · ${calendar.asOf}` : ""
+          } (실데이터)`
+        : "오늘의 일정 조회 실패",
     ],
   };
 }

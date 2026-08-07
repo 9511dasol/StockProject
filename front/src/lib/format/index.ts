@@ -10,7 +10,7 @@ export {
   signedDecimal,
   unsignedPercent,
 } from "./number";
-export { clock, masthead, relative, stamp, ymd } from "./date";
+export { clock, masthead, plainDate, relative, stamp, ymd } from "./date";
 export {
   deltaColorClass,
   direction,

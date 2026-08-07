@@ -102,6 +102,28 @@ export function ymd(iso: string): string {
   return `${d.year}. ${PAD(d.month)}. ${PAD(d.day)}`;
 }
 
+/**
+ * 08.11 (화) — `YYYY-MM-DD` 문자열 전용. 실적발표일·배당락일처럼 **시각이 없는 날짜**다.
+ *
+ * 위 함수들과 달리 `kstParts` 를 지나지 않는다. 그것들은 ISO 순간(instant)을 KST 로
+ * 옮기는 일을 하는데, 여기 오는 값에는 애초에 시각도 타임존도 없다 — `new Date()` 에
+ * 넣으면 UTC 자정으로 해석된 뒤 KST 로 9시간 밀리므로, 어느 타임존을 고르든 그건
+ * 없는 정보를 지어내는 것이다. 그래서 문자열을 그대로 쪼갠다.
+ *
+ * 요일만 Date 를 쓰는데, `Date.UTC` 로 만들고 `getUTCDay()` 로 읽어 실행 환경의
+ * 타임존이 결과를 바꾸지 못하게 한다.
+ */
+export function plainDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return UNKNOWN;
+
+  const [, year, month, day] = match;
+  const weekday = new Date(
+    Date.UTC(Number(year), Number(month) - 1, Number(day)),
+  ).getUTCDay();
+  return `${month}.${day} (${WEEKDAYS[weekday]})`;
+}
+
 /** 09.30 15:31 — 뉴스·로그 타임스탬프 */
 export function stamp(iso: string): string {
   const d = kstParts(iso);

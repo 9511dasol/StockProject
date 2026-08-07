@@ -76,6 +76,52 @@ class MarketMovers(BaseModel):
     updated_at: str
 
 
+CalendarKind = Literal["earnings", "ex_dividend"]
+
+
+class CalendarEvent(BaseModel):
+    """'오늘의 일정' 한 줄. 실적발표 또는 배당락 **하나**를 가리킨다.
+
+    한 종목이 같은 기간에 둘 다 있으면 **줄이 둘 나온다.** 한 줄에 두 날짜를 합치면
+    화면이 날짜순으로 정렬할 수 없다 — 이 목록의 축은 종목이 아니라 날짜다.
+    """
+
+    name: str
+    #: yfinance 심볼 (005930.KS)
+    symbol: str
+    #: 라우팅용 6자리 코드 (005930)
+    code: str
+    board: Literal["KOSPI", "KOSDAQ"] | None = None
+    kind: CalendarKind
+    #: YYYY-MM-DD
+    date: str
+    #: 오늘까지 남은 일수. 0 이면 오늘, 음수는 나오지 않는다(지난 일정은 제외한다)
+    d_day: int
+    #: 원. 화면이 큰 종목을 먼저 보여줄 근거다. 배치가 아직 안 채웠으면 None
+    market_cap: int | None = None
+
+
+class MarketCalendar(BaseModel):
+    """`GET /markets/calendar` 응답.
+
+    `updated_at` 은 응답을 만든 시각이고, `as_of` 는 **일정 배치가 마지막으로 돈 날**이다.
+    둘을 나눈 이유: 값이 며칠 스테일해도 응답은 매번 새로 만들어지므로, `updated_at`
+    하나만 보면 데이터가 최신이라고 오해한다.
+    """
+
+    #: 일정 배치가 마지막으로 돈 날 (YYYY-MM-DD). 한 번도 안 돌았으면 None
+    as_of: str | None = None
+    #: 조회 창 (오늘부터 며칠)
+    days: int = 7
+    #: 창 안의 전체 건수. `events` 는 `limit` 으로 잘린다
+    total: int = 0
+    events: list[CalendarEvent] = Field(default_factory=list)
+    #: 일정이 채워진 종목 수 / 전체 종목 수. 배치가 얼마나 진행됐는지 화면이 알린다
+    covered: int = 0
+    universe_size: int = 0
+    updated_at: str
+
+
 RankingSort = Literal["market_cap", "change"]
 RankingBoard = Literal["ALL", "KOSPI", "KOSDAQ"]
 
