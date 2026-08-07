@@ -5,6 +5,9 @@
 .vercel
 work/
 
+# 커밋 메시지 대기열 — Claude 가 쌓고 사람이 커밋한다. 저장소에 올리지 않는다.
+COMMIT_NOTES.md
+
 # env files
 .env
 .env.local
