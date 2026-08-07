@@ -22,6 +22,10 @@ Supabase 대시보드가 주는 문자열을 **그대로 붙여넣을 수 있어
 지금은 주 DB·벡터 DB·alembic 셋이 모두 이 파일을 지난다. `is_postgres` 가 남아 있는
 것은 설정 검증(`config.Settings._must_be_postgres`)과 벡터 DSN 판정에 쓰이기 때문이고,
 접속 경로에는 더 이상 방언 분기가 없다.
+
+동기 드라이버용 변환(`to_sync_url`)은 없다. alembic 이 psycopg 로 돌던 시절의 유물인데,
+지금은 alembic 도 async 엔진(asyncpg)을 쓰므로(`alembic/env.py`) 부르는 곳이 하나도
+없었다. 동기 경로가 다시 필요해지면 그때 그 소비자와 함께 되살린다.
 """
 
 import ssl
@@ -118,19 +122,3 @@ def normalize_url(raw: str) -> tuple[str, dict[str, object]]:
 def is_pooler(raw: str) -> bool:
     """트랜잭션 풀러 뒤인가. 포트로 판별한다 (Supabase 는 6543)."""
     return str(urlsplit(raw.strip()).port or "") in POOLER_PORTS
-
-
-def to_sync_url(raw: str) -> str:
-    """alembic 등 동기 드라이버용. `+asyncpg` 를 떼고 libpq 파라미터는 남긴다.
-
-    마이그레이션은 psycopg 가 돌리므로 asyncpg 용 정규화를 그대로 쓰면 안 된다 —
-    `sslmode` 는 오히려 **있어야** 하고, `prepared_statement_cache_size` 는 모른다.
-    """
-    parts = urlsplit(raw.strip())
-    scheme = parts.scheme.split("+", 1)[0]
-    query = [
-        (key, value)
-        for key, value in parse_qsl(parts.query)
-        if key != "prepared_statement_cache_size"
-    ]
-    return urlunsplit((scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))

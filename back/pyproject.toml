@@ -16,22 +16,23 @@ dependencies = [
     # 핀을 낮추면 오류 없이 조용히 전 종목 null 이 된다.
     "yfinance>=1.5",
     "alembic>=1.18.5",
+    # **유일한 DB 드라이버다.** 한때 psycopg2-binary·psycopg[binary]·psycopg2 가 함께
+    # 선언돼 있었는데 셋 다 import 되는 곳이 없었다 — alembic 도 async 엔진(asyncpg)으로
+    # 돈다(`alembic/env.py`).
+    #
+    # 비바이너리 `psycopg2` 는 그냥 남는 짐이 아니라 **깨진 상태**였다. PyPI 에 리눅스
+    # 휠이 0개(sdist 뿐)라 `python:3.12-slim` 에서 소스 빌드로 떨어지는데, 그 이미지에는
+    # gcc·libpq-dev 가 없다. 윈도우에는 휠이 있어 로컬만 조용히 통과한다.
+    #
+    # 동기 드라이버가 다시 필요해지는 시점은 langgraph 체크포인터(`AsyncPostgresSaver`)를
+    # 붙일 때이고, 그때 psycopg2 가 아니라 psycopg[binary] 를 그 이유와 함께 추가한다.
     "asyncpg>=0.31.0",
-    "psycopg2-binary>=2.9.12",
-    "bcrypt>=5.0.0",
-    "pyjwt>=2.13.0",
     "python-dotenv>=1.2.2",
-    "fastapi-pagination>=0.15.16",
     "pykrx>=1.2.8",
-    "psycopg[binary]>=3.2",
     "google-genai>=1.0",
     "langgraph>=0.6",
+    "pgvector>=0.3",
 ]
-
-[project.optional-dependencies]
-# asyncpg 는 이제 필수 의존성이다 (주 DB 가 Postgres 전용). 이 extra 는 예전
-# `uv sync --extra postgres` 문서를 따라오는 사람을 위해 남겨 둔 빈 껍데기다.
-postgres = ["asyncpg>=0.30"]
 
 # `fastapi dev` / `fastapi run`이 파일명 탐색 순서(main.py → app/main.py → …)에
 # 의존하지 않도록 진입점을 명시한다. 루트에 다른 main.py가 생겨도 흔들리지 않는다.
@@ -43,10 +44,6 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
     "ruff>=0.9",
-    # **테스트 하네스 전용.** 운영 의존성에서 뺐다 — 배포되는 앱에는 SQLite 경로가
-    # 없다. 테스트는 인메모리 SQLite 로 도는데, 그 대가로 방언 차이는 잡지 못한다
-    # (tests/conftest.py 의 `db_session` 주석).
-    "aiosqlite>=0.20",
 ]
 
 [tool.pytest.ini_options]
