@@ -9,7 +9,10 @@ from datetime import UTC, datetime
 
 from app.agents.analysts import build_context, collect_opinions
 from app.agents.decision import decide
+from app.domain.fit import compute_fit
+from app.domain.verdict import combine
 from app.schemas.advice import StockAdviceResponse, StockRef, resolve_decision_label
+from app.schemas.profile import InvestorProfile
 from app.schemas.stock import KrxListing, StockContent, StockHistoryParams
 from app.services import advice_cache, fundamentals_service, rag_service, stock_service
 
@@ -21,8 +24,16 @@ _ADVICE_TIMEFRAME = "day"
 
 
 async def generate_advice(
-    symbol: str, *, listing: KrxListing | None = None
+    symbol: str,
+    *,
+    listing: KrxListing | None = None,
+    profile: InvestorProfile | None = None,
 ) -> StockAdviceResponse:
+    """종목 분석. `profile` 이 있으면 2축 판단(계획 5.4)까지 얹는다.
+
+    `profile` 을 키워드 전용 선택 인자로 둔 이유: 프로파일 저장소가 아직 없어
+    호출부 대부분은 None 으로 부른다. 그때의 동작은 종전과 완전히 동일하다.
+    """
     params = StockHistoryParams(
         symbol=symbol,
         timeframe=_ADVICE_TIMEFRAME,
@@ -57,9 +68,7 @@ async def generate_advice(
         documents = await rag_service.documents_for_advice(
             stock_data.symbol, stock_data.name, content
         )
-        context = build_context(
-            stock_data, metrics, fundamentals=fundamentals, documents=documents
-        )
+        context = build_context(stock_data, metrics, fundamentals=fundamentals, documents=documents)
         opinions = await collect_opinions(context, metrics, documents)
         decision, used_fallback = await decide(
             stock_data, metrics, opinions, fundamentals=fundamentals, documents=documents
@@ -77,6 +86,13 @@ async def generate_advice(
         )
     else:
         logger.info("%s AI 판단을 캐시에서 냅니다", stock_data.symbol)
+
+    # 캐시 **이후**에 계산한다. 적합도는 사람마다 다르지만 시장 판단은 전 사용자
+    # 공유이므로, 여기서 갈라야 캐시 적중률이 프로파일 수만큼 나뉘지 않는다.
+    # 순수 함수라 LLM 호출도 조회도 늘지 않는다 (계획 5.4 / 7.2).
+    personal = (
+        combine(outcome.decision, compute_fit(profile, metrics)) if profile is not None else None
+    )
 
     return StockAdviceResponse(
         stock=StockRef(
@@ -96,5 +112,6 @@ async def generate_advice(
         buy_conditions=outcome.decision.buy_conditions,
         risk_notes=outcome.decision.risk_notes,
         decision_source="fallback" if outcome.used_fallback else "llm",
+        personal=personal,
         updated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )

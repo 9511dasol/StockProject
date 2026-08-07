@@ -38,6 +38,34 @@ export const MOCK_DECISION: Decision = {
   buyConditions: ["20일선 상향 돌파 · 거래량 1.82x", "목표가 컨센서스 +12%"],
   riskNotes: ["원/달러 1,381원 · 미 금리 경로"],
   source: "llm",
+  // 2축 판단 (계획 5.6). 목에서는 **갈리는 쪽**을 기본으로 둔다 — 일치하는 경우는
+  // 카드가 조용해서 화면 확인에 쓸모가 적고, 불일치가 이 기능의 요지다.
+  personal: {
+    marketVerdict: "BUY",
+    marketConfidence: 72,
+    fitScore: 38,
+    fitLevel: "low",
+    verdict: "WATCH",
+    label: "관망",
+    adjusted: true,
+    concerns: [
+      {
+        axis: "변동성 부담",
+        severity: "high",
+        message: "20일 변동성 32.0%가 당신의 감내 구간(약 20.5%)을 넘습니다.",
+      },
+      {
+        axis: "고점 추격 위험",
+        severity: "medium",
+        message:
+          "52주 구간에서 상위 91% 지점입니다. 군중을 따라가는 성향이 강한 편이라 고점 추격이 되기 쉽습니다.",
+      },
+    ],
+    guardrails: [
+      "평소 넣던 금액의 1/3로 시작하고, 손절선을 진입 전에 정해 두세요.",
+      "지금 전량 담지 말고 눌림목을 기다려 2~3회로 나눠 진입하세요.",
+    ],
+  },
   updatedAt: "2026-07-30T06:31:00Z",
 };
 

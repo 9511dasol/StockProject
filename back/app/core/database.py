@@ -6,22 +6,20 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
-from app.core.db_url import is_pooler, is_postgres, normalize_url
+from app.core.db_url import is_pooler, normalize_url
 
 
 def _create_engine():
-    """주 DB 엔진.
+    """주 DB 엔진. Postgres 전용이다.
 
-    로컬 SQLite 는 예전 그대로 만들고, Postgres 면 접속 문자열을 정규화해서 만든다
-    (`core/db_url.py`). 정규화 없이 Supabase 풀러 URI 를 그대로 넘기면 `sslmode` 에서
-    TypeError 가 나거나 프리페어드 스테이트먼트 충돌로 깨진다 — 붙여넣기만으로
-    돌아가야 하는 값이라 그 처리를 여기서 흡수한다.
+    접속 문자열은 항상 정규화를 거친다 (`core/db_url.py`). 정규화 없이 Supabase 풀러
+    URI 를 그대로 넘기면 `sslmode` 에서 TypeError 가 나거나 프리페어드 스테이트먼트
+    충돌로 깨진다 — 붙여넣기만으로 돌아가야 하는 값이라 그 처리를 여기서 흡수한다.
+
+    방언 분기는 없다. 주소가 Postgres 인지는 설정이 이미 검증했고
+    (`config.Settings._must_be_postgres`), 여기서 다시 갈래를 만들면 개발과 운영이
+    다른 경로로 도는 구조가 되살아난다.
     """
-    if not is_postgres(settings.database_url):
-        return create_async_engine(
-            settings.database_url, echo=settings.db_echo, pool_pre_ping=True
-        )
-
     url, connect_args = normalize_url(settings.database_url)
     return create_async_engine(
         url,

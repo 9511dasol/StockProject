@@ -12,6 +12,7 @@ import pytest
 from app.agents import analysts, decision
 from app.core.config import settings
 from app.schemas.advice import AnalystOutput, InvestmentDecision
+from app.schemas.profile import InvestorProfile
 from app.schemas.rag import RetrievedDoc
 from app.schemas.stock import (
     NewsItem,
@@ -158,3 +159,79 @@ async def test_upstream_failure_becomes_stage_zero(monkeypatch: pytest.MonkeyPat
     assert len(events) == 1
     assert events[0].stage == 0
     assert "Rate limited" in (events[0].error or "")
+
+
+# ---------------------------------------------------------------------------
+# 2축 판단이 **이 경로**로 흐르는지 (사주 통합 계획 5.4).
+#
+# 이 테스트가 따로 필요한 이유: 프런트는 비스트리밍 `/advice` 를 부르지 않는다.
+# 그쪽에만 personal 을 얹었을 때 백엔드 테스트는 전부 초록인데 화면에는 2축 판단이
+# 영영 나타나지 않았다 — 계층별 테스트가 배선을 검증해 주지 않는다는 사례다.
+# ---------------------------------------------------------------------------
+
+_CAUTIOUS = InvestorProfile(
+    risk_appetite=25, patience=15, decisiveness=80, loss_aversion=90, herd_tendency=85
+)
+
+_VOLATILE_METRICS = StockMetrics(
+    latest_close=82_000.0,
+    day_change_pct=7.1,
+    volatility_20d_pct=34.0,
+    week52_position_pct=93.0,
+    volume_ratio_20d=2.8,
+    sma5=80_000.0,
+    sma20=76_000.0,
+    trend="상승 우위",
+)
+
+
+@pytest.fixture
+def volatile(monkeypatch: pytest.MonkeyPatch, wired: None) -> None:
+    """적합도가 확실히 낮게 나오는 종목으로 바꾼다."""
+    history = _HISTORY.model_copy(update={"metrics": _VOLATILE_METRICS})
+
+    async def fake_history(params, **kwargs):
+        return history
+
+    monkeypatch.setattr(stock_service, "get_history", fake_history)
+    monkeypatch.setattr(stock_service, "get_metrics", lambda data: _VOLATILE_METRICS)
+
+
+async def test_stream_omits_personal_without_a_profile(wired: None) -> None:
+    """프로파일이 없으면 종전 이벤트 그대로다 — 개인화는 얹는 기능이다."""
+    events = [event async for event in advice_stream.stream_advice("005930")]
+
+    assert events[-1].decision is not None
+    assert events[-1].decision.personal is None
+
+
+async def test_stream_carries_the_two_axis_verdict_when_a_profile_is_given(
+    volatile: None,
+) -> None:
+    events = [
+        event
+        async for event in advice_stream.stream_advice("005930", profile=_CAUTIOUS)
+    ]
+
+    decision_event = events[-1].decision
+    assert decision_event is not None
+    # 상단은 여전히 시장 판단 — 기존 클라이언트가 보는 필드는 안 바뀐다.
+    assert decision_event.verdict == "BUY"
+
+    personal = decision_event.personal
+    assert personal is not None
+    assert personal.market_verdict == "BUY"
+    assert personal.verdict == "WATCH"      # 단방향 보정
+    assert personal.adjusted is True
+    assert personal.fit_level == "low"
+    assert personal.concerns and personal.guardrails
+
+
+async def test_stage_order_is_unchanged_by_personalisation(volatile: None) -> None:
+    """개인화가 이벤트 순서·개수를 건드리지 않는다 — 진행 바 계약은 그대로다."""
+    events = [
+        event
+        async for event in advice_stream.stream_advice("005930", profile=_CAUTIOUS)
+    ]
+
+    assert [event.stage for event in events] == [1, 2, 3, 3, 3, 4]

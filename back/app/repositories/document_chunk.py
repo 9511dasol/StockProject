@@ -4,11 +4,12 @@ ORM을 쓰지 않고 원시 SQL을 쓰는 이유:
 
 * 벡터 연산자(`<=>`)와 트라이그램 연산자(`<%`)는 SQLAlchemy 표현식으로 옮기면
   오히려 읽기 어려워진다. 하이브리드 검색은 SQL 자체가 명세다.
-* 이 테이블은 주 DB(SQLite)의 `Base.metadata`에 들어가면 안 된다. 같은 메타데이터에
-  얹으면 개발용 `create_all()`이 `vector` 타입에서 깨진다.
+* 이 테이블은 `Base.metadata`에 들어가면 안 된다. `vector(N)` 타입과 HNSW·트라이그램
+  인덱스를 SQLAlchemy 모델로 표현할 수 없고, 얹어 두면 alembic 이 자기가 관리하는
+  테이블로 착각한다 (`alembic/env.py` 의 `_FOREIGN_TABLES` 가 그래서 필요하다).
 
-스키마는 `ensure_schema()`가 멱등으로 만든다 — alembic이 주 DB(SQLite) 기준으로
-설정돼 있어 다른 DB의 마이그레이션을 함께 관리할 수 없다.
+스키마는 `ensure_schema()`가 멱등으로 만든다 — 벡터 저장소는 주 DB 와 다른 인스턴스일
+수 있어(`VECTOR_DATABASE_URL`) 주 DB 의 마이그레이션 이력으로 함께 관리할 수 없다.
 """
 
 import logging
@@ -31,8 +32,9 @@ def _as_date(value: str | None) -> date | None:
     터진다 — `'str' object has no attribute 'toordinal'`. SQL 캐스트는 값이 서버에
     닿은 **뒤에** 일어나므로 바인딩을 구해 주지 못한다.
 
-    이 경로는 로컬 SQLite 로는 검증되지 않는다(벡터 테이블 자체가 Postgres 전용).
-    그래서 5회차부터 색인이 한 번도 성공한 적 없이 남아 있었다.
+    이 경로는 예전에 로컬 SQLite 로 개발하던 시절 아무도 실행해 보지 못했고(벡터
+    테이블 자체가 Postgres 전용), 그래서 5회차부터 색인이 한 번도 성공한 적 없이
+    남아 있었다. 개발 DB 를 Postgres 로 통일한 이유가 정확히 이런 종류다.
 
     형식이 다르면 예외 대신 None 이다. 공급자가 준 이상한 날짜 하나가 색인 전체를
     죽이면, 나머지 정상 기사까지 검색에서 사라진다.

@@ -18,6 +18,10 @@ Supabase 대시보드가 주는 문자열을 **그대로 붙여넣을 수 있어
 예전에는 이 로직이 `vector_database.py` 안에만 있었다. 주 DB 가 로컬 SQLite 라
 필요가 없었기 때문이다. 주 DB 를 Supabase 로 옮기는 순간 **같은 처리가 양쪽에 필요**해졌고,
 한쪽에만 있으면 "벡터 검색은 되는데 앱이 DB에 못 붙는" 상태가 된다.
+
+지금은 주 DB·벡터 DB·alembic 셋이 모두 이 파일을 지난다. `is_postgres` 가 남아 있는
+것은 설정 검증(`config.Settings._must_be_postgres`)과 벡터 DSN 판정에 쓰이기 때문이고,
+접속 경로에는 더 이상 방언 분기가 없다.
 """
 
 import ssl

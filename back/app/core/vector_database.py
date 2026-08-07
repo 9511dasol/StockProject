@@ -1,12 +1,15 @@
 """RAG 전용 Postgres(pgvector) 엔진.
 
-주 DB 엔진(`core/database.py`)과 **분리한다.** 이유는 둘이다.
+주 DB 엔진(`core/database.py`)과 **분리한다.** 주소가 같은 Supabase 를 가리키더라도
+그렇다. 이유는 둘이다.
 
-1. 벡터 검색은 `vector` 확장이 필요한데 로컬 개발 DB는 SQLite라 확장을 못 올린다.
-   같은 `Base.metadata`에 벡터 테이블을 얹으면 `create_all()`이 SQLite에서 깨진다.
-2. RAG는 **없으면 없는 대로 돌아가야 한다.** `VECTOR_DATABASE_URL`이 비어 있거나
-   Supabase가 죽어 있어도 종목 상세·AI 판단은 그대로 나와야 하므로, 실패를 이
-   경계 안에 가둔다 (`get_engine()`이 None을 돌려주면 호출부는 문서 없이 진행한다).
+1. RAG는 **없으면 없는 대로 돌아가야 한다.** 벡터 저장소가 비어 있거나 죽어 있어도
+   종목 상세·AI 판단은 그대로 나와야 하므로, 실패를 이 경계 안에 가둔다
+   (`get_engine()`이 None을 돌려주면 호출부는 문서 없이 진행한다). 주 엔진을 함께
+   쓰면 벡터 쪽 장애가 앱 전체의 세션 풀로 번진다.
+2. 벡터 테이블은 `Base.metadata` 밖에 있다. `vector(N)` 타입과 HNSW·트라이그램
+   인덱스는 SQLAlchemy 모델로 표현할 수 없어 원시 SQL로 만들고
+   (`repositories/document_chunk.ensure_schema`), 그래서 수명주기가 다르다.
 
 Supabase가 주는 URI를 **그대로** 붙여넣을 수 있게 정규화를 여기서 흡수한다.
 그 문자열은 `postgresql://...?sslmode=require` 형태인데 asyncpg는 `sslmode`를

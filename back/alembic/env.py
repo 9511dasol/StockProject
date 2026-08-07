@@ -10,10 +10,15 @@ from alembic import context
 # 앱 설정과 모델을 그대로 재사용한다 — alembic.ini 에 DB 주소를 이중으로 적으면
 # .env 와 어긋날 때 조용히 다른 DB 를 마이그레이션하게 된다.
 from app.core.config import settings
-from app.core.db_url import is_postgres, normalize_url
+from app.core.db_url import normalize_url
 from app.models.base import Base
-from app.models.listed_company import ListedCompany  # noqa: F401  (메타데이터 등록)
-from app.models.watchlist import WatchlistItem  # noqa: F401  (메타데이터 등록)
+
+# 메타데이터 등록 — **모델을 추가하면 여기에도 반드시 넣는다.**
+# 빠뜨리면 `--autogenerate` 가 DB 에는 있고 메타데이터에는 없는 테이블로 보고
+# `drop_table` 을 제안한다. 그대로 실행하면 데이터가 통째로 사라진다.
+from app.models.investor_profile import InvestorProfileRow  # noqa: F401
+from app.models.listed_company import ListedCompany  # noqa: F401
+from app.models.watchlist import WatchlistItem  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -34,11 +39,7 @@ target_metadata = Base.metadata
 # **앱과 같은 정규화를 거친다.** Supabase 풀러 URI 를 그대로 넘기면 `sslmode` 에서
 # TypeError 가 나 마이그레이션이 아예 시작되지 않는다 — 앱은 붙는데 alembic 만 안
 # 붙는 상태가 되고, 그러면 스키마가 코드보다 뒤처진 채로 오래 간다.
-_ALEMBIC_URL, _ALEMBIC_CONNECT_ARGS = (
-    normalize_url(settings.database_url)
-    if is_postgres(settings.database_url)
-    else (settings.database_url, {})
-)
+_ALEMBIC_URL, _ALEMBIC_CONNECT_ARGS = normalize_url(settings.database_url)
 config.set_main_option("sqlalchemy.url", _ALEMBIC_URL)
 
 # other values from the config, defined by the needs of env.py,
@@ -65,8 +66,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        # SQLite 는 ALTER TABLE 지원이 좁아 테이블 재생성(batch)이 필요하다.
-        render_as_batch=settings.database_url.startswith("sqlite"),
+        # batch 모드(테이블 재생성)는 SQLite 의 좁은 ALTER TABLE 를 우회하기 위한
+        # 장치였다. Postgres 는 ALTER 를 그대로 지원하므로 쓰지 않는다.
         include_object=_include_object,
     )
 
@@ -107,7 +108,6 @@ def do_run_migrations(connection: Connection) -> None:
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        render_as_batch=settings.database_url.startswith("sqlite"),
         include_object=_include_object,
     )
 

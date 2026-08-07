@@ -1,22 +1,67 @@
-"""테스트 픽스처. 인메모리 SQLite를 쓰고 외부 호출은 하지 않는다."""
+"""테스트 픽스처. 외부 호출은 하지 않는다.
 
+## DB 는 두 갈래다
+
+`TEST_DATABASE_URL` 이 있으면 **진짜 Postgres**, 없으면 인메모리 SQLite 로 돈다.
+
+SQLite 는 빠르지만 방언 차이를 못 잡는다 — `ORDER BY ... DESC` 의 NULL 위치가
+Postgres 와 정반대라, 264개가 전부 초록인 채로 운영 랭킹이 조용히 뒤집혀 있던 적이
+있다. 그래서 운영과 같은 엔진으로 돌릴 수 있는 길을 열어 둔다.
+
+    TEST_DATABASE_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:5432/postgres
+
+**세션 풀러(5432)를 쓴다.** 아래 `db_session` 이 테스트 하나 동안 커넥션 하나를
+붙잡고 트랜잭션을 열어 두기 때문이다 — 트랜잭션 풀러(6543)는 그 사이 백엔드가
+바뀔 수 있어 이 방식과 맞지 않는다.
+"""
+
+import os
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 import pytest_asyncio
+from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.agents import analysts
 from app.agents import decision as decision_agent
 from app.api.deps import get_listed_company_repository
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.db_url import is_pooler, is_postgres, normalize_url
 from app.integrations import llm
 from app.main import create_app
 from app.models.base import Base
 from app.repositories.listed_company import ListedCompanyRepository
 from app.services import advice_cache, fundamentals_service
+
+# `Settings` 는 이 값을 모른다 — 테스트 하네스 전용이라 운영 설정에 넣지 않는다.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
+TEST_DATABASE_URL = (os.environ.get("TEST_DATABASE_URL") or "").strip()
+
+
+def _target(url: str) -> tuple[str | None, int | None, str]:
+    """같은 DB 를 가리키는지 비교할 키. 자격증명·쿼리스트링은 무시한다."""
+    parts = urlsplit(url)
+    return (parts.hostname, parts.port, parts.path)
+
+
+if TEST_DATABASE_URL:
+    if not is_postgres(TEST_DATABASE_URL):
+        raise RuntimeError(
+            "TEST_DATABASE_URL 은 Postgres 여야 합니다. SQLite 로 돌리려면 값을 비워 두세요."
+        )
+    # **운영 DB 를 겨누면 즉시 멈춘다.** 아래 스키마 준비가 drop_all 로 시작하므로,
+    # 이 검사가 없으면 오타 하나로 실 데이터가 통째로 사라진다.
+    if _target(TEST_DATABASE_URL) == _target(settings.database_url):
+        raise RuntimeError(
+            "TEST_DATABASE_URL 이 DATABASE_URL 과 같은 DB 를 가리킵니다. "
+            "테스트는 스키마를 지우고 다시 만들므로 별도 프로젝트여야 합니다."
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -106,17 +151,70 @@ def reset_advice_cache() -> Iterator[None]:
     advice_cache.reset_for_tests()
 
 
-@pytest_asyncio.fixture
-async def db_session() -> AsyncIterator[AsyncSession]:
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
+async def pg_engine():
+    """테스트 Postgres 엔진. `TEST_DATABASE_URL` 이 없으면 None 이다.
+
+    스키마는 **세션당 한 번** 만든다. 테스트마다 만들면 273개 × 왕복이 되어
+    네트워크 DB 에서는 견딜 수 없다. 격리는 `db_session` 의 트랜잭션이 맡는다.
+    """
+    if not TEST_DATABASE_URL:
+        yield None
+        return
+
+    url, connect_args = normalize_url(TEST_DATABASE_URL)
+    engine = create_async_engine(
+        url,
+        poolclass=NullPool if is_pooler(TEST_DATABASE_URL) else None,
+        connect_args=connect_args,
+    )
+
+    # drop → create. 앞 실행이 남긴 스키마 변경이 조용히 남아 있으면, 통과 여부가
+    # "언제 마지막으로 돌렸는가" 에 달리게 된다. NextAuth 테이블은 `Base.metadata`
+    # 밖이라 여기서 건드리지 않는다.
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
-
+    yield engine
     await engine.dispose()
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def db_session(pg_engine) -> AsyncIterator[AsyncSession]:
+    """테스트 하나가 쓰는 세션. 끝나면 **아무것도 남기지 않는다.**
+
+    Postgres 경로는 테이블을 비우지 않고 **바깥 트랜잭션을 롤백**한다. 273개마다
+    TRUNCATE 를 돌리면 네트워크 왕복이 그만큼 늘고, 병렬 실행도 불가능해진다.
+
+    `join_transaction_mode="create_savepoint"` 가 핵심이다. 리포지토리들이 자기
+    쓰기마다 `commit()` 을 부르는데(`get_db` 가 커밋하지 않는 규약 때문이다), 그대로
+    두면 바깥 트랜잭션이 끝나 버려 롤백할 것이 없어진다. 세이브포인트로 바꾸면
+    커밋은 세이브포인트 해제가 되고 바깥 트랜잭션은 살아 있다.
+    """
+    if pg_engine is None:
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with session_factory() as session:
+            yield session
+
+        await engine.dispose()
+        return
+
+    conn = await pg_engine.connect()
+    trans = await conn.begin()
+    session = AsyncSession(
+        bind=conn, expire_on_commit=False, join_transaction_mode="create_savepoint"
+    )
+    try:
+        yield session
+    finally:
+        await session.close()
+        await trans.rollback()
+        await conn.close()
 
 
 @pytest.fixture
@@ -124,7 +222,7 @@ def repo(db_session: AsyncSession) -> ListedCompanyRepository:
     return ListedCompanyRepository(db_session)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="session")
 async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
     """스키마 자동 생성과 실제 DB를 끄고, 테스트 세션을 주입한 앱."""
     app = create_app()

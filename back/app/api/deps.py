@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_advice_key
 from app.core.database import get_db
+from app.repositories.investor_profile import InvestorProfileRepository
 from app.repositories.listed_company import ListedCompanyRepository
 from app.repositories.watchlist import WatchlistRepository
 
@@ -27,6 +28,13 @@ def get_watchlist_repository(db: DbSession) -> WatchlistRepository:
 WatchlistRepo = Annotated[WatchlistRepository, Depends(get_watchlist_repository)]
 
 
+def get_investor_profile_repository(db: DbSession) -> InvestorProfileRepository:
+    return InvestorProfileRepository(db)
+
+
+InvestorProfileRepo = Annotated[InvestorProfileRepository, Depends(get_investor_profile_repository)]
+
+
 async def get_owner_key(
     x_owner_key: str | None = Header(
         default=None,
@@ -45,15 +53,35 @@ async def get_owner_key(
     """
     key = (x_owner_key or "").strip()
     if not key:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, "소유자 식별자(X-Owner-Key)가 필요합니다"
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "소유자 식별자(X-Owner-Key)가 필요합니다")
     if len(key) > 80:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "소유자 식별자가 너무 깁니다")
     return key
 
 
 OwnerKey = Annotated[str, Depends(get_owner_key)]
+
+
+async def get_optional_owner_key(
+    x_owner_key: str | None = Header(
+        default=None,
+        alias="X-Owner-Key",
+        description="있으면 그 소유자의 투자 성향으로 판단을 개인화한다.",
+    ),
+) -> str | None:
+    """소유자를 **선택적으로** 읽는다. 없으면 None 이고 그것은 오류가 아니다.
+
+    AI 판단 경로가 쓴다. 여기서 `get_owner_key` 를 그대로 붙였다면 헤더 없는 기존
+    호출이 전부 400 이 된다 — 개인화는 얹는 기능이지 전제 조건이 아니고, 로그인하지
+    않은 사람도 시장 판단은 그대로 받아야 한다.
+    """
+    key = (x_owner_key or "").strip()
+    if not key or len(key) > 80:
+        return None
+    return key
+
+
+OptionalOwnerKey = Annotated[str | None, Depends(get_optional_owner_key)]
 
 # 토큰을 쓰는 엔드포인트에만 붙인다 (app/api/auth.py 주석).
 # 값을 쓰지 않는 의존성이라 `dependencies=[...]` 가 아니라 별칭으로 둔 것은,

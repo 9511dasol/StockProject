@@ -97,8 +97,11 @@ class ListedCompanyRepository:
         `.KS`/`.KQ` 가 붙은 행만 남긴다 — 접미사 없는 행(수집 원본이 깨진 44건)은
         yfinance 심볼로 쓸 수 없어 스캔 자리만 낭비한다.
 
-        SQLite 는 NULL 을 가장 작은 값으로 보므로 `DESC` 에서 시총 미수집 종목이
-        자연히 뒤로 밀린다 — 배치가 아직 안 돈 환경에서도 순서가 무너지지 않는다.
+        **`nullslast()` 가 반드시 있어야 한다.** 예전에는 없었고, 주석은 "SQLite 는
+        NULL 을 가장 작은 값으로 보므로 DESC 에서 뒤로 밀린다" 고 적혀 있었다.
+        그 전제는 Postgres 에서 **정반대**다 — `DESC` 의 기본이 `NULLS FIRST` 라
+        시총이 아직 없는 종목이 모집단 맨 앞을 채웠다. 배치가 덜 돈 상태에서 랭킹이
+        조용히 빈 종목으로 채워지는, 오류 없이 틀리는 종류의 버그였다.
         """
         stmt = (
             select(ListedCompany)
@@ -108,7 +111,7 @@ class ListedCompanyRepository:
                     ListedCompany.symbol.like("%.KQ"),
                 )
             )
-            .order_by(ListedCompany.market_cap.desc(), ListedCompany.symbol)
+            .order_by(ListedCompany.market_cap.desc().nullslast(), ListedCompany.symbol)
             .limit(limit)
         )
         result = await self._db.execute(stmt)
@@ -122,7 +125,9 @@ class ListedCompanyRepository:
         value = result.scalar_one_or_none()
         if value is None:
             return None
-        # SQLite 는 tz 정보를 잃어버린다 — 비교 전에 UTC 로 되살린다.
+        # Postgres 의 timestamptz 는 tz 를 실어 오므로 대개 그대로 통과한다.
+        # 방어를 남겨 두는 이유는 naive 값 하나가 들어오면 아래 비교가 TypeError 로
+        # 배치를 통째로 세우기 때문이다 — 되살리는 비용이 그 위험보다 싸다.
         return value if value.tzinfo else value.replace(tzinfo=UTC)
 
     async def symbols_without_market_cap(self, limit: int) -> list[str]:

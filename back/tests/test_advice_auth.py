@@ -52,7 +52,7 @@ def no_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_resolve(repo, symbol: str):
         return None
 
-    async def fake_generate(symbol: str, *, listing=None) -> StockAdviceResponse:
+    async def fake_generate(symbol: str, *, listing=None, profile=None) -> StockAdviceResponse:
         return StockAdviceResponse(
             stock=StockRef(name="삼성전자", symbol="005930.KS", query="005930"),
             stock_data=_HISTORY,
@@ -65,7 +65,9 @@ def no_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
             updated_at="2026-08-05T00:00:00Z",
         )
 
-    async def fake_stream(symbol: str, *, listing=None) -> AsyncIterator[AdviceStreamEvent]:
+    async def fake_stream(
+        symbol: str, *, listing=None, profile=None
+    ) -> AsyncIterator[AdviceStreamEvent]:
         yield AdviceStreamEvent(stage=1)
 
     monkeypatch.setattr(listed_company_service, "resolve_listing", fake_resolve)

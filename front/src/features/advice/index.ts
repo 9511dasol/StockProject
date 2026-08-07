@@ -16,5 +16,7 @@ export type {
   AdviceStreamEvent,
   AgentOpinion,
   Decision,
+  FitConcern,
+  PersonalVerdict,
   Verdict,
 } from "./model/types";

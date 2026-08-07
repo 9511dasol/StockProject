@@ -38,6 +38,43 @@ export interface AgentOpinion {
   source?: string;
 }
 
+/** 적합도가 깎인 이유 한 건. 백엔드 FitConcern 대응 */
+export interface FitConcern {
+  /** 적합도 축 이름 — "변동성 부담" */
+  axis: string;
+  severity: "low" | "medium" | "high";
+  /** 사용자에게 그대로 보여줄 문장 */
+  message: string;
+}
+
+/**
+ * 2축 판단. 백엔드 PersonalVerdict 대응 (사주 통합 계획 5.4).
+ *
+ * 투자 성향 프로파일이 저장돼 있을 때만 온다. 없으면 undefined 이고 화면은 시장
+ * 판단만 그린다 — 개인화는 얹는 기능이지 전제 조건이 아니다.
+ *
+ * `marketVerdict` 가 따로 있는 이유: 화면이 "시장은 BUY 인데 당신에게는 관망"
+ * 이라는 **불일치 자체**를 보여주기 때문이다(계획 5.6). 결합 결과만으로는 그 화면을
+ * 만들 수 없다.
+ */
+export interface PersonalVerdict {
+  /** 보정 전 시장 판단 */
+  marketVerdict: Verdict;
+  marketConfidence: number;
+  /** 0~100 */
+  fitScore: number;
+  fitLevel: "high" | "medium" | "low";
+  /** 보정 후 최종 판단. **절대 상향되지 않는다** (단방향 보정 원칙) */
+  verdict: Verdict;
+  /** "분할 매수" · "관망" 등 화면 라벨 */
+  label: string;
+  /** 프로파일이 실제로 판단을 움직였는지 — '왜 갈렸나' 블록을 켜는 근거 */
+  adjusted: boolean;
+  concerns: FitConcern[];
+  /** "그래도 사겠다면" — 막지 않고 방법을 준다 */
+  guardrails: string[];
+}
+
 /**
  * 최종 판단. 백엔드 StockAdviceResponse 의 판단 부분에 대응.
  * source 는 fallback_decision(LLM 실패) 여부 — 백엔드는 agents[].status 로 알려준다.
@@ -52,6 +89,8 @@ export interface Decision {
   buyConditions: string[];
   riskNotes: string[];
   source: "llm" | "fallback";
+  /** 투자 성향 프로파일이 있을 때만. 위 verdict 는 **시장 판단 그대로**다 */
+  personal?: PersonalVerdict;
   /** ISO */
   updatedAt: string;
 }

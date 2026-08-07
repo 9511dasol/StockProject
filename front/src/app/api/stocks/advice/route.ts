@@ -7,6 +7,7 @@ import {
 import type { AdviceStreamEvent } from "@/features/advice/model/types";
 import { apiPostStream, ApiError } from "@/lib/api";
 import { ADVICE_API_KEY, AI_TIMEOUT_MS, USE_MOCK } from "@/lib/config/env";
+import { readOwnerKey } from "@/lib/watchlist/owner";
 
 /**
  * AI 판단 스트리밍 (BFF). 브라우저는 FastAPI 를 직접 부르지 않는다.
@@ -46,6 +47,18 @@ interface WireAdviceEvent {
     buy_conditions: string[];
     risk_notes: string[];
     decision_source: "llm" | "fallback";
+    /** 투자 성향 프로파일이 있을 때만. 없으면 필드 자체가 null 로 온다 */
+    personal?: {
+      market_verdict: "BUY" | "WATCH" | "AVOID";
+      market_confidence: number;
+      fit_score: number;
+      fit_level: "high" | "medium" | "low";
+      verdict: "BUY" | "WATCH" | "AVOID";
+      label: string;
+      adjusted: boolean;
+      concerns: { axis: string; severity: "low" | "medium" | "high"; message: string }[];
+      guardrails: string[];
+    } | null;
     updated_at: string;
   };
   error?: string | null;
@@ -80,6 +93,21 @@ function toEvent(wire: WireAdviceEvent): AdviceStreamEvent {
           buyConditions: wire.decision.buy_conditions,
           riskNotes: wire.decision.risk_notes,
           source: wire.decision.decision_source,
+          // 프로파일이 없으면 null 로 온다 — undefined 로 바꿔 화면이 2축 블록을
+          // 아예 그리지 않게 한다 (`sources` 와 같은 규약).
+          personal: wire.decision.personal
+            ? {
+                marketVerdict: wire.decision.personal.market_verdict,
+                marketConfidence: wire.decision.personal.market_confidence,
+                fitScore: wire.decision.personal.fit_score,
+                fitLevel: wire.decision.personal.fit_level,
+                verdict: wire.decision.personal.verdict,
+                label: wire.decision.personal.label,
+                adjusted: wire.decision.personal.adjusted,
+                concerns: wire.decision.personal.concerns,
+                guardrails: wire.decision.personal.guardrails,
+              }
+            : undefined,
           updatedAt: wire.decision.updated_at,
         }
       : undefined,
@@ -205,6 +233,13 @@ export async function POST(request: Request) {
     return new Response(mockStream(fallback, signal), { headers });
   }
 
+  // 소유자를 여기서 붙여야 백엔드가 그 사람의 투자 성향으로 판단을 개인화한다
+  // (2축 판단 · `personal`). 브라우저는 이 헤더를 직접 만들지 않는다 — 관심종목과
+  // 같은 규약이고, `readOwnerKey` 가 "로그인이면 계정, 아니면 브라우저" 규칙의
+  // 유일한 출처다. 값이 없으면 헤더를 붙이지 않고, 그때 응답은 `personal` 이
+  // 빠진 종전 형태 그대로다.
+  const owner = await readOwnerKey();
+
   try {
     const upstream = await apiPostStream(
       "/stocks/advice/stream",
@@ -215,7 +250,10 @@ export async function POST(request: Request) {
         // 공유 비밀키는 **여기서만** 붙는다. 이 라우트 핸들러는 서버에서만 돌므로
         // 브라우저는 이 헤더도, 값도 보지 못한다. 비어 있으면 헤더를 붙이지 않고,
         // 백엔드도 미설정이면 통과시킨다 — 로컬 개발이 키 없이 그대로 돈다.
-        headers: ADVICE_API_KEY ? { "X-Advice-Key": ADVICE_API_KEY } : undefined,
+        headers: {
+          ...(ADVICE_API_KEY ? { "X-Advice-Key": ADVICE_API_KEY } : {}),
+          ...(owner ? { "X-Owner-Key": owner } : {}),
+        },
       },
     );
     return new Response(proxyStream(upstream, signal), { headers });

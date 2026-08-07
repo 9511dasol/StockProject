@@ -53,6 +53,7 @@ function readTokens(host: HTMLElement) {
     paper: token("--paper"),
     up: token("--up"),
     down: token("--down"),
+    ma20: token("--ma20"),
     ma60: token("--ma60"),
     line: token("--line-14"),
     lineStrong: token("--line-20"),
@@ -214,8 +215,10 @@ export function StockChart({
     candleSeries.setData(toCandlePoints(rows));
     candleSeriesRef.current = candleSeries;
 
+    // MA20 은 --ink(본문 글자색)를 쓰지 않는다. 계열 색과 글자 색이 같은 토큰을
+    // 공유하면 테마를 손볼 때 한쪽 의도만 반영돼 다른 쪽이 조용히 끌려간다.
     const ma20 = chart.addSeries(LineSeries, {
-      color: t.ink,
+      color: t.ma20,
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,

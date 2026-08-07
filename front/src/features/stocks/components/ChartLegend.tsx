@@ -7,7 +7,7 @@ export function ChartLegend() {
       style={{ fontSize: 10.5 }}
     >
       <span className="flex items-center gap-[5px]">
-        <span className={`${SWATCH} bg-ink`} />
+        <span className={`${SWATCH} bg-ma20`} />
         MA20
       </span>
       <span className="flex items-center gap-[5px]">

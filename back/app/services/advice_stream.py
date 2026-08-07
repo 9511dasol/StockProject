@@ -38,6 +38,8 @@ import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
+from app.domain.fit import compute_fit
+from app.domain.verdict import combine
 from app.graph import get_graph
 from app.schemas.advice import (
     AdviceStreamDecision,
@@ -46,6 +48,7 @@ from app.schemas.advice import (
     StockRef,
     resolve_decision_label,
 )
+from app.schemas.profile import InvestorProfile
 from app.schemas.stock import KrxListing
 
 logger = logging.getLogger(__name__)
@@ -69,11 +72,24 @@ _DECISION_NODES = frozenset({"store_result", "force_fallback", "replay"})
 
 
 def _decision_event(
-    stock_ref: StockRef, state: dict, opinions: list[AgentOpinion]
+    stock_ref: StockRef,
+    state: dict,
+    opinions: list[AgentOpinion],
+    profile: InvestorProfile | None = None,
 ) -> AdviceStreamEvent | None:
     decision = state.get("decision")
     if decision is None:
         return None
+
+    # 2축 판단은 그래프 **밖**에서 만든다. 시장 판단은 전 사용자 공유라 캐시되지만
+    # 적합도는 사람마다 다르다 — 그래프 안에 넣으면 캐시 키에 프로파일이 섞여
+    # 적중률이 프로파일 수만큼 쪼개진다 (advice_service 의 같은 판단).
+    metrics = state.get("metrics")
+    personal = (
+        combine(decision, compute_fit(profile, metrics))
+        if profile is not None and metrics is not None
+        else None
+    )
 
     return AdviceStreamEvent(
         stage=4,
@@ -88,15 +104,23 @@ def _decision_event(
             buy_conditions=decision.buy_conditions,
             risk_notes=decision.risk_notes,
             decision_source="fallback" if state.get("used_fallback") else "llm",
+            personal=personal,
             updated_at=datetime.now(UTC).isoformat(timespec="seconds"),
         ),
     )
 
 
 async def stream_advice(
-    symbol: str, *, listing: KrxListing | None = None
+    symbol: str,
+    *,
+    listing: KrxListing | None = None,
+    profile: InvestorProfile | None = None,
 ) -> AsyncIterator[AdviceStreamEvent]:
-    """단계 이벤트를 순서대로 내보낸다. 소비자가 끊으면 GeneratorExit로 종료된다."""
+    """단계 이벤트를 순서대로 내보낸다. 소비자가 끊으면 GeneratorExit로 종료된다.
+
+    `profile` 이 있으면 마지막 stage 4 이벤트에 2축 판단(`personal`)이 함께 실린다.
+    없으면 종전 이벤트 그대로다.
+    """
     graph = get_graph()
 
     # `updates` 모드는 **그 노드가 바꾼 것만** 준다. 최종 판단 이벤트에는 여러 노드가
@@ -125,7 +149,11 @@ async def stream_advice(
                 patch: dict = raw if isinstance(raw, dict) else {}
 
                 # 판단·폴백 여부는 마지막 값이 이긴다 (재시도가 앞의 것을 덮는다).
-                for key in ("decision", "used_fallback"):
+                #
+                # `metrics` 도 함께 모은다 — 적합도 계산의 종목 쪽 입력이다.
+                # `updates` 모드는 그 노드가 **바꾼 것만** 주므로, 지표를 만든
+                # 노드(collect_price)가 지나간 뒤에는 다시 오지 않는다.
+                for key in ("decision", "used_fallback", "metrics"):
                     if key in patch:
                         latest[key] = patch[key]
 
@@ -151,7 +179,7 @@ async def stream_advice(
 
                 # 3) 최종 판단 — 확정되는 노드에서 한 번만.
                 if node in _DECISION_NODES and not decided and stock_ref is not None:
-                    event = _decision_event(stock_ref, latest, opinions)
+                    event = _decision_event(stock_ref, latest, opinions, profile)
                     if event is not None:
                         decided = True
                         yield event

@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.profile import FitConcern, FitLevel
 from app.schemas.rag import DocRef
 from app.schemas.stock import StockHistory, StockMetrics
 
@@ -37,6 +38,29 @@ class InvestmentDecision(BaseModel):
     answer: str = Field(description="첫 문장에 사도 되는지 여부가 드러나는 최종 답변")
     buy_conditions: list[str] = Field(default_factory=list)
     risk_notes: list[str] = Field(default_factory=list)
+
+
+class PersonalVerdict(BaseModel):
+    """시장 판단 × 적합도를 결정론적으로 결합한 최종 판단 (계획 5.4).
+
+    `market_verdict` 를 함께 싣는 이유: 화면이 "시장은 BUY 인데 당신에게는 관망"
+    이라는 불일치 자체를 보여주기 때문이다 (계획 5.6). 결합 결과만 남기면 그 화면을
+    만들 수 없다.
+    """
+
+    market_verdict: Verdict
+    market_confidence: int = Field(ge=0, le=100)
+    fit_score: int = Field(ge=0, le=100)
+    fit_level: FitLevel
+
+    verdict: Verdict = Field(description="보정 후 최종 판단. 절대 상향되지 않는다")
+    label: str = Field(description="사용자에게 보여줄 짧은 판단. 예: 분할 매수")
+    # 프로파일이 실제로 판단을 움직였는지. 화면의 '왜 갈렸나' 블록을 켜는 근거다.
+    adjusted: bool = False
+
+    concerns: list[FitConcern] = Field(default_factory=list)
+    # "그래도 사겠다면" — 막지 않고 방법을 준다 (계획 5.6).
+    guardrails: list[str] = Field(default_factory=list)
 
 
 class AnalystOutput(BaseModel):
@@ -94,6 +118,11 @@ class StockAdviceResponse(BaseModel):
     # 배지와 재시도 버튼을 켜는 유일한 근거다 — agents[].status 로는 알 수 없다
     # (에이전트가 모두 성공해도 의사결정 호출만 실패할 수 있다).
     decision_source: DecisionSource = "llm"
+    # 프로파일이 있을 때만 채워진다. 상단 `verdict`/`decision_label` 은 **시장 판단**
+    # 그대로 두고 개인화 결과를 별도 블록으로 얹는다 — 같은 필드를 덮어쓰면 화면이
+    # "시장은 BUY 인데 당신에게는 관망"이라는 불일치(계획 5.6)를 그릴 수 없고,
+    # 프로파일 없는 기존 클라이언트의 동작도 바뀐다.
+    personal: PersonalVerdict | None = None
     updated_at: str
 
 
@@ -112,6 +141,12 @@ class AdviceStreamDecision(BaseModel):
     buy_conditions: list[str] = Field(default_factory=list)
     risk_notes: list[str] = Field(default_factory=list)
     decision_source: DecisionSource = "llm"
+    # 비스트리밍 응답과 같은 규약 — 프로파일이 있을 때만 채워지고, 위쪽
+    # `verdict`/`decision_label` 은 시장 판단 그대로 둔다.
+    #
+    # **화면이 실제로 쓰는 경로는 이쪽이다.** 프런트는 스트리밍만 부르므로
+    # `StockAdviceResponse` 에만 얹으면 2축 판단이 사용자에게 도달하지 못한다.
+    personal: PersonalVerdict | None = None
     updated_at: str
 
 

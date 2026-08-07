@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.db_url import is_postgres
@@ -28,7 +28,14 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # --- DB ---
-    database_url: str = "sqlite+aiosqlite:///./stock.db"
+    # **Postgres 전용이다.** 예전 기본값은 로컬 SQLite 였는데, 그러면 개발·테스트와
+    # 운영이 서로 다른 방언 위에서 돌아 **차이가 운영에서만 드러난다.** 실제로 그렇게
+    # 새어 나간 버그가 있었다: `ORDER BY market_cap DESC` 의 NULL 위치가 SQLite 는
+    # 마지막, Postgres 는 처음이라 등락률 랭킹 모집단이 시총 미수집 종목으로 채워졌다
+    # (`repositories/listed_company.top_by_market_cap`).
+    #
+    # 기본값은 로컬 Postgres 다. 실제 값은 `.env` 의 DATABASE_URL(Supabase)이 준다.
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
     db_echo: bool = False
     # 개발 편의용. 운영에서는 alembic 마이그레이션을 쓰고 False로 둔다.
     db_create_all_on_startup: bool = True
@@ -100,9 +107,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=2, ge=0)
 
     # --- RAG (벡터 검색) ---
-    # 주 DB(`database_url`)와 분리한다. 벡터 검색은 pgvector 확장이 필요한데 로컬
-    # 개발 DB는 SQLite라 확장을 못 올린다. 비워 두면 **RAG 계층만** 꺼지고 나머지는
-    # 그대로 동작한다 — 에이전트는 예전처럼 최신 뉴스 3건을 직접 받는다.
+    # **대개 비워 둔다.** 주 DB 가 Postgres 라 그것을 그대로 벡터 저장소로 쓴다 —
+    # 같은 Supabase 인스턴스가 앱 테이블과 pgvector 테이블을 함께 담는다.
+    # 벡터만 다른 인스턴스로 빼고 싶을 때만 채우고, 그때는 이쪽이 이긴다.
     # Supabase의 URI를 그대로 붙여넣으면 된다 (postgres:// · sslmode · 6543 포트
     # 풀러 모두 vector_database.py 가 정규화한다).
     vector_database_url: str | None = None
@@ -129,17 +136,35 @@ class Settings(BaseSettings):
     # 늦어지거나 실패하면 안 된다.
     rag_timeout_seconds: float = Field(default=15.0, gt=0)
 
+    @field_validator("database_url")
+    @classmethod
+    def _must_be_postgres(cls, value: str) -> str:
+        """SQLite 주소를 **기동 시점에** 막는다.
+
+        조용히 받아 주면 앱은 뜨고 방언 차이만 런타임에 흩어져 나타난다 — 어느 쿼리가
+        왜 다르게 도는지 추적하는 비용이 훨씬 크다. 여기서 한 번에 실패하는 편이 낫다.
+        """
+        if not is_postgres(value):
+            scheme = value.split("://", 1)[0] if "://" in value else value
+            raise ValueError(
+                "DATABASE_URL 은 Postgres 여야 합니다. Supabase 대시보드의 풀러 URI 를 "
+                f"그대로 붙여넣으면 됩니다. 받은 스킴: {scheme or '(빈 값)'}"
+            )
+        return value
+
     @property
     def vector_database_dsn(self) -> str | None:
         """벡터 저장소가 **실제로** 쓸 접속 문자열.
 
-        `VECTOR_DATABASE_URL` 을 따로 두는 것은 이제 선택이다. 주 DB 가 Postgres 면
+        `VECTOR_DATABASE_URL` 을 따로 두는 것은 선택이다. 주 DB 가 Postgres 이므로
         그것을 그대로 쓴다 — 같은 Supabase 인스턴스가 앱 테이블과 pgvector 테이블을
         함께 담을 수 있고, 두 곳에 같은 주소를 적어 두면 한쪽만 바꿔 어긋난다.
+        벡터만 다른 인스턴스로 빼고 싶을 때만 채우고, 그때는 그쪽이 이긴다.
 
-        분리가 필요했던 이유는 **주 DB 가 SQLite 였기 때문**이다(확장을 못 올린다).
-        주 DB 가 Postgres 인 지금은 그 이유가 없어졌다. 그래도 변수를 남겨 두는 것은
-        벡터만 다른 인스턴스로 빼고 싶을 때를 위해서다 — 있으면 그쪽이 이긴다.
+        `is_postgres` 검사를 남겨 둔 이유: 이 속성이 **벡터 저장소로 쓸 수 있는
+        주소인가**를 판정하는 자리이기 때문이다. 설정 검증을 통과한 값만 들어온다는
+        보장에 기대어 검사를 빼면, 테스트가 주소를 갈아끼우는 경로에서 pgvector 가
+        아닌 DB 로 조용히 붙으려 든다.
         """
         if self.vector_database_url:
             return self.vector_database_url

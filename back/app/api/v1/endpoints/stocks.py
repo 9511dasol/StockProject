@@ -10,7 +10,12 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 
-from app.api.deps import AdviceKeyGuard, ListedCompanyRepo
+from app.api.deps import (
+    AdviceKeyGuard,
+    InvestorProfileRepo,
+    ListedCompanyRepo,
+    OptionalOwnerKey,
+)
 from app.schemas.advice import StockAdviceRequest, StockAdviceResponse
 from app.schemas.stock import (
     ListedCompaniesStatus,
@@ -26,6 +31,7 @@ from app.services import (
     advice_stream,
     fundamentals_service,
     listed_company_service,
+    profile_service,
     stock_service,
 )
 
@@ -114,12 +120,24 @@ async def get_listed_companies_status(repo: ListedCompanyRepo) -> ListedCompanie
 
 @router.post("/advice", response_model=StockAdviceResponse, summary="AI 멀티 에이전트 판단")
 async def create_stock_advice(
-    repo: ListedCompanyRepo, payload: StockAdviceRequest, _: AdviceKeyGuard = None
+    repo: ListedCompanyRepo,
+    payload: StockAdviceRequest,
+    profiles: InvestorProfileRepo,
+    owner: OptionalOwnerKey,
+    _: AdviceKeyGuard = None,
 ) -> StockAdviceResponse:
+    """`X-Owner-Key` 가 있고 그 소유자에게 프로파일이 있으면 2축 판단까지 실어 준다.
+
+    없으면 `personal` 이 null 인 종전 응답 그대로다 — 개인화는 얹는 기능이지 전제
+    조건이 아니다.
+    """
     listing = await listed_company_service.resolve_listing(repo, payload.symbol)
+    profile = await profile_service.get_profile(profiles, owner) if owner else None
     try:
         async with advice_cache.reserve_slot():
-            return await advice_service.generate_advice(payload.symbol, listing=listing)
+            return await advice_service.generate_advice(
+                payload.symbol, listing=listing, profile=profile
+            )
     except advice_cache.AdviceBusyError as exc:
         raise _busy(exc) from exc
 
@@ -130,16 +148,24 @@ async def create_stock_advice(
     response_class=StreamingResponse,
 )
 async def stream_stock_advice(
-    repo: ListedCompanyRepo, payload: StockAdviceRequest, _: AdviceKeyGuard = None
+    repo: ListedCompanyRepo,
+    payload: StockAdviceRequest,
+    profiles: InvestorProfileRepo,
+    owner: OptionalOwnerKey,
+    _: AdviceKeyGuard = None,
 ) -> StreamingResponse:
     """`/advice`와 같은 결과를 4단계로 나눠 흘린다.
 
     종목당 LLM 4회라 완료까지 수십 초가 걸린다 — 진행 단계를 보여주려면
     스트리밍이 필요하다. 응답 본문은 `AdviceStreamEvent` JSON 한 줄씩이다.
+
+    **화면이 실제로 부르는 경로는 여기다.** 프런트는 비스트리밍 `/advice` 를 쓰지
+    않으므로, 2축 판단(`personal`)도 이쪽에 실려야 사용자에게 도달한다.
     """
     # 스트림이 열리기 전에 읽어 값으로 넘긴다 — 제너레이터 안에서 DB를 만지면
-    # 수십 초 동안 세션이 붙잡힌다.
+    # 수십 초 동안 세션이 붙잡힌다. 프로파일도 같은 이유로 여기서 읽는다.
     listing = await listed_company_service.resolve_listing(repo, payload.symbol)
+    profile = await profile_service.get_profile(profiles, owner) if owner else None
 
     # 슬롯도 스트림을 열기 **전에** 잡는다. 제너레이터 안에서 잡으면 상한 초과를
     # 알릴 때 이미 200 + text/event-stream 헤더가 나간 뒤라, 클라이언트는 429 대신
@@ -152,7 +178,7 @@ async def stream_stock_advice(
     async def events() -> AsyncIterator[bytes]:
         try:
             async for event in advice_stream.stream_advice(
-                payload.symbol, listing=listing
+                payload.symbol, listing=listing, profile=profile
             ):
                 yield f"data: {event.model_dump_json()}\n\n".encode()
         finally:

@@ -10,7 +10,6 @@ dependencies = [
     "pydantic>=2.11",
     "pydantic-settings>=2.8",
     "sqlalchemy[asyncio]>=2.0.36",
-    "aiosqlite>=0.20",
     "httpx>=0.28",
     # 1.5 에서 추가된 get_valuation_measures() 가 필요하다. 국내 종목(.KS/.KQ)은
     # info["trailingPE"]/["priceToBook"] 가 항상 None 이라 PER/PBR 의 유일한 소스다.
@@ -30,6 +29,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# asyncpg 는 이제 필수 의존성이다 (주 DB 가 Postgres 전용). 이 extra 는 예전
+# `uv sync --extra postgres` 문서를 따라오는 사람을 위해 남겨 둔 빈 껍데기다.
 postgres = ["asyncpg>=0.30"]
 
 # `fastapi dev` / `fastapi run`이 파일명 탐색 순서(main.py → app/main.py → …)에
@@ -42,11 +43,20 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
     "ruff>=0.9",
+    # **테스트 하네스 전용.** 운영 의존성에서 뺐다 — 배포되는 앱에는 SQLite 경로가
+    # 없다. 테스트는 인메모리 SQLite 로 도는데, 그 대가로 방언 차이는 잡지 못한다
+    # (tests/conftest.py 의 `db_session` 주석).
+    "aiosqlite>=0.20",
 ]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# 테스트 Postgres 엔진(`pg_engine`)은 세션 스코프다 — 스키마를 273번 다시 만들 수
+# 없기 때문이다. asyncpg 커넥션은 **자기를 만든 이벤트 루프에서만** 쓸 수 있으므로,
+# 세션 픽스처와 테스트가 같은 루프를 공유해야 한다. 둘 다 session 으로 맞춘다.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 
 [tool.ruff]
 target-version = "py312"

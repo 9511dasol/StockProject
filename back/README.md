@@ -85,9 +85,15 @@ KRX/KIND 수집은 `httpx.AsyncClient`로 네이티브 비동기다.
 검색 증강: 하이브리드 검색 → 문서 없이 진행(`services/rag_service`).
 모든 폴백 전환은 WARNING 로그를 남긴다 — 조용히 삼키지 않는다.
 
-**벡터 DB 분리** — RAG는 `VECTOR_DATABASE_URL`(Supabase pgvector)을 쓰고 주 DB와 엔진을
-공유하지 않는다. 로컬 주 DB는 SQLite라 `vector` 확장을 올릴 수 없고, 벡터 테이블을 같은
-`Base.metadata`에 얹으면 개발용 `create_all()`이 깨진다.
+**DB는 Postgres(Supabase) 전용** — SQLite 지원을 걷어냈다. 개발과 운영이 다른 방언
+위에서 돌면 차이가 운영에서만 드러나기 때문이다(실제로 `ORDER BY ... DESC`의 NULL
+위치가 정반대라 등락률 랭킹 모집단이 조용히 뒤집혔다). `sqlite://`를 넣으면 설정 검증이
+기동 시점에 막는다. 테스트 하네스만 인메모리 SQLite를 쓰고, 방언이 갈리는 쿼리는
+`tests/test_postgres_dialect.py`가 Postgres 방언으로 컴파일해 검사한다.
+
+**벡터 DB 분리** — RAG는 주 DB와 **엔진**을 공유하지 않는다(주소는 같을 수 있다).
+벡터 쪽 장애가 앱 세션 풀로 번지지 않게 하기 위해서고, 벡터 테이블은 `vector(N)`과
+HNSW 인덱스 때문에 `Base.metadata` 밖에서 원시 SQL로 관리한다.
 
 **예외 처리** — 서비스·통합 계층은 `HTTPException`을 던지지 않는다. `core/exceptions.py`의
 도메인 예외를 던지고 HTTP 매핑은 등록된 핸들러가 담당한다. 덕분에 서비스 계층을

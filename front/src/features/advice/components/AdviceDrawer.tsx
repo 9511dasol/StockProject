@@ -8,6 +8,7 @@ import { AdviceProgress } from "./AdviceProgress";
 import { AgentCard } from "./AgentCard";
 import { AgentSkeleton } from "./AgentSkeleton";
 import { FinalDecision } from "./FinalDecision";
+import { PersonalVerdictCard } from "./PersonalVerdictCard";
 
 /**
  * AI 종합 판단 패널. 2a·2b 가 같은 인스턴스를 공유한다.
@@ -101,6 +102,13 @@ export function AdviceDrawer({ symbol }: { symbol: string }) {
 
         {decision ? (
           <FinalDecision decision={decision} onRetry={retry} />
+        ) : null}
+
+        {/* 시장 판단 **다음에** 온다. 위 카드가 "데이터는 이렇게 말한다" 이고
+            이 카드가 "당신에게는" 이라, 그 순서로 읽혀야 불일치가 이야기가 된다.
+            프로파일이 없으면 personal 자체가 없어 아무것도 그리지 않는다. */}
+        {decision?.personal ? (
+          <PersonalVerdictCard personal={decision.personal} />
         ) : null}
 
         {error && !decision ? (
