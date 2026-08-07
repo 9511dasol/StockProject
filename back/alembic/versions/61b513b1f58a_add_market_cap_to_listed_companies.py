@@ -3,7 +3,10 @@
 자동완성 랭킹을 시가총액으로 가중하기 위한 컬럼이다. 값은 하루 1회 pykrx 배치가
 채우며, 배치 전이거나 KRX 에 없는 종목은 NULL 로 남아 랭킹에서 뒤로 밀린다.
 
-SQLite 는 ALTER TABLE 지원이 좁아 batch_alter_table(테이블 재생성)로 적용한다.
+`batch_alter_table` 은 SQLite 의 좁은 ALTER TABLE 을 우회하려던 흔적이다. 그 시절
+주 DB 가 SQLite 였고, 지금은 아니다 — Postgres 에서 batch 모드는 그대로 ALTER 로
+내려가므로 동작에 차이가 없다. **이미 적용된 리비전이라 다시 쓰지 않는다.**
+새 마이그레이션에는 쓰지 말 것 (`alembic/env.py` 주석 참고).
 
 Revision ID: 61b513b1f58a
 Revises:

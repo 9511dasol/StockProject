@@ -88,12 +88,21 @@ KRX/KIND 수집은 `httpx.AsyncClient`로 네이티브 비동기다.
 **DB는 Postgres(Supabase) 전용** — SQLite 지원을 걷어냈다. 개발과 운영이 다른 방언
 위에서 돌면 차이가 운영에서만 드러나기 때문이다(실제로 `ORDER BY ... DESC`의 NULL
 위치가 정반대라 등락률 랭킹 모집단이 조용히 뒤집혔다). `sqlite://`를 넣으면 설정 검증이
-기동 시점에 막는다. 테스트 하네스만 인메모리 SQLite를 쓰고, 방언이 갈리는 쿼리는
-`tests/test_postgres_dialect.py`가 Postgres 방언으로 컴파일해 검사한다.
+기동 시점에 막는다. **테스트도 Postgres에서만 돈다** — `TEST_DATABASE_URL`(`DATABASE_URL`과
+다른 프로젝트, 세션 풀러 5432)이 없으면 하네스가 시작하지 않는다. 인메모리 SQLite 폴백은
+걷어냈다: 그 폴백이 막으려던 종류의 사고를 스스로 냈기 때문이다(실패한 문장이 트랜잭션을
+중단시키는지 여부가 갈려, `orphan_service`의 `users` 탐침이 세션을 죽이는 결함이 264개
+초록 뒤에 숨어 있었다).
+
+**프런트와 같은 DB를 본다** — `front/.env.local`의 `AUTH_DATABASE_URL`과 `DATABASE_URL`은
+같은 Supabase 프로젝트여야 한다. 갈리면 `services/orphan_service`가 로그인 사용자의 행을
+전부 "소유자 없음"으로 읽는다.
 
 **벡터 DB 분리** — RAG는 주 DB와 **엔진**을 공유하지 않는다(주소는 같을 수 있다).
-벡터 쪽 장애가 앱 세션 풀로 번지지 않게 하기 위해서고, 벡터 테이블은 `vector(N)`과
-HNSW 인덱스 때문에 `Base.metadata` 밖에서 원시 SQL로 관리한다.
+벡터 쪽 장애가 앱 세션 풀로 번지지 않게 하기 위해서다. 다만 `document_chunks` 스키마
+자체는 `models/document_chunk.py`의 ORM 모델이 단일 출처이고 alembic이 관리한다 —
+`vector(N)`과 HNSW·트라이그램 인덱스는 `pgvector.sqlalchemy.Vector`와
+`postgresql_using`/`postgresql_ops`로 전부 표현된다.
 
 **예외 처리** — 서비스·통합 계층은 `HTTPException`을 던지지 않는다. `core/exceptions.py`의
 도메인 예외를 던지고 HTTP 매핑은 등록된 핸들러가 담당한다. 덕분에 서비스 계층을
@@ -183,18 +192,36 @@ uv run python -m scripts.verify_rag 000660     # 종목 지정
 ## 운영
 
 ```bash
-docker compose up --build     # API + Postgres
+docker compose up --build     # API 만. DB는 .env 의 Supabase 를 그대로 본다
 ```
 
-Postgres를 쓰려면 `uv sync --extra postgres` 후 `DATABASE_URL`을
-`postgresql+asyncpg://...`로 바꾼다.
+DB 컨테이너는 없다. 예전에는 `postgres:17-alpine`을 함께 띄웠는데, 그러면 컨테이너로
+띄운 앱과 로컬에서 띄운 앱이 다른 DB를 보게 되고 그 이미지에는 pgvector가 없어 RAG가
+컨테이너에서만 조용히 죽는다. 주소는 `.env` 하나가 정한다.
 
-스키마는 개발 편의를 위해 기동 시 `create_all`로 만든다. 운영에서는
-`DB_CREATE_ALL_ON_STARTUP=false`로 두고 alembic 마이그레이션을 도입한다.
+스키마는 alembic이 관리한다.
+
+```bash
+uv run alembic upgrade head   # document_chunks 포함
+uv run alembic check          # 모델과 DB가 어긋났는지
+```
+
+`DB_CREATE_ALL_ON_STARTUP`은 운영에서 `false`로 둔다 — `create_all`이 마이그레이션과
+별개로 테이블을 만들면 이력이 어긋난다.
 
 ## 남은 정리 작업
 
 - `_legacy/` — `app/`으로 이관이 끝난 원본 보관소. 실행되지 않으며 이관 매핑은
   [`_legacy/README.md`](_legacy/README.md)에 있다. 대조가 끝나면 폴더째 삭제.
-- alembic 도입 (현재는 기동 시 `create_all`).
-- 미사용 의존성 정리: `bcrypt`, `pyjwt`, `fastapi-pagination` (인증·페이지네이션 도입 시점에).
+- `front/.env.local.example` — `AUTH_DATABASE_URL`이 `back/.env`의 `DATABASE_URL`과
+  같은 Supabase여야 한다는 경고가 back 쪽에만 있다. 반대 방향도 필요하다.
+- `GEMINI_MODEL`이 `gemini-3-flash-preview`다. `-preview` 계열은 `thinkingConfig`와
+  함께 400이 날 수 있어(`.env.example` 참고) `LLM_EFFORT`가 조용히 무시될 수 있다.
+  `uv run python -m scripts.verify_llm`으로 확인할 것.
+
+정리 완료:
+
+- ~~alembic 도입~~ — `document_chunks`까지 포함해 alembic이 관리한다.
+- ~~미사용 의존성 정리~~ — `bcrypt`·`pyjwt`·`fastapi-pagination`과 동기 Postgres 드라이버
+  3종(`psycopg2-binary`·`psycopg[binary]`·`psycopg2`)을 걷어냈다. 전부 import되는 곳이
+  없었고, 비바이너리 `psycopg2`는 소스 빌드가 필요해 설치를 깨뜨렸다.

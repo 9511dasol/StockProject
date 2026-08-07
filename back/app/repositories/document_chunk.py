@@ -1,15 +1,14 @@
 """문서 청크 저장·검색 (pgvector).
 
-ORM을 쓰지 않고 원시 SQL을 쓰는 이유:
+조회에 ORM 을 쓰지 않고 원시 SQL 을 쓰는 이유: 벡터 연산자(`<=>`)와 트라이그램
+연산자(`<%`)는 SQLAlchemy 표현식으로 옮기면 오히려 읽기 어려워진다. 하이브리드
+검색은 SQL 자체가 명세다.
 
-* 벡터 연산자(`<=>`)와 트라이그램 연산자(`<%`)는 SQLAlchemy 표현식으로 옮기면
-  오히려 읽기 어려워진다. 하이브리드 검색은 SQL 자체가 명세다.
-* 이 테이블은 `Base.metadata`에 들어가면 안 된다. `vector(N)` 타입과 HNSW·트라이그램
-  인덱스를 SQLAlchemy 모델로 표현할 수 없고, 얹어 두면 alembic 이 자기가 관리하는
-  테이블로 착각한다 (`alembic/env.py` 의 `_FOREIGN_TABLES` 가 그래서 필요하다).
-
-스키마는 `ensure_schema()`가 멱등으로 만든다 — 벡터 저장소는 주 DB 와 다른 인스턴스일
-수 있어(`VECTOR_DATABASE_URL`) 주 DB 의 마이그레이션 이력으로 함께 관리할 수 없다.
+**스키마는 별개다.** 테이블 정의는 `models/document_chunk.DocumentChunkRow` 에 있고
+alembic(`d5e8a1c60f47`)이 관리한다. 예전에는 이 파일이 원시 SQL 로 직접 만들면서
+`Base.metadata` 밖에 있었는데, 그러면 alembic 이 이 테이블의 차원·인덱스 변화를
+전혀 검증하지 못한다. `ensure_schema()` 는 이제 그 모델을 적용하는 얇은 경로일
+뿐이고, `VECTOR_DATABASE_URL` 로 벡터를 다른 인스턴스에 둘 때만 쓰인다.
 """
 
 import logging
@@ -18,7 +17,6 @@ from datetime import date
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.core.config import settings
 from app.schemas.rag import DocumentChunk
 
 logger = logging.getLogger(__name__)
@@ -65,47 +63,23 @@ class DocumentChunkRepository:
     async def ensure_schema(self) -> None:
         """확장·테이블·인덱스를 멱등으로 만든다.
 
-        HNSW 인덱스는 문서가 없어도 만들어 둔다 — 적재 후에 만들면 그 시점에 테이블
-        전체를 훑어 잠기는데, 색인 배치가 도는 중에 그 비용을 치를 이유가 없다.
+        DDL 은 여기 적지 않는다. `models/document_chunk.DocumentChunkRow` 가 단일
+        출처이고 이 메서드는 그 정의를 `checkfirst` 로 적용할 뿐이다 — 예전에는
+        같은 스키마가 원시 SQL 로도 적혀 있어서, 한쪽만 고치면 어느 것이 진짜인지
+        알 수 없었다.
+
+        주 DB 는 alembic(`d5e8a1c60f47`)이 이미 만든다. 이 경로가 남아 있는 이유는
+        `VECTOR_DATABASE_URL` 로 **벡터만 다른 인스턴스에 둘 수 있기** 때문이다.
+        그 인스턴스는 주 DB 의 마이그레이션 이력 밖이라 스스로 스키마를 갖춰야 한다.
         """
-        dim = settings.embedding_dimensions
-        statements = [
-            "create extension if not exists vector",
-            "create extension if not exists pg_trgm",
-            f"""
-            create table if not exists document_chunks (
-                id          bigserial primary key,
-                symbol      text        not null,
-                doc_type    text        not null,
-                doc_key     text        not null,
-                chunk_index integer     not null,
-                title       text        not null default '',
-                publisher   text        not null default '',
-                url         text        not null default '',
-                published_at date,
-                content     text        not null,
-                embedding   vector({dim}) not null,
-                created_at  timestamptz not null default now(),
-                unique (doc_key, chunk_index)
-            )
-            """,
-            """
-            create index if not exists document_chunks_symbol_idx
-                on document_chunks (symbol, published_at desc)
-            """,
-            """
-            create index if not exists document_chunks_content_trgm_idx
-                on document_chunks using gin (content gin_trgm_ops)
-            """,
-            """
-            create index if not exists document_chunks_embedding_idx
-                on document_chunks using hnsw (embedding vector_cosine_ops)
-            """,
-        ]
+        from app.models.document_chunk import DocumentChunkRow
 
         async with self._engine.begin() as conn:
-            for statement in statements:
-                await conn.execute(text(statement))
+            # 확장이 먼저다 — `vector` 없이는 `vector(N)` 컬럼 타입이 없고,
+            # `pg_trgm` 없이는 gin_trgm_ops 인덱스를 만들 수 없다.
+            for extension in ("vector", "pg_trgm"):
+                await conn.execute(text(f"create extension if not exists {extension}"))
+            await conn.run_sync(DocumentChunkRow.__table__.create, checkfirst=True)
 
     async def count(self, symbol: str | None = None) -> int:
         sql = "select count(*) from document_chunks"

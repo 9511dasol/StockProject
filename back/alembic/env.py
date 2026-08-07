@@ -16,6 +16,7 @@ from app.models.base import Base
 # 메타데이터 등록 — **모델을 추가하면 여기에도 반드시 넣는다.**
 # 빠뜨리면 `--autogenerate` 가 DB 에는 있고 메타데이터에는 없는 테이블로 보고
 # `drop_table` 을 제안한다. 그대로 실행하면 데이터가 통째로 사라진다.
+from app.models.document_chunk import DocumentChunkRow  # noqa: F401
 from app.models.investor_profile import InvestorProfileRow  # noqa: F401
 from app.models.listed_company import ListedCompany  # noqa: F401
 from app.models.watchlist import WatchlistItem  # noqa: F401
@@ -80,18 +81,18 @@ def run_migrations_offline() -> None:
 #: 이 목록이 없으면 `--autogenerate` 가 "메타데이터에 없다" 며 **drop_table 을 제안한다.**
 #: 그대로 실행하면 데이터가 통째로 사라진다. 실제로 탐침을 돌려 확인한 위험이다.
 #:
-#: 둘로 나뉜다.
-#:   * NextAuth(Auth.js) 계약 — 프런트의 `@auth/pg-adapter` 가 읽고 쓴다.
-#:     스키마는 `b3f1c2d47a90` 마이그레이션이 만든다.
-#:   * `document_chunks` — `repositories/document_chunk.ensure_schema()` 가 **원시 SQL**로
-#:     만든다. pgvector 의 `vector(N)` 타입과 HNSW·트라이그램 인덱스는 SQLAlchemy 모델로
-#:     표현할 수 없어 그렇게 둔 것이고, 그 대가로 여기 예외가 필요하다.
+#: 남은 것은 NextAuth(Auth.js) 계약뿐이다 — 프런트의 `@auth/pg-adapter` 가 읽고 쓰고,
+#: 스키마는 `b3f1c2d47a90` 마이그레이션이 만든다.
+#:
+#: `document_chunks` 는 여기 있었지만 빠졌다. pgvector 의 `vector(N)` 과 HNSW·트라이그램
+#: 인덱스를 SQLAlchemy 로 표현할 수 없다고 봤기 때문인데 `pgvector.sqlalchemy.Vector` 와
+#: `postgresql_using`/`postgresql_ops` 로 전부 표현된다 (`models/document_chunk.py`).
+#: 이제 alembic 이 그 테이블의 차원·인덱스 변화까지 diff 로 잡는다.
 _FOREIGN_TABLES = {
     "users",
     "accounts",
     "sessions",
     "verification_token",
-    "document_chunks",
 }
 
 
