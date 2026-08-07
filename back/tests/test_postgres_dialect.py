@@ -13,6 +13,8 @@ Postgres 는 `DESC` 의 기본이 `NULLS FIRST` 라 **맨 앞을 채운다.** �
 SQLite 위에서 돌면서도 운영 DB 의 SQL 을 검사할 수 있는 유일한 방법이다.
 """
 
+import re
+
 import pytest
 from sqlalchemy import or_, select
 from sqlalchemy.dialects import postgresql
@@ -80,3 +82,106 @@ def test_postgres_database_url_is_accepted() -> None:
 
     url = "postgresql://u:p@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres"
     assert Settings(database_url=url).database_url == url
+
+
+# ── NULL 정렬 규칙 — 한 곳이 아니라 규칙으로 ────────────────────────────
+
+
+def _nullable_columns() -> set[str]:
+    """모델이 선언한 nullable 컬럼 전부. `table.column` 형태."""
+    from app.models.base import Base
+
+    return {
+        f"{table.name}.{column.name}"
+        for table in Base.metadata.tables.values()
+        for column in table.columns
+        if column.nullable
+    }
+
+
+def null_ordering_violations(sql: str) -> list[str]:
+    """`ORDER BY <nullable> DESC` 인데 NULLS 를 안 적은 자리를 찾는다.
+
+    **한 쿼리를 고치는 것으로는 부족하다.** `nullslast()` 를 빠뜨리는 것은 실수이지
+    설계가 아니고, 다음에 정렬을 추가하는 사람이 또 빠뜨린다. 그래서 개별 쿼리가
+    아니라 **규칙**을 검사한다.
+
+    NOT NULL 컬럼은 대상이 아니다 — 거기서는 NULLS 절이 뜻이 없고, 굳이 적으라고
+    하면 잡음만 늘어 진짜 위반이 묻힌다.
+    """
+    nullable = _nullable_columns()
+    violations = []
+    for match in re.finditer(r"(\w+\.\w+)\s+DESC\b(?!\s+NULLS)", sql, re.IGNORECASE):
+        if match.group(1).lower() in nullable:
+            violations.append(match.group(1))
+    return violations
+
+
+def test_the_rule_catches_a_bare_desc() -> None:
+    """검사기 자체가 동작하는지. 안 잡는 검사기는 없는 것과 같다."""
+    bad = "SELECT x FROM listed_companies ORDER BY listed_companies.market_cap DESC"
+    good = bad + " NULLS LAST"
+
+    assert null_ordering_violations(bad) == ["listed_companies.market_cap"]
+    assert null_ordering_violations(good) == []
+
+
+def test_not_null_columns_are_not_flagged() -> None:
+    """`symbol` 은 NOT NULL 이라 NULLS 절이 뜻이 없다."""
+    sql = "SELECT x FROM listed_companies ORDER BY listed_companies.symbol DESC"
+
+    assert null_ordering_violations(sql) == []
+
+
+async def test_no_repository_query_orders_nullable_desc_without_nulls(
+    db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """**리포지토리가 실제로 내보내는 모든 쿼리**를 규칙에 걸어 본다.
+
+    13회차에 `top_by_market_cap` 하나가 걸렸는데, 그때 주석은 "SQLite 는 NULL 을 가장
+    작은 값으로 본다" 며 근거까지 정확히 적혀 있었다 — 코드가 틀린 게 아니라 **전제가
+    바뀐** 것이라 리뷰로는 안 잡힌다. 그런 것은 규칙으로 막아야 한다.
+    """
+    from app.repositories.investor_profile import InvestorProfileRepository
+    from app.repositories.listed_company import ListedCompanyRepository
+    from app.repositories.watchlist import WatchlistRepository
+
+    captured: list[str] = []
+    original = db_session.execute
+
+    async def spy(stmt, *args, **kwargs):
+        try:
+            captured.append(_pg_sql(stmt))
+        except Exception:  # noqa: BLE001 - 원시 SQL 은 컴파일 대상이 아니다
+            pass
+        return await original(stmt, *args, **kwargs)
+
+    monkeypatch.setattr(db_session, "execute", spy)
+
+    listings = ListedCompanyRepository(db_session)
+    watch = WatchlistRepository(db_session)
+    profiles = InvestorProfileRepository(db_session)
+
+    # 읽기 경로를 한 번씩 태운다. 결과는 안 본다 — 여기서 보는 것은 **SQL 의 모양**이다.
+    await listings.top_by_market_cap(limit=5)
+    await listings.symbols_without_market_cap(limit=5)
+    await listings.find_by_code("005930")
+    await listings.find_by_symbols(["005930.KS"])
+    await listings.find_candidates("삼성", "ㅅㅅ", 50)
+    await listings.count()
+    await listings.latest_market_cap_update()
+    await watch.list_for_owner("anon:x")
+    await watch.find_by_code("anon:x", "005930")
+    await watch.count_for_owner("anon:x")
+    await profiles.get("anon:x")
+
+    assert captured, "쿼리가 하나도 잡히지 않았다 — 스파이가 안 걸렸다"
+
+    offenders = {
+        column for sql in captured for column in null_ordering_violations(sql)
+    }
+    assert not offenders, (
+        f"nullable 컬럼을 NULLS 절 없이 DESC 정렬한다: {sorted(offenders)}\n"
+        "Postgres 는 DESC 의 기본이 NULLS FIRST 라 빈 값이 앞을 채운다. "
+        "`.desc().nullslast()` 를 쓴다."
+    )
