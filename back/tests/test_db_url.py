@@ -1,7 +1,7 @@
 """Postgres 접속 문자열 정규화 (`core/db_url.py`).
 
 이 파일이 중요한 이유는 하나다. **여기가 틀리면 앱이 DB에 아예 못 붙는다.** 그런데
-실패가 붙는 시점에 나므로 로컬 SQLite 로 개발하는 동안에는 전부 초록이고, 배포에서
+실패가 접속하는 시점에 나므로, 접속하지 않는 단위 테스트는 전부 초록인 채로 배포에서
 처음 드러난다. 그래서 실제 Supabase 문자열 형태를 그대로 넣고 결과를 고정한다.
 
 접속하지 않는다 — 순수 문자열 변환이라 네트워크가 필요 없고, 그래야 Supabase 가
@@ -12,7 +12,6 @@ from app.core.db_url import (
     is_pooler,
     is_postgres,
     normalize_url,
-    to_sync_url,
 )
 
 # Supabase 대시보드 > Project Settings > Database > Connection string 이 주는 형태.
@@ -25,7 +24,9 @@ _SESSION_POOLER = (
     "postgresql://postgres.abcd:pw@aws-0-ap-northeast-2.pooler.supabase.com"
     ":5432/postgres?sslmode=require"
 )
-_SQLITE = "sqlite+aiosqlite:///./stock.db"
+#: Postgres 가 아닌 주소. 이 코드베이스에서 SQLite 는 **거부 대상으로만** 등장한다 —
+#: 실행 경로에는 없고, 여기와 `test_postgres_dialect` 의 자물쇠 테스트가 그것을 지킨다.
+_NOT_POSTGRES = "sqlite+aiosqlite:///./stock.db"
 
 
 def test_driver_is_added_for_asyncpg() -> None:
@@ -126,31 +127,45 @@ def test_localhost_does_not_force_tls() -> None:
     assert "ssl" not in connect_args
 
 
-def test_sqlite_is_not_postgres() -> None:
-    """분기의 기준. 이게 틀리면 SQLite 에 asyncpg 정규화를 걸어 로컬이 깨진다."""
-    assert not is_postgres(_SQLITE)
+def test_non_postgres_is_rejected() -> None:
+    """`is_postgres` 는 설정 검증과 벡터 DSN 판정의 기준이다.
+
+    이게 헐거워지면 `sqlite://` 가 설정 검증을 통과하고, 그때부터 방언 차이가
+    런타임에 흩어져 나타난다.
+    """
+    assert not is_postgres(_NOT_POSTGRES)
+    assert not is_postgres("")
     assert not is_postgres(None)
     assert is_postgres(_TRANSACTION_POOLER)
     assert is_postgres("postgresql+asyncpg://u:p@h/db")
 
 
-def test_sync_url_keeps_libpq_params_for_alembic() -> None:
-    """alembic 은 psycopg 로 돈다 — asyncpg 용 변환을 그대로 쓰면 안 된다.
+def test_alembic_uses_the_same_normalization_as_the_app(monkeypatch) -> None:
+    """alembic 이 앱과 **같은 정규화**를 거치는지.
 
-    `sslmode` 는 오히려 **있어야** 하고 `prepared_statement_cache_size` 는 모른다.
+    예전에는 `to_sync_url` 로 psycopg 용 주소를 따로 만들었다. 지금 alembic 은 async
+    엔진(asyncpg)으로 돌므로 변환이 하나뿐이고, 그래서 여기서 확인할 것도 하나다:
+    앱이 붙는 주소와 마이그레이션이 붙는 주소가 같은 함수에서 나오는가.
+
+    갈라지면 "앱은 붙는데 alembic 만 안 붙는" 상태가 되고, 스키마가 코드보다 뒤처진
+    채로 오래 간다.
     """
-    normalized, _ = normalize_url(_TRANSACTION_POOLER)
-    sync = to_sync_url(normalized)
+    from app.core.config import settings
 
-    assert sync.startswith("postgresql://")
-    assert "prepared_statement_cache_size" not in sync
+    monkeypatch.setattr(settings, "database_url", _TRANSACTION_POOLER)
+    url, connect_args = normalize_url(settings.database_url)
+
+    assert url.startswith("postgresql+asyncpg://")
+    # 풀러 뒤라 프리페어드 캐시가 양쪽 다 꺼져 있어야 한다.
+    assert "prepared_statement_cache_size=0" in url
+    assert connect_args["statement_cache_size"] == 0
 
 
 def test_vector_dsn_falls_back_to_main_database(monkeypatch) -> None:
     """`VECTOR_DATABASE_URL` 이 없으면 주 DB(Postgres)를 그대로 쓴다.
 
-    두 곳에 같은 주소를 적어 두면 한쪽만 바꿔 어긋난다. 분리가 필요했던 이유는
-    주 DB 가 SQLite 였기 때문이고, Postgres 인 지금은 그 이유가 없다.
+    두 곳에 같은 주소를 적어 두면 한쪽만 바꿔 어긋난다. 주소를 따로 두는 것이
+    필수였던 시절은 주 DB 가 pgvector 를 올릴 수 없던 때뿐이고, 지금은 선택이다.
     """
     from app.core.config import settings
 
@@ -159,8 +174,8 @@ def test_vector_dsn_falls_back_to_main_database(monkeypatch) -> None:
     assert settings.vector_database_dsn == _TRANSACTION_POOLER
     assert settings.rag_enabled
 
-    # 주 DB 가 SQLite 면 벡터 저장소가 될 수 없다 — 확장을 못 올린다.
-    monkeypatch.setattr(settings, "database_url", _SQLITE)
+    # Postgres 가 아니면 벡터 저장소가 될 수 없다 — pgvector 확장을 못 올린다.
+    monkeypatch.setattr(settings, "database_url", _NOT_POSTGRES)
     assert settings.vector_database_dsn is None
     assert not settings.rag_enabled
 

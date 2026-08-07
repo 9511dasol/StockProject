@@ -11,14 +11,20 @@
 "가끔 안 되는 것 같다"로만 보고된다.
 
 그래서 여기서는 **세션을 두 개 연다.** 첫 세션이 쓰고 닫은 뒤, 두 번째 세션이 같은
-DB 를 다시 열어 읽는다. 인메모리 SQLite 는 연결마다 다른 DB 라 파일로 쓴다.
+DB 를 다시 열어 읽는다.
+
+## 왜 `db_session` 을 쓰지 않는가
+
+그 픽스처는 바깥 트랜잭션을 열어 두고 테스트가 끝나면 롤백한다. 여기서 확인하려는
+것이 정확히 "커밋이 실제로 됐는가" 라, 롤백으로 감싸면 검증하려던 것이 사라진다.
+그래서 이 파일만 **진짜로 커밋하고**, 남긴 행을 픽스처가 직접 지운다.
 """
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.models.base import Base
 from app.repositories.listed_company import ListedCompanyRepository
 from app.repositories.watchlist import WatchlistRepository
 from app.schemas.market import MoversScan
@@ -27,6 +33,7 @@ from app.schemas.watchlist import WatchlistItemPatch
 from app.services import watchlist_service
 
 _OWNER = "anon:persist"
+_SYMBOLS = ("005930.KS", "000660.KS")
 
 
 @pytest.fixture(autouse=True)
@@ -39,16 +46,28 @@ def no_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
     watchlist_service._quote_cache.clear()
 
 
-@pytest_asyncio.fixture
-async def sessions(tmp_path):
-    """같은 파일 DB 를 보는 세션 팩토리. 요청 경계를 흉내 내려면 파일이어야 한다."""
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'persist.db'}")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def _clear(engine) -> None:
+    """이 파일이 남긴 행을 지운다.
 
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    yield factory
-    await engine.dispose()
+    앞뒤로 모두 부른다 — 앞선 실행이 중간에 죽었으면 행이 남아 있고, 그러면 다음
+    실행이 "이미 담겨 있다" 는 이유로 엉뚱하게 통과하거나 실패한다.
+    """
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("delete from watchlist_items where owner_key = :owner"), {"owner": _OWNER}
+        )
+        await conn.execute(
+            text("delete from listed_companies where symbol = any(:symbols)"),
+            {"symbols": list(_SYMBOLS)},
+        )
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def sessions(pg_engine):
+    """같은 DB 를 보는 세션 팩토리. 커밋이 살아 있어야 요청 경계를 흉내 낼 수 있다."""
+    await _clear(pg_engine)
+    yield async_sessionmaker(pg_engine, expire_on_commit=False)
+    await _clear(pg_engine)
 
 
 async def _seed(factory) -> None:

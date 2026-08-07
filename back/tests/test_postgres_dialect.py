@@ -1,7 +1,7 @@
-"""Postgres 방언 회귀 — **테스트가 SQLite 로 도는 한 여기서만 잡힌다.**
+"""Postgres 방언 회귀 — SQL 의 **모양**을 데이터와 무관하게 고정한다.
 
-테스트 하네스는 인메모리 SQLite 를 쓴다(빠르고 네트워크가 없다). 그 대가는
-**방언 차이를 못 잡는다**는 것이고, 실제로 그렇게 새어 나간 버그가 있었다:
+원래 이 파일은 하네스가 인메모리 SQLite 로 돌던 시절, 운영 DB 의 SQL 을 검사할
+유일한 방법이었다. 그때 이렇게 새어 나간 버그가 있었다:
 
     ORDER BY market_cap DESC
 
@@ -9,8 +9,14 @@ SQLite 는 NULL 을 가장 작은 값으로 보므로 시총 미수집 종목이
 Postgres 는 `DESC` 의 기본이 `NULLS FIRST` 라 **맨 앞을 채운다.** 등락률 랭킹의
 모집단 200종목이 시총 없는 종목으로 채워졌는데, 오류가 나지 않아 조용했다.
 
-그래서 이 파일은 쿼리를 **실행하지 않고 Postgres 방언으로 컴파일해서** 본다.
-SQLite 위에서 돌면서도 운영 DB 의 SQL 을 검사할 수 있는 유일한 방법이다.
+지금은 하네스가 진짜 Postgres 로 돈다(`conftest`). 그래도 이 파일이 남는 이유는
+**검사하는 대상이 다르기** 때문이다. 실행하는 테스트는 그 순간 테이블에 NULL 이
+들어 있어야만 정렬 실수를 잡는다 — 픽스처가 값을 다 채우도록 바뀌면 조용히 눈이
+먼다. 여기서는 쿼리를 실행하지 않고 **Postgres 방언으로 컴파일만 해서** `NULLS
+LAST` 가 SQL 에 있는지 본다. 데이터가 무엇이든 결과가 같다.
+
+아래쪽 `_nullable_columns` 규칙 검사도 같은 취지다 — 한 쿼리를 고치는 것이 아니라
+"NULL 가능 컬럼으로 정렬하면 NULLS 위치를 명시한다" 는 규칙 자체를 강제한다.
 """
 
 import re
@@ -66,15 +72,25 @@ async def test_repository_query_is_the_one_checked(repo, monkeypatch) -> None:
     )
 
 
-def test_sqlite_database_url_is_rejected_by_settings() -> None:
-    """설정이 SQLite 주소를 기동 시점에 막는지.
+@pytest.mark.parametrize(
+    "url",
+    [
+        "sqlite+aiosqlite:///./stock.db",
+        "sqlite:///:memory:",
+        "mysql+aiomysql://u:p@h/db",
+    ],
+)
+def test_non_postgres_database_url_is_rejected_by_settings(url: str) -> None:
+    """설정이 Postgres 아닌 주소를 **기동 시점에** 막는지.
 
+    이 자물쇠가 SQLite 를 코드베이스 밖에 붙들어 두는 장치다. 하네스에서 폴백을
+    걷어내는 것만으로는 부족하다 — `.env` 에 `sqlite://` 한 줄이면 되돌아온다.
     조용히 받아 주면 앱은 뜨고 방언 차이만 런타임에 흩어져 나타난다.
     """
     from app.core.config import Settings
 
     with pytest.raises(ValueError, match="Postgres"):
-        Settings(database_url="sqlite+aiosqlite:///./stock.db")
+        Settings(database_url=url)
 
 
 def test_postgres_database_url_is_accepted() -> None:

@@ -59,13 +59,18 @@ async def test_missing_users_table_stops_everything(
     """`users` 를 못 읽으면 **아무것도 지우지 않는다.**
 
     행이 0개인 것과 테이블이 없는 것은 완전히 다르다. 후자를 "사용자가 하나도 없다"
-    로 읽으면 모든 `user:` 행이 고아가 되어 전부 사라진다 — 로컬 SQLite 처럼 그
-    테이블이 없는 환경에서 스크립트를 한 번 잘못 돌리는 것으로 충분하다.
+    로 읽으면 모든 `user:` 행이 고아가 되어 전부 사라진다 — NextAuth 마이그레이션이
+    아직 안 돌았거나 백엔드가 엉뚱한 DB 를 보고 있을 때 스크립트를 한 번 돌리는 것으로
+    충분하다.
+
+    아래 조회가 이 테스트의 절반이다. Postgres 는 실패한 문장 하나가 트랜잭션 전체를
+    중단시키므로, `users` 탐침이 세이브포인트 안에서 돌지 않으면 **거부한 뒤 세션이
+    죽는다.** 그러면 "아무것도 안 했다" 를 확인할 방법조차 없다.
     """
     with pytest.raises(UsersTableUnavailable):
         await sweep_orphans(db_session, apply=True)
 
-    # 한 건도 안 지워졌다.
+    # 한 건도 안 지워졌고, 세션은 계속 쓸 수 있다.
     assert len(await WatchlistRepository(db_session).list_for_owner(f"user:{_GONE}")) == 1
 
 

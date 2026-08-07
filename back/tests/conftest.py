@@ -1,18 +1,21 @@
 """테스트 픽스처. 외부 호출은 하지 않는다.
 
-## DB 는 두 갈래다
+## DB 는 Postgres 하나뿐이다
 
-`TEST_DATABASE_URL` 이 있으면 **진짜 Postgres**, 없으면 인메모리 SQLite 로 돈다.
-
-SQLite 는 빠르지만 방언 차이를 못 잡는다 — `ORDER BY ... DESC` 의 NULL 위치가
-Postgres 와 정반대라, 264개가 전부 초록인 채로 운영 랭킹이 조용히 뒤집혀 있던 적이
-있다. 그래서 운영과 같은 엔진으로 돌릴 수 있는 길을 열어 둔다.
+`TEST_DATABASE_URL` 은 **필수**다. 예전에는 비어 있으면 인메모리 SQLite 로 폴백했는데,
+그 폴백이 정확히 막으려던 사고를 냈다 — `ORDER BY ... DESC` 의 NULL 위치가 Postgres 와
+정반대라, 264개가 전부 초록인 채로 운영 랭킹이 조용히 뒤집혀 있었다. 방언이 갈리는 한
+"테스트가 통과했다" 는 말이 운영에 대해 아무것도 보장하지 않는다.
 
     TEST_DATABASE_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:5432/postgres
 
-**세션 풀러(5432)를 쓴다.** 아래 `db_session` 이 테스트 하나 동안 커넥션 하나를
-붙잡고 트랜잭션을 열어 두기 때문이다 — 트랜잭션 풀러(6543)는 그 사이 백엔드가
-바뀔 수 있어 이 방식과 맞지 않는다.
+지켜야 할 것이 둘이다.
+
+  ① **반드시 `DATABASE_URL` 과 다른 프로젝트.** 아래 `pg_engine` 이 drop_all 로 시작한다.
+     같은 DB 를 가리키면 이 파일이 즉시 멈춘다.
+  ② **세션 풀러(5432)를 쓴다.** `db_session` 이 테스트 하나 동안 커넥션 하나를 붙잡고
+     트랜잭션을 열어 두기 때문이다 — 트랜잭션 풀러(6543)는 그 사이 백엔드가 바뀔 수
+     있어 이 방식과 맞지 않는다.
 """
 
 import os
@@ -24,7 +27,8 @@ import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.agents import analysts
@@ -43,6 +47,10 @@ from app.services import advice_cache, fundamentals_service
 load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 TEST_DATABASE_URL = (os.environ.get("TEST_DATABASE_URL") or "").strip()
 
+#: RAG 를 끄기 위한 "주소 없음". `is_postgres("")` 가 False 라 `vector_database_dsn`
+#: 이 None 을 낸다 (`rag_off_by_default`).
+_NO_VECTOR_STORE = ""
+
 
 def _target(url: str) -> tuple[str | None, int | None, str]:
     """같은 DB 를 가리키는지 비교할 키. 자격증명·쿼리스트링은 무시한다."""
@@ -50,18 +58,21 @@ def _target(url: str) -> tuple[str | None, int | None, str]:
     return (parts.hostname, parts.port, parts.path)
 
 
-if TEST_DATABASE_URL:
-    if not is_postgres(TEST_DATABASE_URL):
-        raise RuntimeError(
-            "TEST_DATABASE_URL 은 Postgres 여야 합니다. SQLite 로 돌리려면 값을 비워 두세요."
-        )
-    # **운영 DB 를 겨누면 즉시 멈춘다.** 아래 스키마 준비가 drop_all 로 시작하므로,
-    # 이 검사가 없으면 오타 하나로 실 데이터가 통째로 사라진다.
-    if _target(TEST_DATABASE_URL) == _target(settings.database_url):
-        raise RuntimeError(
-            "TEST_DATABASE_URL 이 DATABASE_URL 과 같은 DB 를 가리킵니다. "
-            "테스트는 스키마를 지우고 다시 만들므로 별도 프로젝트여야 합니다."
-        )
+if not TEST_DATABASE_URL:
+    raise RuntimeError(
+        "TEST_DATABASE_URL 이 없습니다. 테스트는 Postgres 에서만 돕니다 — SQLite 폴백은 "
+        "방언 차이(NULL 정렬 등)를 숨겨서 제거했습니다. DATABASE_URL 과 **다른** Supabase "
+        "프로젝트의 세션 풀러(5432) URI 를 back/.env 에 넣으세요."
+    )
+if not is_postgres(TEST_DATABASE_URL):
+    raise RuntimeError("TEST_DATABASE_URL 은 Postgres 여야 합니다.")
+# **운영 DB 를 겨누면 즉시 멈춘다.** 아래 스키마 준비가 drop_all 로 시작하므로,
+# 이 검사가 없으면 오타 하나로 실 데이터가 통째로 사라진다.
+if _target(TEST_DATABASE_URL) == _target(settings.database_url):
+    raise RuntimeError(
+        "TEST_DATABASE_URL 이 DATABASE_URL 과 같은 DB 를 가리킵니다. "
+        "테스트는 스키마를 지우고 다시 만들므로 별도 프로젝트여야 합니다."
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -117,9 +128,13 @@ def rag_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     살아나는 순간 실패로 바뀌었다 — 그때까지 그 테스트는 아무것도 검증하지 않았다.
 
     RAG 를 쓰는 테스트는 `vector_database_url` 을 직접 설정해 **명시적으로 켠다.**
+
+    주소를 빈 문자열로 둔다 — `vector_database_dsn` 은 `is_postgres` 로 판정하므로
+    빈 값이면 None 을 내고 RAG 가 꺼진다. 예전에는 여기에 SQLite 주소를 넣어 같은
+    효과를 냈는데, 그 문자열이 "테스트는 SQLite 로 돈다" 는 오해를 만들었다.
     """
     monkeypatch.setattr(settings, "vector_database_url", None)
-    monkeypatch.setattr(settings, "database_url", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setattr(settings, "database_url", _NO_VECTOR_STORE)
 
 
 @pytest.fixture(autouse=True)
@@ -153,15 +168,11 @@ def reset_advice_cache() -> Iterator[None]:
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def pg_engine():
-    """테스트 Postgres 엔진. `TEST_DATABASE_URL` 이 없으면 None 이다.
+    """테스트 Postgres 엔진.
 
     스키마는 **세션당 한 번** 만든다. 테스트마다 만들면 273개 × 왕복이 되어
     네트워크 DB 에서는 견딜 수 없다. 격리는 `db_session` 의 트랜잭션이 맡는다.
     """
-    if not TEST_DATABASE_URL:
-        yield None
-        return
-
     url, connect_args = normalize_url(TEST_DATABASE_URL)
     engine = create_async_engine(
         url,
@@ -172,7 +183,12 @@ async def pg_engine():
     # drop → create. 앞 실행이 남긴 스키마 변경이 조용히 남아 있으면, 통과 여부가
     # "언제 마지막으로 돌렸는가" 에 달리게 된다. NextAuth 테이블은 `Base.metadata`
     # 밖이라 여기서 건드리지 않는다.
+    #
+    # 확장이 먼저다 — `document_chunks` 가 이제 `Base.metadata` 안에 있어서
+    # (`models/document_chunk.py`), vector·pg_trgm 없이는 create_all 자체가 실패한다.
     async with engine.begin() as conn:
+        for extension in ("vector", "pg_trgm"):
+            await conn.execute(text(f"create extension if not exists {extension}"))
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
@@ -192,18 +208,6 @@ async def db_session(pg_engine) -> AsyncIterator[AsyncSession]:
     두면 바깥 트랜잭션이 끝나 버려 롤백할 것이 없어진다. 세이브포인트로 바꾸면
     커밋은 세이브포인트 해제가 되고 바깥 트랜잭션은 살아 있다.
     """
-    if pg_engine is None:
-        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-        session_factory = async_sessionmaker(engine, expire_on_commit=False)
-        async with session_factory() as session:
-            yield session
-
-        await engine.dispose()
-        return
-
     conn = await pg_engine.connect()
     trans = await conn.begin()
     session = AsyncSession(

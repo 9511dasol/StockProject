@@ -201,7 +201,8 @@ async def test_rag_disabled_skips_the_loop_entirely(
     실제로 이 가드가 없어서 단위 테스트가 실제 Gemini 를 쳤고 무료 한도를 태웠다.
     """
     monkeypatch.setattr(settings, "vector_database_url", None)
-    monkeypatch.setattr(settings, "database_url", "sqlite+aiosqlite:///:memory:")
+    # 주소가 없으면 `vector_database_dsn` 이 None 을 낸다 = RAG 꺼짐.
+    monkeypatch.setattr(settings, "database_url", "")
 
     state = await _run()
 
