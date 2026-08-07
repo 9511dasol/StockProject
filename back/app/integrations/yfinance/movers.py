@@ -58,6 +58,35 @@ def _closes_of(frame: Any, symbol: str) -> Any | None:
     return series.dropna()
 
 
+#: 이 비율 밑으로 떨어지면 상류가 아니라 **우리 파싱**을 의심한다.
+#:
+#: 개별 종목이 빠지는 것은 정상이다(신규 상장·거래정지는 전일 종가가 없다). 하지만
+#: 대다수가 빠지면 그건 프레임 모양이 바뀌었다는 뜻이다 — 실제로 그렇게 당했다:
+#: yfinance 가 1종목에도 MultiIndex 를 유지하도록 바뀌면서 `_closes_of` 의 단일 분기가
+#: 항상 KeyError 로 떨어졌고, **스캔은 "완료" 로 로그를 남기며 0건을 돌려줬다.**
+_HEALTHY_YIELD = 0.5
+
+
+def _report_yield(scanned: int, requested: int, as_of: str | None) -> None:
+    """수확률을 보고한다. 낮으면 INFO 가 아니라 WARNING 이다.
+
+    예전에는 무조건 INFO 였다. `0/1종목` 이 정상 완료와 똑같은 모양으로 찍혀 아무도
+    보지 않았고, 관심종목 시세가 통째로 비어 있는 것을 사람이 눈으로 볼 때까지
+    몰랐다 — **오류 없이 틀리는 버그는 로그 레벨이 유일한 조기 경보다.**
+    """
+    if requested and scanned / requested < _HEALTHY_YIELD:
+        logger.warning(
+            "등락률 스캔 수확률이 낮습니다: %d/%d종목 (기준일 %s) — "
+            "상류 장애가 아니라면 응답 프레임 모양이 바뀐 것이다",
+            scanned,
+            requested,
+            as_of,
+        )
+        return
+
+    logger.info("등락률 스캔 완료: %d/%d종목 (기준일 %s)", scanned, requested, as_of)
+
+
 def scan_movers(
     universe: Sequence[ListedCompanyRecord],
     *,
@@ -127,9 +156,7 @@ def scan_movers(
     if len(frame.index):
         as_of = str(frame.index[-1].date())
 
-    logger.info(
-        "등락률 스캔 완료: %d/%d종목 (기준일 %s)", len(rows), len(symbols), as_of
-    )
+    _report_yield(len(rows), len(symbols), as_of)
     return MoversScan(
         as_of=as_of,
         source="YFINANCE",

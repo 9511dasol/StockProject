@@ -152,7 +152,36 @@ class ListedCompanyRepository:
             .limit(limit)
         )
         result = await self._db.execute(stmt)
-        return list(result.scalars().all())
+        symbols = list(result.scalars().all())
+
+        # 정렬이 살아 있는지 결과로 확인한다.
+        #
+        # 이 정렬은 **죽어도 오류가 안 난다** — 실제로 그렇게 오래 살아 있었다.
+        # 배치는 정상 동작하고 채우는 순서만 무작위가 되므로, "우선순위가 먹었는가" 를
+        # 사람이 눈으로 볼 방법이 없었다. 한 번 물어보는 비용이 그 침묵보다 싸다.
+        if symbols and not any(s.endswith(".KS") for s in symbols):
+            remaining = await self._count_missing_cap_kospi()
+            if remaining:
+                logger.warning(
+                    "시총 배치 %d건에 .KS 가 하나도 없는데 아직 %d종목 남아 있습니다 — "
+                    "우선순위 정렬이 죽었을 수 있습니다",
+                    len(symbols),
+                    remaining,
+                )
+
+        return symbols
+
+    async def _count_missing_cap_kospi(self) -> int:
+        """시총이 아직 없는 유가증권 종목 수. 위 경보의 근거로만 쓴다."""
+        stmt = (
+            select(func.count())
+            .select_from(ListedCompany)
+            .where(
+                ListedCompany.market_cap.is_(None),
+                ListedCompany.symbol.like("%.KS"),
+            )
+        )
+        return int((await self._db.execute(stmt)).scalar_one())
 
     async def update_market_caps(self, caps: dict[str, int]) -> int:
         """6자리 코드 → 시총 매핑을 반영한다. 반영된 행 수를 돌려준다.
@@ -177,6 +206,20 @@ class ListedCompanyRepository:
             updated += 1
 
         await self._db.commit()
+
+        # 받은 것이 있는데 한 건도 못 붙였다면 코드 형식이 어긋난 것이다.
+        #
+        # pykrx 가 `005930` 을 주고 우리가 `005930.KS` 를 저장한다는 전제가 이 매칭의
+        # 전부다. 공급자가 형식을 바꾸면(접미사를 붙여 준다든가) 조용히 0건이 되고,
+        # 배치는 "성공" 으로 끝난 채 시총이 영원히 안 채워진다.
+        if not updated:
+            logger.warning(
+                "시총 %d건을 받았지만 한 종목도 매칭되지 않았습니다 — "
+                "공급자 코드 형식이 바뀌었을 수 있습니다 (예: %s)",
+                len(caps),
+                next(iter(caps)),
+            )
+
         return updated
 
     async def upsert_many(self, records: Sequence[ListedCompanyRecord]) -> int:
