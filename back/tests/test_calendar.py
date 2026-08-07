@@ -99,24 +99,142 @@ async def seeded(db_session) -> ListedCompanyRepository:
     return repo
 
 
-async def test_asked_symbols_get_a_timestamp_even_without_dates(seeded) -> None:
-    """**값을 못 받아도 물어본 시각은 찍는다.**
+async def test_answered_symbols_get_a_timestamp_even_without_dates(seeded) -> None:
+    """**응답만 받았으면 날짜가 없어도 시각은 찍는다.**
 
     안 찍으면 일정이 없는 종목(대부분)이 `nullsfirst` 정렬 맨 앞에 영원히 남아,
     배치가 같은 종목만 반복해서 물어보고 나머지는 한 번도 못 채운다. 조용히 제자리를
     도는 종류라 로그로도 안 보인다 — 그래서 테스트가 필요하다.
     """
-    asked = ["005930.KS", "000660.KS"]
+    answered = ["005930.KS", "000660.KS"]
 
     filled = await seeded.update_calendar_dates(
-        {"005930.KS": CalendarDates(next_earnings_date="2026-10-28")}, asked
+        {"005930.KS": CalendarDates(next_earnings_date="2026-10-28")}, answered
     )
 
     assert filled == 1  # 날짜를 얻은 것은 하나뿐이지만
 
-    # 물어본 둘 다 정렬 맨 앞에서 빠져야 한다 — 다음 배치는 아직 안 물어본 종목을 본다.
+    # 응답받은 둘 다 정렬 맨 앞에서 빠져야 한다 — 다음 배치는 아직 안 물어본 종목을 본다.
     following = await seeded.symbols_for_calendar_refresh(limit=3)
     assert following[0] == "247540.KQ"
+
+
+async def test_unanswered_symbols_are_left_completely_alone(seeded) -> None:
+    """**응답을 못 받은 종목은 건드리지 않는다 — 실제로 데이터를 지운 자리다.**
+
+    전 종목 배치를 돌렸을 때 야후가 요청을 전부 거부했다(직전에 시총 배치가
+    `get_info()` 를 2,747번 쳤다). 2,703종목이 113초 만에 0건으로 "끝났고", 그 0건이
+    이미 수집돼 있던 29종목의 날짜를 NULL 로 덮었다. `calendar_updated_at` 까지 찍혀
+    방금 확인한 행처럼 보였다.
+
+    지금은 응답 못 받은 종목이 `answered` 에서 빠지므로, 값도 타임스탬프도 그대로다.
+    """
+    await seeded.update_calendar_dates(
+        {"005930.KS": CalendarDates(next_earnings_date="2026-10-28")}, ["005930.KS"]
+    )
+
+    # 다음 배치가 005930 은 응답을 못 받고 000660 만 받았다.
+    await seeded.update_calendar_dates({}, ["000660.KS"])
+
+    kept = await seeded.upcoming_calendar(
+        "next_earnings_date", _TODAY, date(2026, 12, 31), 10
+    )
+    assert [row.symbol for row in kept] == ["005930.KS"], "응답 못 받은 종목의 날짜가 지워졌다"
+
+
+async def test_failed_fetch_is_not_the_same_as_no_schedule() -> None:
+    """수집기가 **실패(None)** 와 **응답했으나 일정 없음(빈 값)** 을 구분하는가.
+
+    이 구분이 없으면 위 테스트가 지키는 계약을 저장 계층이 아무리 지켜도 소용없다 —
+    실패가 "일정 없음" 으로 도착하기 때문이다.
+    """
+    from app.integrations.yfinance import calendar as calendar_module
+
+    responses = {
+        "OK.KS": {"earningsTimestampStart": 1793142000},
+        "EMPTY.KS": {"someField": 1},  # 응답은 왔고 일정만 없다
+        "BLOCKED.KS": {},  # 빈 info = 막혔다
+    }
+
+    def fake_fetch(symbol: str):
+        info = responses[symbol]
+        if not info:
+            return symbol, None
+        ex, ne = calendar_module.extract_calendar_dates(_Ticker(), info)
+        return symbol, CalendarDates(ex_dividend_date=ex, next_earnings_date=ne)
+
+    original = calendar_module._fetch_one
+    calendar_module._fetch_one = fake_fetch
+    try:
+        record = calendar_module.fetch_calendar_dates(list(responses))
+    finally:
+        calendar_module._fetch_one = original
+
+    assert record.attempted == 3
+    # 막힌 종목은 응답 목록에서 빠진다 → 저장 계층이 건드리지 않는다.
+    assert sorted(record.answered) == ["EMPTY.KS", "OK.KS"]
+    assert set(record.dates) == {"OK.KS"}
+
+
+async def test_collapsed_response_rate_discards_the_whole_batch(seeded, monkeypatch) -> None:
+    """응답률이 무너지면 **응답받은 소수까지 포함해 통째로 버린다.**
+
+    종목별 구분(`answered` 에서 제외)만으로도 전멸 사고는 막힌다. 이 층을 하나 더 두는
+    이유는 **일부만 응답하는 중간 상태** 때문이다 — 공급자가 조이기 시작하면 소수만
+    통과하는데, 그 소수의 "일정 없음" 을 곧이곧대로 반영하면 멀쩡하던 날짜가 지워진다.
+    표본이 무너진 배치는 부분 반영도 하지 않는 편이 안전하다.
+
+    이 테스트는 처음에 `answered=[]` 로 썼다가 **가드를 빼도 통과**했다. 빈 목록은
+    리포지토리가 먼저 걸러내(`if not answered`) 가드까지 가지도 않기 때문이다 —
+    검사기가 검사 대상을 안 지나가는, 안 잡는 테스트였다.
+    """
+    await seeded.update_calendar_dates(
+        {"005930.KS": CalendarDates(next_earnings_date="2026-10-28")}, ["005930.KS"]
+    )
+
+    from app.schemas.stock import CalendarRecord
+
+    def throttled(symbols):
+        # 3종목에 물었지만 하나만 통과했고, 그마저 일정이 비어 있다.
+        # 가드가 없으면 이 하나가 005930 의 날짜를 지운다.
+        return CalendarRecord(
+            as_of="2026-08-07", attempted=3, answered=["005930.KS"], dates={}
+        )
+
+    monkeypatch.setattr(calendar_service, "fetch_calendar_dates", throttled)
+
+    filled = await calendar_service.refresh_calendar(seeded, force=True)
+
+    assert filled == 0
+    kept = await seeded.upcoming_calendar(
+        "next_earnings_date", _TODAY, date(2026, 12, 31), 10
+    )
+    assert [row.symbol for row in kept] == ["005930.KS"], "버려야 할 배치가 기존 값을 덮었다"
+
+
+async def test_healthy_batch_is_written_even_with_few_dates(seeded, monkeypatch) -> None:
+    """반대 방향도 지킨다 — **응답률이 멀쩡하면 날짜가 적어도 반영한다.**
+
+    가드를 '날짜 수확률' 로 걸면 안 되는 이유다. 소형주 배치는 일정이 잡힌 종목이
+    원래 드물어서, 수확 0건이 정상인 날이 있다. 그때 배치를 버리면 그 종목들은
+    영원히 타임스탬프를 못 받아 큐 맨 앞에 남는다.
+    """
+    from app.schemas.stock import CalendarRecord
+
+    def lean(symbols):
+        return CalendarRecord(
+            as_of="2026-08-07",
+            attempted=len(symbols),
+            answered=list(symbols),
+            dates={},
+        )
+
+    monkeypatch.setattr(calendar_service, "fetch_calendar_dates", lean)
+
+    await calendar_service.refresh_calendar(seeded, force=True)
+
+    # 전부 응답받았으므로 타임스탬프가 찍혀 다음 배치가 앞으로 나아간다.
+    assert await seeded.latest_calendar_update() is not None
 
 
 async def test_batch_picks_the_stalest_first(seeded) -> None:

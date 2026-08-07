@@ -80,12 +80,29 @@ class CalendarRecord(BaseModel):
     쓰는 것은 pykrx 가 그렇게 주기 때문이고, 여기는 우리가 심볼로 물어봤으므로 심볼을
     그대로 쓴다 — 접미사를 떼고 다시 붙이는 단계가 없으니 "공급자 코드 형식이 바뀌어
     매칭 0건" 이 되는 경로 자체가 없다 (`update_market_caps` 의 경보 참고).
+
+    ## `attempted` 와 `answered` 를 나누는 이유 — 실제로 데이터를 지웠다
+
+    처음에는 "물어본 것 전부"(`asked`) 하나만 들고 있었다. 저장 계층이 그것으로
+    `calendar_updated_at` 을 찍어야 배치가 앞으로 나아가기 때문인데, **응답을 못 받은
+    종목까지 거기 들어갔다.**
+
+    그 상태로 전 종목(2,703) 배치를 돌렸더니 야후가 요청을 거부했다 — 직전에 시총
+    배치가 `get_info()` 를 2,747번 쳤기 때문이다. 2,703종목이 113초 만에 "끝났고"
+    (실제 왕복이면 5분 이상이다) 결과가 0건이었으며, 그 0건이 **이미 수집돼 있던 29종목의
+    날짜를 NULL 로 덮어썼다.** 게다가 `calendar_updated_at` 은 찍혀서 방금 확인한 행처럼
+    보였다.
+
+    그래서 둘을 나눈다. 쓰기·타임스탬프는 `answered` 에만 적용하고, 응답을 못 받은
+    종목은 아무것도 하지 않아 다음 배치가 다시 물어본다.
     """
 
     as_of: str | None = None
-    #: **물어본 심볼 전부.** 값이 없는 종목도 포함한다 — 저장 계층이 이것으로
-    #: `calendar_updated_at` 을 찍어야 배치가 다음 종목으로 넘어간다.
-    asked: list[str] = Field(default_factory=list)
+    #: 물어본 종목 수. `answered` 와 비교해 공급자가 우리를 막고 있는지 판정한다.
+    attempted: int = 0
+    #: **응답을 받은 심볼.** 일정이 없다는 응답도 여기 들어간다 — 그건 사실이므로
+    #: 그대로 반영하고 타임스탬프를 찍는다. 응답 자체를 못 받은 종목은 빠진다.
+    answered: list[str] = Field(default_factory=list)
     dates: dict[str, CalendarDates] = Field(default_factory=dict)
 
 

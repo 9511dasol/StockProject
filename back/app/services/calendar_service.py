@@ -12,6 +12,15 @@ SQL 한 번이 된다 (`models/listed_company.py` 주석).
 **일정은 만료된다.** 시총은 며칠 스테일해도 랭킹 순서가 안 바뀌지만, 실적발표일은
 지나가면 그 값이 과거를 가리킨다. 그래서 "아직 없는 종목" 이 아니라 **"가장 오래
 안 물어본 종목"** 부터 채운다 (`symbols_for_calendar_refresh`).
+
+## ⚠ 시총 배치와 **연달아** 돌리지 않는다
+
+둘 다 종목당 `ticker.get_info()` 를 부른다. 시총 따라잡기(2,747종목) 직후에 이 배치를
+2,703종목으로 돌렸더니 야후가 전 종목을 거부했다 — 2,703종목이 113초 만에 "끝나고"
+응답 0건이었다(실제 왕복이면 5분 이상이다). 회복까지 시간이 걸린다.
+
+한쪽을 크게 돌렸으면 다른 쪽은 다음 날 돌린다. 평소의 하루 1회 상한(400 / 200)으로는
+겪지 않는 문제이고, 따라잡기처럼 상한을 올릴 때만 나온다.
 """
 
 import asyncio
@@ -27,6 +36,14 @@ from app.schemas.market import CalendarEvent, CalendarKind, MarketCalendar
 logger = logging.getLogger(__name__)
 
 _CALENDAR_TTL = timedelta(days=1)
+
+#: 이 비율보다 적게 응답하면 배치 결과를 통째로 버린다.
+#:
+#: 절반으로 잡은 근거: 정상 실행은 30종목 중 30종목이 응답했다(그중 28종목이 날짜를
+#: 가졌다). 반대로 막힌 실행은 2,703종목 중 **0종목**이었다. 둘 사이가 크게 벌어져
+#: 있어 경계가 예민할 이유가 없고, 상장폐지·해외 계열이 섞여 응답률이 조금 떨어지는
+#: 정상 배치를 버리지 않는 편이 중요하다.
+_MIN_RESPONSE_RATIO = 0.5
 
 #: 응답의 `kind` → 저장 컬럼. 리포지토리가 이 문자열만 받는다.
 _COLUMNS: dict[CalendarKind, str] = {
@@ -60,25 +77,50 @@ async def refresh_calendar(repo: ListedCompanyRepository, *, force: bool = False
                 return 0
 
             record = await asyncio.to_thread(fetch_calendar_dates, symbols)
-            filled = await repo.update_calendar_dates(record.dates, record.asked)
 
-            # 0건이 사실일 수 있다 — 배당도 안 하고 발표일도 안 잡힌 종목만 걸린 경우다.
-            # 그래도 **한 건도 없으면** 공급자 응답 형태가 바뀌었을 가능성을 남긴다
-            # (14회차의 0건 경보와 같은 결).
-            if not filled:
+            # **응답률이 무너지면 아무것도 쓰지 않는다.**
+            #
+            # 이 가드가 없어서 실제로 데이터를 지웠다. 시총 배치가 직전에 get_info() 를
+            # 2,747번 친 뒤 이 배치가 2,703종목을 돌았는데, 야후가 전부 거부해 113초 만에
+            # 0건으로 "끝났다". 저장 계층은 그 0건을 곧이곧대로 반영해 이미 수집돼 있던
+            # 29종목의 날짜를 NULL 로 덮었다.
+            #
+            # 종목별 구분(`_fetch_one` 이 실패를 None 으로 표시)만으로도 그 사고는 막힌다.
+            # 그래도 이 층을 하나 더 두는 이유: 공급자가 **에러 대신 빈 응답**을 주기
+            # 시작하면 종목별로는 "정상 응답, 일정 없음" 과 구별되지 않는다. 그때
+            # 마지막으로 이상을 알아챌 수 있는 신호가 "전 종목이 동시에 비었다" 이다.
+            answered = len(record.answered)
+            if answered < record.attempted * _MIN_RESPONSE_RATIO:
+                logger.error(
+                    "일정 배치를 버립니다 — %d종목 중 %d종목만 응답했습니다(%.0f%%). "
+                    "공급자가 요청을 막고 있을 가능성이 큽니다. 기존 값은 그대로 둡니다.",
+                    record.attempted,
+                    answered,
+                    100 * answered / record.attempted if record.attempted else 0,
+                )
+                return 0
+
+            filled = await repo.update_calendar_dates(record.dates, record.answered)
+
+            # 수확 0건은 **버릴 근거가 아니라 볼 근거**다. 소형주만 걸린 배치는 일정이
+            # 잡힌 종목이 원래 드물어 0건이 정상일 수 있으므로 여기서 쓰기를 막지
+            # 않는다(막으면 그 종목들이 타임스탬프를 못 받아 큐 앞에 영영 남는다).
+            # 다만 응답은 멀쩡한데 날짜만 전부 비는 것은 공급자 필드가 바뀌었을 때의
+            # 모습이기도 해서, 로그로는 남긴다 (14회차의 0건 경보와 같은 결).
+            if answered and not filled:
                 logger.warning(
-                    "일정 배치: %d종목에 물었지만 날짜를 하나도 얻지 못했습니다 — "
-                    "yfinance 응답 형태를 확인하세요 (예: %s)",
-                    len(symbols),
-                    symbols[0],
+                    "일정 배치: %d종목이 응답했지만 날짜는 0건입니다 — 소형주만 걸린 "
+                    "정상일 수 있으나, yfinance 필드가 바뀌었는지 확인하세요 (예: %s)",
+                    answered,
+                    record.answered[0],
                 )
-            else:
-                logger.info(
-                    "일정 배치: %d/%d종목에서 날짜 반영 (기준일 %s)",
-                    filled,
-                    len(symbols),
-                    record.as_of,
-                )
+
+            logger.info(
+                "일정 배치: %d종목 응답 중 %d종목에서 날짜 반영 (기준일 %s)",
+                answered,
+                filled,
+                record.as_of,
+            )
             return filled
         except Exception:  # noqa: BLE001 - 일정 실패가 홈을 죽이면 안 된다
             logger.exception("일정 배치 실패 — 기존 값으로 계속합니다")

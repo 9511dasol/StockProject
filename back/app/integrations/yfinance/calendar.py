@@ -98,22 +98,35 @@ def extract_calendar_dates(ticker: Any, info: dict) -> tuple[str | None, str | N
     return ex_dividend, next_earnings
 
 
-def _fetch_one(symbol: str) -> tuple[str, CalendarDates]:
-    """종목 하나의 일정. 실패는 빈 값으로 흡수한다.
+def _fetch_one(symbol: str) -> tuple[str, CalendarDates | None]:
+    """종목 하나의 일정.
 
-    **빈 값과 실패를 구분하지 않는다.** 일정이 없는 종목(배당을 안 하거나 발표일이
-    아직 안 잡힌 곳)이 다수라 어차피 대부분 비어 있고, 종목 하나의 예외가 배치 전체를
-    세우면 나머지 정상 종목까지 못 채운다.
+    **`None` 과 빈 `CalendarDates` 는 다르다.**
+
+        None            응답을 못 받았다 (예외 · 빈 info). 아무것도 모르는 상태다
+        CalendarDates() 응답은 받았고 일정이 없다. 이건 **사실**이라 그대로 반영한다
+
+    처음에는 둘을 같은 값으로 뭉갰다. "일정 없는 종목이 어차피 다수라 구분할 실익이
+    없다" 고 봤는데 틀렸다 — 저장 계층이 이 값으로 **덮어쓰기** 때문이다. 야후가
+    요청을 거부하는 순간 전 종목이 "일정 없음" 이 되어 이미 수집한 날짜를 지운다
+    (`schemas/stock.CalendarRecord` 주석에 실제로 겪은 내용을 적어 뒀다).
+
+    `info` 가 비어 있는 것을 실패로 보는 근거: 살아 있는 종목의 `get_info()` 는 항상
+    채워진 dict 를 준다. 빈 dict 는 조회가 막혔거나 심볼이 죽었다는 뜻이고, 어느
+    쪽이든 "일정이 없다" 고 단정할 근거가 되지 못한다.
     """
     import yfinance as yf
 
     try:
         ticker = yf.Ticker(symbol)
         info = ticker.get_info() or {}
-        ex_dividend, next_earnings = extract_calendar_dates(ticker, info)
     except Exception:  # noqa: BLE001 - 종목 하나가 배치 전체를 세우면 안 된다
-        return symbol, CalendarDates()
+        return symbol, None
 
+    if not info:
+        return symbol, None
+
+    ex_dividend, next_earnings = extract_calendar_dates(ticker, info)
     return symbol, CalendarDates(
         ex_dividend_date=ex_dividend, next_earnings_date=next_earnings
     )
@@ -122,22 +135,33 @@ def _fetch_one(symbol: str) -> tuple[str, CalendarDates]:
 def fetch_calendar_dates(symbols: list[str]) -> CalendarRecord:
     """종목 목록의 일정을 모아 온다. 블로킹이므로 서비스가 `to_thread` 로 감싼다.
 
-    `asked` 에 **물어본 심볼 전부**를 담아 돌려준다 — 값이 없는 종목도 포함이다.
-    저장 계층이 그것으로 `calendar_updated_at` 을 찍어야 배치가 앞으로 나아간다.
-    값이 있는 것만 갱신하면 일정 없는 종목(대부분)을 매번 다시 물어보게 된다.
+    `answered` 에는 **응답을 받은 심볼만** 담는다. 일정이 없다는 응답도 포함이다 —
+    그건 사실이므로 저장 계층이 반영하고 `calendar_updated_at` 을 찍어야 배치가
+    앞으로 나아간다. 반면 응답을 못 받은 종목은 빠지므로 아무것도 기록되지 않고
+    다음 배치가 다시 물어본다.
     """
     if not symbols:
         return CalendarRecord()
 
     dates: dict[str, CalendarDates] = {}
+    answered: list[str] = []
     with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
         for symbol, value in pool.map(_fetch_one, symbols):
+            if value is None:
+                continue
+            answered.append(symbol)
             if value.ex_dividend_date or value.next_earnings_date:
                 dates[symbol] = value
 
-    logger.info("일정 수집: %d/%d종목에서 날짜를 얻음", len(dates), len(symbols))
+    logger.info(
+        "일정 수집: %d종목에 물어 %d종목이 응답, 그중 %d종목에서 날짜를 얻음",
+        len(symbols),
+        len(answered),
+        len(dates),
+    )
     return CalendarRecord(
         as_of=datetime.now(KST).date().isoformat(),
-        asked=list(symbols),
+        attempted=len(symbols),
+        answered=answered,
         dates=dates,
     )

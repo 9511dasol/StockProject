@@ -307,25 +307,31 @@ class ListedCompanyRepository:
         return list(result.scalars().all())
 
     async def update_calendar_dates(
-        self, dates: Mapping[str, CalendarDates], asked: Sequence[str]
+        self, dates: Mapping[str, CalendarDates], answered: Sequence[str]
     ) -> int:
         """일정을 반영한다. 날짜를 얻은 종목 수를 돌려준다.
 
-        **`asked` 전체에 `calendar_updated_at` 을 찍는다.** 값을 못 받은 종목까지다.
-        그러지 않으면 일정이 없는 종목(배당을 안 하거나 발표일이 안 잡힌 곳 — 다수다)이
-        `nullsfirst` 정렬의 맨 앞에 영원히 남아, 배치가 같은 종목만 반복해서 물어보고
-        나머지는 한 번도 못 채운다. 조용히 제자리를 도는 종류라 로그로도 안 보인다.
+        **`answered` 는 "응답을 받은 종목" 이지 "물어본 종목" 이 아니다.** 그 둘을
+        같게 두었다가 실제로 데이터를 지웠다 — 공급자가 요청을 거부한 배치가 전 종목을
+        "일정 없음" 으로 만들어 이미 수집한 날짜를 NULL 로 덮었다
+        (`schemas/stock.CalendarRecord` 주석). 응답을 못 받은 종목은 이 목록에서
+        빠지므로 여기서 아무것도 하지 않고, 다음 배치가 다시 물어본다.
 
-        날짜를 **덮어쓰는** 것도 의도다. 실적발표가 끝나면 공급자가 다음 분기 날짜를
-        주고, 그때 값이 바뀌어야 '오늘의 일정' 이 과거를 가리키지 않는다. 새 값이
-        없어졌으면(`None`) 그것도 그대로 반영한다 — 취소된 일정을 남겨 두면 안 된다.
+        응답받은 종목에는 **날짜가 없어도 `calendar_updated_at` 을 찍는다.** 일정이 없는
+        종목(배당을 안 하거나 발표일이 안 잡힌 곳)이 다수인데 이걸 안 찍으면 그것들이
+        `nullsfirst` 정렬 맨 앞에 영원히 남아 배치가 같은 자리를 돈다. 로그로도 안
+        보이는 제자리걸음이다.
+
+        날짜를 **덮어쓰는** 것은 의도다. 실적발표가 끝나면 공급자가 다음 분기 날짜를
+        주고, 그때 값이 바뀌어야 '오늘의 일정' 이 과거를 가리키지 않는다. 응답받은
+        종목에서 일정이 사라졌으면(취소·미정) 그것도 반영한다.
         """
-        if not asked:
+        if not answered:
             return 0
 
         now = datetime.now(UTC)
         result = await self._db.execute(
-            select(ListedCompany).where(ListedCompany.symbol.in_(list(asked)))
+            select(ListedCompany).where(ListedCompany.symbol.in_(list(answered)))
         )
 
         filled = 0
