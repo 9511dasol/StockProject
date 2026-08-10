@@ -1,6 +1,6 @@
-import { Icon } from "@/shared/ui";
 import type { SortedColumn } from "../../model/ranking";
-import { RANKING_GRID, RANKING_HEAD } from "./tokens";
+import { HeadCell } from "../table";
+import { RANKING_GRID } from "./tokens";
 
 export interface RankingHeadRowProps {
   /** 지금 목록의 순서를 만든 열. 여기에만 내림차순 표식이 붙는다 */
@@ -16,7 +16,8 @@ export interface RankingHeadRowProps {
  *
  * 정렬 기준 열은 잉크색 + 캐럿으로 표시한다. 칩으로 이미 "시가총액순" 을 눌렀더라도
  * 스크롤을 내리면 칩은 화면 밖이고 이 행만 남기 때문에, 순서의 근거가 여기 있어야 한다.
- * 방향은 항상 내림차순이다 (model/ranking 의 SORTED_COLUMN 주석).
+ * 방향은 **항상 내림차순**이라 `"desc"` 를 고정으로 넘긴다 (model/ranking 의
+ * SORTED_COLUMN 주석). 조건 검색 표는 축이 방향을 정해서 그쪽만 값이 갈린다.
  */
 export function RankingHeadRow({ sortedColumn }: RankingHeadRowProps) {
   return (
@@ -29,37 +30,16 @@ export function RankingHeadRow({ sortedColumn }: RankingHeadRowProps) {
       <HeadCell label="종목" />
       <HeadCell label="3개월" align="right" />
       <HeadCell label="현재가" align="right" />
-      <HeadCell label="등락률" align="right" sorted={sortedColumn === "change"} />
+      <HeadCell
+        label="등락률"
+        align="right"
+        sorted={sortedColumn === "change" ? "desc" : undefined}
+      />
       <HeadCell
         label="시가총액"
         align="right"
-        sorted={sortedColumn === "marketCap"}
+        sorted={sortedColumn === "marketCap" ? "desc" : undefined}
       />
     </div>
-  );
-}
-
-interface HeadCellProps {
-  label: string;
-  align?: "left" | "right";
-  sorted?: boolean;
-}
-
-/**
- * `sr-only` 를 쓰지 않는다 — 이 셀들은 그리드 아이템이라 position:absolute 가 되면
- * 그리드에서 빠지고 나머지 열이 한 칸씩 밀린다 (RankingTable 주석).
- */
-function HeadCell({ label, align = "left", sorted = false }: HeadCellProps) {
-  return (
-    <span
-      role="columnheader"
-      aria-sort={sorted ? "descending" : undefined}
-      className={`${RANKING_HEAD} flex items-center gap-0.5 ${
-        align === "right" ? "justify-end" : ""
-      } ${sorted ? "text-ink" : "text-muted-50"}`}
-    >
-      {label}
-      {sorted ? <Icon name="caret-down" size={12} /> : null}
-    </span>
   );
 }

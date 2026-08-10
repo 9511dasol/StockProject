@@ -65,16 +65,44 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: AUTH_ENABLED ? "database" : "jwt" },
   pages: {
     signIn: "/login",
+    /**
+     * 실패도 **우리 화면**에서 받는다.
+     *
+     * 기본값은 Auth.js 가 들고 있는 `/api/auth/error` 인데, 그 화면은 검은 배경에
+     * "Server error — There is a problem with the server configuration." 만 띄운다.
+     * 제호도 없고 돌아갈 링크도 없어서 사용자는 사이트를 벗어난 것처럼 느낀다.
+     *
+     * **가장 흔한 도착 경로가 '취소' 라서 더 나쁘다.** 구글 OAuth 를 취소하면
+     * `error=access_denied` 로 돌아오는데, 구글의 discovery 가
+     * `authorization_response_iss_parameter_supported: true` 를 광고하므로 Auth.js 는
+     * 응답에 `iss` 를 요구한다. 그런데 구글은 **성공 응답에만** `iss` 를 싣는다.
+     * 그래서 취소는 "access_denied" 로 도착하지 못하고 `iss` 검증에서 먼저 터지며,
+     * 그 실패가 `CallbackRouteError` → 에러 페이지의 `error=Configuration` 이 된다.
+     *
+     * 즉 **취소가 서버 설정 오류처럼 보인다.** 로그인만 취소했을 뿐인 사람에게
+     * 그 화면을 보여줄 이유가 없다. `/login` 으로 돌려보내면 그 자리에서 다시
+     * 시도할 수 있고, 무슨 일이 있었는지도 화면이 말한다 (`app/login/page.tsx`).
+     */
+    error: "/login",
   },
   callbacks: {
     /**
-     * 세션에 사용자 ID 를 실어 준다.
+     * 세션에 사용자 ID 와 권한을 실어 준다.
      *
-     * 관심종목 소유자 키(`user:<id>`)가 이 값에서 나온다 — 없으면 로그인해도 익명
+     * 관심종목 소유자 키(`user:<id>`)가 `id` 에서 나온다 — 없으면 로그인해도 익명
      * 목록을 계속 보게 된다. DB 세션 전략에서는 `user` 인자에 들어 있다.
+     *
+     * `role` 은 우리가 `users` 에 더한 컬럼이다(`c9b3e7d21a08`). 어댑터가
+     * `select * from users` 로 읽으므로(실측) 별도 조회 없이 여기 실려 온다 —
+     * 관리자 판단 때문에 매 요청 DB 를 한 번 더 치지 않아도 되는 이유다.
+     *
+     * **기본값이 `"user"` 인 것이 중요하다.** 컬럼이 없는 환경(마이그레이션 전)에서
+     * `undefined` 가 그대로 흐르면, 그 값을 비교하는 쪽이 실수 한 번으로 통과시킬
+     * 여지가 생긴다. 모르면 권한 없음이다.
      */
     session({ session, user }) {
       if (user?.id) session.user.id = user.id;
+      session.user.role = (user as { role?: string })?.role === "admin" ? "admin" : "user";
       return session;
     },
     /** 지금은 모든 경로가 공개다. 관심종목도 익명으로 쓸 수 있어야 한다. */

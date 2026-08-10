@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/shared/ui";
 import {
   createContext,
   useCallback,
@@ -92,7 +93,15 @@ export function useDetailView(): ViewContextValue {
   return context;
 }
 
-/** 우상단 뷰 토글. 두 뷰의 헤더가 각각 렌더한다. */
+/**
+ * 뷰 토글. 두 뷰의 액션 줄이 각각 렌더한다.
+ *
+ * 라벨은 테마 토글과 마찬가지로 '무엇으로 바뀌는지'다. 다만 그 둘이 한때 같은
+ * 단어를 썼다 — 이쪽은 `CONSOLE`/`EDITORIAL`, 테마는 `TERMINAL`/`EDITORIAL` 이라
+ * 나란히 둘 다 `EDITORIAL` 이 되는 순간이 있었다. 테마 쪽 라벨을 밝기 언어
+ * (DARK/LIGHT)로 옮겨 어휘를 갈랐고, 글리프도 은유를 나눈다 — 여기는 터미널·기사,
+ * 저기는 해·달 (`shared/theme/ThemeToggle` 주석).
+ */
 export function ViewToggle() {
   const { view, setView } = useDetailView();
   const next: DetailView = view === "console" ? "editorial" : "console";
@@ -102,10 +111,13 @@ export function ViewToggle() {
       type="button"
       onClick={() => setView(next)}
       aria-pressed={view === "console"}
+      aria-label={next === "console" ? "터미널 콘솔 화면으로" : "에디토리얼 화면으로"}
       title={next === "console" ? "터미널 콘솔로 전환" : "에디토리얼로 전환"}
-      className="hidden border border-line-control px-2.5 py-2 font-mono uppercase tracking-label-tight text-muted-60 hover:border-ink hover:text-ink md:block"
+      // flex-none whitespace-nowrap: 테마 토글과 같은 이유다 (Masthead 주석).
+      className="hidden flex-none items-center gap-1.5 whitespace-nowrap border border-line-control px-2.5 py-2 font-mono uppercase tracking-label-tight text-muted-60 hover:border-ink hover:text-ink md:flex"
       style={{ fontSize: 9.5 }}
     >
+      <Icon name={next === "console" ? "terminal" : "article"} size={13} />
       {next}
     </button>
   );

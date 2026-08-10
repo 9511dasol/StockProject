@@ -1,4 +1,8 @@
-"""AI 판단 엔드포인트의 자물쇠 — 공유 비밀키 헤더.
+"""서버-서버 공유 비밀키 자물쇠 둘 — AI 판단(`X-Advice-Key`)과 관리자(`X-Admin-Key`).
+
+**두 키는 절대 같은 값이 아니다.** 잃었을 때의 크기가 다르기 때문이고, 그 근거는
+`require_admin_key` 주석에 있다. 미설정일 때의 동작도 반대다 — AI 쪽은 열고
+관리자 쪽은 닫는다.
 
 ## 왜 이것만 잠그나
 
@@ -40,6 +44,7 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 _HEADER = "X-Advice-Key"
+_ADMIN_HEADER = "X-Admin-Key"
 
 
 async def require_advice_key(
@@ -64,4 +69,59 @@ async def require_advice_key(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="AI 판단 엔드포인트에 접근할 수 없습니다.",
+        )
+
+
+async def require_admin_key(
+    x_admin_key: str | None = Header(
+        default=None,
+        alias=_ADMIN_HEADER,
+        description="관리자 엔드포인트 공유 비밀키. 프런트 BFF가 서버 측에서 붙인다.",
+    ),
+) -> None:
+    """관리자 엔드포인트의 자물쇠.
+
+    ## 왜 AI 판단 키를 재사용하지 않나
+
+    같은 패턴이지만 **잃었을 때의 크기가 다르다.** AI 키가 새면 남이 우리 토큰을
+    태운다. 관리자 키가 새면 남이 자기 계정에 관리자 권한을 준다 — 거기서부터는
+    무엇이든 가능하다. 두 값을 하나로 두면 매 AI 요청에 실려 나가는 키가 곧 관리자
+    키가 되고, **넓은 표면에 노출되는 값이 가장 강한 권한을 갖게** 된다.
+
+    ## 이건 인증이 아니라 **2차 방어선**이다
+
+    "누가 관리자인가" 는 프런트가 판단한다 — 세션과 `users.role` 을 보는 쪽이 거기다
+    (`front/src/lib/auth/admin.ts`). 이 키는 그 판단을 우회해 백엔드를 직접 두드리는
+    것을 막을 뿐이고, 그 이상을 주장하지 않는다.
+
+        브라우저 ──(세션 쿠키)──▶ Next /admin/*   ← 여기서 role 을 검증한다
+                                     │
+                                     └──(X-Admin-Key)──▶ FastAPI /admin/*
+
+    그러므로 **프런트의 검사를 이 키로 대체할 수 없다.** 이 키만 아는 사람은
+    로그인 없이도 관리자 API 를 부를 수 있기 때문이다. 두 겹이 함께 있어야 한다.
+
+    ## 미설정이면 **막는다** — advice 와 반대다
+
+    `require_advice_key` 는 키가 없으면 통과시킨다. 로컬 개발이 키 없이 돌아야 하고,
+    막아 봐야 잃는 것이 토큰뿐이기 때문이다. 여기서는 반대로 **닫는다.** 설정을
+    빠뜨린 서버가 관리자 API 를 열어 두는 것보다, 관리자 화면이 안 열리는 편이
+    비교할 수 없이 낫다 — 조용히 열려 있는 것이 가장 나쁘다.
+    """
+    expected = (settings.admin_api_key or "").strip()
+    if not expected:
+        logger.error(
+            "ADMIN_API_KEY 가 설정되지 않아 관리자 엔드포인트를 거절했습니다 — "
+            "관리자 기능을 쓰려면 백엔드와 프런트에 같은 값을 넣으세요"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="관리자 기능이 설정되지 않았습니다.",
+        )
+
+    if x_admin_key is None or not secrets.compare_digest(x_admin_key, expected):
+        logger.warning("관리자 요청이 잘못된 키로 거절되었습니다")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="관리자 엔드포인트에 접근할 수 없습니다.",
         )

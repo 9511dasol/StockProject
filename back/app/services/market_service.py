@@ -4,6 +4,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
+from app.core.background import schedule_once
 from app.core.config import settings
 from app.domain.symbols import board_of
 from app.integrations.yfinance.market import fetch_market_overview
@@ -38,7 +39,6 @@ _scan: MoversScan | None = None
 # 매 요청이 갱신을 예약해 실패를 계속 두드린다.
 _scanned_at: datetime | None = None
 _scan_lock = asyncio.Lock()
-_refresh_task: asyncio.Task[None] | None = None
 
 
 def _is_fresh() -> bool:
@@ -102,14 +102,15 @@ async def _refresh_in_new_session() -> None:
 def _schedule_movers_refresh() -> None:
     """갱신을 배경 태스크로 띄운다. 이미 도는 중이면 아무것도 하지 않는다.
 
-    태스크 참조를 모듈 변수로 잡아 두는 것은 GC 가 실행 중인 태스크를 수거하지
-    못하게 하기 위함이다.
-    """
-    global _refresh_task
+    **`min_interval` 을 주지 않는다** — 만료 판정은 `refresh_movers` 가 `_is_fresh()`
+    로 이미 한다. 여기서 한 번 더 걸면 같은 판정이 두 곳에 생기고, `market_movers_ttl_seconds`
+    를 고칠 때 한쪽만 고치는 자리가 된다.
 
-    if _refresh_task is not None and not _refresh_task.done():
-        return
-    _refresh_task = asyncio.create_task(_refresh_in_new_session())
+    테스트가 이 이름을 대역으로 세운다(`test_market.py` · `test_market_ranking.py`) —
+    막지 않으면 랭킹 테스트가 실제 yfinance 벌크 다운로드를 친다. 그래서 공용
+    스케줄러를 부르더라도 **이 함수 자체는 남는다.**
+    """
+    schedule_once("movers", _refresh_in_new_session)
 
 
 def _to_response(scan: MoversScan | None, limit: int) -> MarketMovers:

@@ -27,6 +27,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.dialects import postgresql
 
 from app.models.listed_company import ListedCompany
+from app.schemas.market import ScreenerQuery
 
 
 def _pg_sql(stmt) -> str:
@@ -194,6 +195,13 @@ async def test_no_repository_query_orders_nullable_desc_without_nulls(
     await listings.calendar_coverage()
     await listings.upcoming_calendar("next_earnings_date", date(2026, 8, 7), date(2026, 8, 14), 5)
     await listings.count_upcoming_calendar("ex_dividend_date", date(2026, 8, 7), date(2026, 8, 14))
+    # 스크리너(P2). 정렬 축이 다섯이라 **하나만 태우면 나머지 넷은 규칙 밖**이다 —
+    # 축을 추가하면서 `nullslast()` 를 빠뜨리는 것이 정확히 이 검사가 노리는 실수다.
+    for axis in ("market_cap", "per", "pbr", "dividend_yield", "roe"):
+        await listings.screen(ScreenerQuery(sort=axis), limit=5, offset=0)
+    await listings.count_screened(ScreenerQuery(per_max=15))
+    await listings.screener_coverage()
+    await listings.latest_fundamentals_update()
     await watch.list_for_owner("anon:x")
     await watch.find_by_code("anon:x", "005930")
     await watch.count_for_owner("anon:x")

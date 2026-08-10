@@ -4,11 +4,12 @@ import logging
 from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.listed_company import ListedCompany
-from app.schemas.stock import CalendarDates, ListedCompanyRecord
+from app.schemas.market import SCREENER_ORDER, ScreenerQuery, ScreenerSort
+from app.schemas.stock import CalendarDates, CompanyMetrics, ListedCompanyRecord
 from app.utils.text import get_initial_consonants, normalize_search_text
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,56 @@ _CALENDAR_COLUMNS = {
     "next_earnings_date": ListedCompany.next_earnings_date,
     "ex_dividend_date": ListedCompany.ex_dividend_date,
 }
+
+#: 배치·조회의 모집단. 접미사 없는 행(수집 원본이 깨진 44건)은 yfinance 심볼로 쓸 수
+#: 없어 물어봐야 빈손이고, 분모에 넣으면 진행률이 영원히 100%에 닿지 않는다.
+_BOARD_FILTER = or_(ListedCompany.symbol.like("%.KS"), ListedCompany.symbol.like("%.KQ"))
+
+#: 정렬 축 → 컬럼. `ScreenerSort` 의 값만 여기 있다 — 문자열이 SQL 로 가는 유일한
+#: 통로이므로, 매핑에 없는 값은 존재할 수 없어야 한다 (`_CALENDAR_COLUMNS` 와 같은 관문).
+_SCREENER_COLUMNS: dict[ScreenerSort, ColumnElement] = {
+    "market_cap": ListedCompany.market_cap,
+    "per": ListedCompany.per,
+    "pbr": ListedCompany.pbr,
+    "dividend_yield": ListedCompany.dividend_yield_pct,
+    "roe": ListedCompany.roe_pct,
+}
+
+#: 시장 구분 필터. 랭킹이 파이썬에서 `board_of(symbol)` 로 판정하는 것과 같은 근거를
+#: SQL 로 옮긴 것이다 — 접미사는 실제로 공급자에게 물어본 심볼 그 자체라 행과 어긋날 수
+#: 없다 (`domain/symbols.board_of` 주석).
+_BOARD_SUFFIX = {"KOSPI": "%.KS", "KOSDAQ": "%.KQ"}
+
+
+def _screener_conditions(query: ScreenerQuery) -> list:
+    """조건 검색의 WHERE 절. 조회와 건수 세기가 **같은 목록**을 써야 한다.
+
+    두 곳에 나눠 적으면 한쪽만 고쳐 `total` 과 행 수가 어긋나고, 그건 화면에서
+    "23건" 이라 쓰고 5줄만 나오는 형태로만 드러난다 — 오류가 나지 않는다.
+
+    비어 있는 조건은 절을 만들지 않는다. `None >= x` 같은 항을 넣으면 SQL 이 전부
+    거짓이 되어 결과가 통째로 사라진다.
+    """
+    conditions: list = [_BOARD_FILTER]
+
+    suffix = _BOARD_SUFFIX.get(query.board)
+    if suffix:
+        conditions.append(ListedCompany.symbol.like(suffix))
+
+    ranges: list[tuple[ColumnElement, float | int | None, float | int | None]] = [
+        (ListedCompany.market_cap, query.market_cap_min, query.market_cap_max),
+        (ListedCompany.per, query.per_min, query.per_max),
+        (ListedCompany.pbr, query.pbr_min, query.pbr_max),
+        (ListedCompany.dividend_yield_pct, query.dividend_min, None),
+        (ListedCompany.roe_pct, query.roe_min, None),
+    ]
+    for column, low, high in ranges:
+        if low is not None:
+            conditions.append(column >= low)
+        if high is not None:
+            conditions.append(column <= high)
+
+    return conditions
 
 
 def _as_date(value: str | None) -> date | None:
@@ -128,12 +179,7 @@ class ListedCompanyRepository:
         """
         stmt = (
             select(ListedCompany)
-            .where(
-                or_(
-                    ListedCompany.symbol.like("%.KS"),
-                    ListedCompany.symbol.like("%.KQ"),
-                )
-            )
+            .where(_BOARD_FILTER)
             .order_by(ListedCompany.market_cap.desc().nullslast(), ListedCompany.symbol)
             .limit(limit)
         )
@@ -289,12 +335,7 @@ class ListedCompanyRepository:
         """
         stmt = (
             select(ListedCompany.symbol)
-            .where(
-                or_(
-                    ListedCompany.symbol.like("%.KS"),
-                    ListedCompany.symbol.like("%.KQ"),
-                )
-            )
+            .where(_BOARD_FILTER)
             .order_by(
                 ListedCompany.calendar_updated_at.asc().nullsfirst(),
                 ListedCompany.market_cap.desc().nullslast(),
@@ -306,10 +347,13 @@ class ListedCompanyRepository:
         result = await self._db.execute(stmt)
         return list(result.scalars().all())
 
-    async def update_calendar_dates(
-        self, dates: Mapping[str, CalendarDates], answered: Sequence[str]
-    ) -> int:
-        """일정을 반영한다. 날짜를 얻은 종목 수를 돌려준다.
+    async def update_snapshots(
+        self,
+        dates: Mapping[str, CalendarDates],
+        metrics: Mapping[str, CompanyMetrics],
+        answered: Sequence[str],
+    ) -> tuple[int, int]:
+        """일정과 지표를 반영한다. `(날짜를 얻은 종목 수, 지표를 얻은 종목 수)`.
 
         **`answered` 는 "응답을 받은 종목" 이지 "물어본 종목" 이 아니다.** 그 둘을
         같게 두었다가 실제로 데이터를 지웠다 — 공급자가 요청을 거부한 배치가 전 종목을
@@ -325,26 +369,65 @@ class ListedCompanyRepository:
         날짜를 **덮어쓰는** 것은 의도다. 실적발표가 끝나면 공급자가 다음 분기 날짜를
         주고, 그때 값이 바뀌어야 '오늘의 일정' 이 과거를 가리키지 않는다. 응답받은
         종목에서 일정이 사라졌으면(취소·미정) 그것도 반영한다.
+
+        ## 지표는 세 갈래로 나뉜다 — 값이 온 **경로**가 다르기 때문이다
+
+        `metrics` 에 항목이 없는 종목은 지표를 **아무것도 건드리지 않는다.** 항목이
+        있으면 그 안에서 다시 갈린다.
+
+            ROE · 배당수익률   그대로 덮어쓴다. `get_info()` 응답에서 왔고 응답은
+                              받았으므로, 값이 없으면 없는 것이 사실이다 (배당을
+                              중단한 회사는 수익률이 사라져야 한다)
+            PER · PBR         `valuation_ok` 일 때만 쓴다. 이 둘만 `get_info()` 가
+                              아니라 `get_valuation_measures()` 에서 오는데, **별개의
+                              호출이라 info 는 멀쩡한데 이쪽만 실패할 수 있다.**
+                              그때 None 은 "없다" 가 아니라 "모른다" 다
+            시가총액          **있을 때만** 쓴다. 이 컬럼은 이 배치만의 것이 아니다 —
+                              KRX 벌크 경로(`update_market_caps`)도 같은 컬럼에 쓰고
+                              그쪽 계약이 "있는 값만" 이다. 두 writer 가 반대 규칙을
+                              가지면 같은 종목의 시총이 어느 배치가 나중에 돌았느냐에
+                              따라 나타났다 사라진다
+
+        `fundamentals_updated_at` 은 PER/PBR 을 실제로 쓴 경우에만 찍는다. 밸류에이션
+        호출이 실패한 배치에서 이 시각을 갱신하면, 화면이 옛날 PER 을 오늘 값이라고
+        말하게 된다 (`models/listed_company` 주석).
         """
         if not answered:
-            return 0
+            return 0, 0
 
         now = datetime.now(UTC)
         result = await self._db.execute(
             select(ListedCompany).where(ListedCompany.symbol.in_(list(answered)))
         )
 
-        filled = 0
+        filled_dates = 0
+        filled_metrics = 0
         for company in result.scalars().all():
             value = dates.get(company.symbol)
             company.ex_dividend_date = _as_date(value.ex_dividend_date) if value else None
             company.next_earnings_date = _as_date(value.next_earnings_date) if value else None
             company.calendar_updated_at = now
             if company.ex_dividend_date or company.next_earnings_date:
-                filled += 1
+                filled_dates += 1
+
+            metric = metrics.get(company.symbol)
+            if metric is None:
+                continue
+
+            company.roe_pct = metric.roe_pct
+            company.dividend_yield_pct = metric.dividend_yield_pct
+            if metric.market_cap:
+                company.market_cap = metric.market_cap
+                company.market_cap_updated_at = now
+            if metric.valuation_ok:
+                company.per = metric.per
+                company.pbr = metric.pbr
+                company.fundamentals_updated_at = now
+            if metric.per is not None or metric.pbr is not None:
+                filled_metrics += 1
 
         await self._db.commit()
-        return filled
+        return filled_dates, filled_metrics
 
     async def calendar_coverage(self) -> tuple[int, int]:
         """`(일정을 한 번이라도 받은 종목 수, 배치 모집단 크기)`.
@@ -353,13 +436,10 @@ class ListedCompanyRepository:
         물어보는 모집단(`.KS`/`.KQ`)이다 — 접미사 없는 행을 분모에 넣으면 진행률이
         영원히 100%에 닿지 않는다.
         """
-        board_filter = or_(
-            ListedCompany.symbol.like("%.KS"), ListedCompany.symbol.like("%.KQ")
-        )
         total = int(
             (
                 await self._db.execute(
-                    select(func.count()).select_from(ListedCompany).where(board_filter)
+                    select(func.count()).select_from(ListedCompany).where(_BOARD_FILTER)
                 )
             ).scalar_one()
         )
@@ -369,7 +449,7 @@ class ListedCompanyRepository:
                     select(func.count())
                     .select_from(ListedCompany)
                     .where(
-                        board_filter,
+                        _BOARD_FILTER,
                         or_(
                             ListedCompany.next_earnings_date.is_not(None),
                             ListedCompany.ex_dividend_date.is_not(None),
@@ -417,6 +497,104 @@ class ListedCompanyRepository:
             select(func.count())
             .select_from(ListedCompany)
             .where(target.between(start, end))
+        )
+        return int((await self._db.execute(stmt)).scalar_one())
+
+    # --- 스크리너 (조건 검색) --------------------------------------------------
+
+    async def latest_fundamentals_update(self) -> datetime | None:
+        """가장 최근 지표 갱신 시각. 화면의 `as_of` 가 여기서 나온다.
+
+        `latest_calendar_update` 와 **따로** 둔다. 같은 배치가 둘 다 찍지만
+        밸류에이션 호출만 실패한 배치는 일정만 갱신하므로, 하나로 합치면 화면이
+        옛날 PER 을 오늘 값이라고 말하게 된다.
+        """
+        result = await self._db.execute(select(func.max(ListedCompany.fundamentals_updated_at)))
+        value = result.scalar_one_or_none()
+        if value is None:
+            return None
+        # `latest_market_cap_update` 와 같은 방어다.
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+    async def screener_coverage(self) -> tuple[int, int]:
+        """`(지표를 한 번이라도 받은 종목 수, 배치 모집단 크기)`.
+
+        `calendar_coverage` 와 같은 목적이고 분모도 같다 — 접미사 없는 행을 넣으면
+        진행률이 영원히 100%에 닿지 않는다.
+
+        분자는 PER **또는** PBR 이 있는 종목이다. ROE·배당수익률로 세지 않는 이유:
+        그 둘은 값이 없는 것이 정상인 종목이 많아(적자·무배당) 진행률이 아니라
+        시장 구성을 재게 된다.
+        """
+        covered = int(
+            (
+                await self._db.execute(
+                    select(func.count())
+                    .select_from(ListedCompany)
+                    .where(
+                        _BOARD_FILTER,
+                        or_(ListedCompany.per.is_not(None), ListedCompany.pbr.is_not(None)),
+                    )
+                )
+            ).scalar_one()
+        )
+        total = int(
+            (
+                await self._db.execute(
+                    select(func.count()).select_from(ListedCompany).where(_BOARD_FILTER)
+                )
+            ).scalar_one()
+        )
+        return covered, total
+
+    async def count_with_market_cap(self) -> int:
+        """시가총액이 채워진 종목 수. 관리자 화면의 배치 진행률에 쓴다.
+
+        분모는 `calendar_coverage`/`screener_coverage` 와 같은 모집단(`.KS`/`.KQ`)이라
+        여기서는 분자만 센다 — 세 진행률이 같은 분모를 공유해야 나란히 읽힌다.
+        """
+        stmt = (
+            select(func.count())
+            .select_from(ListedCompany)
+            .where(_BOARD_FILTER, ListedCompany.market_cap.is_not(None))
+        )
+        return int((await self._db.execute(stmt)).scalar_one())
+
+    async def screen(
+        self, query: ScreenerQuery, *, limit: int, offset: int
+    ) -> Sequence[ListedCompany]:
+        """조건에 맞는 종목. 정렬 축의 방향은 `SCREENER_ORDER` 가 정한다.
+
+        **NULL 은 정렬의 맨 뒤다 — 방향과 무관하게.** `asc()` 의 Postgres 기본값이
+        이미 NULLS LAST 이고 `desc()` 는 NULLS FIRST 지만, 여기서는 둘 다 명시한다.
+        기본값에 기대면 나중에 축을 하나 추가하면서 방향만 바꿨을 때 조용히 뒤집힌다 —
+        13회차에 `top_by_market_cap` 이 정확히 그렇게 무너졌다. 뜻은 한 문장이다:
+        **값이 없는 종목은 어느 축에서도 앞에 오지 않는다.**
+
+        타이브레이크로 `symbol` 을 둔다. 없으면 동점 구간이 물리적 행 순서라 페이지를
+        넘길 때 같은 종목이 두 번 나오거나 사라진다 (`offset` 페이지네이션의 고전적 사고).
+        """
+        column = _SCREENER_COLUMNS[query.sort]
+        direction = (
+            column.asc().nullslast()
+            if SCREENER_ORDER[query.sort] == "asc"
+            else column.desc().nullslast()
+        )
+
+        stmt = (
+            select(ListedCompany)
+            .where(*_screener_conditions(query))
+            .order_by(direction, ListedCompany.symbol)
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self._db.execute(stmt)
+        return result.scalars().all()
+
+    async def count_screened(self, query: ScreenerQuery) -> int:
+        """위 조회의 전체 건수. `limit` 으로 잘리기 전 숫자다."""
+        stmt = (
+            select(func.count()).select_from(ListedCompany).where(*_screener_conditions(query))
         )
         return int((await self._db.execute(stmt)).scalar_one())
 

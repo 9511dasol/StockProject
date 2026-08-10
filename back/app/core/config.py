@@ -55,13 +55,19 @@ class Settings(BaseSettings):
     # 기다리지 않게 하는 것이 목적이다. 테스트·오프라인에서는 끈다.
     seed_listed_companies_on_startup: bool = True
 
-    # --- 오늘의 일정 (실적발표 · 배당락) ---
-    # 하루 1회 배치가 한 번에 물어볼 종목 수. 종목당 yfinance 1회 호출(~1초)이고
-    # 동시 8스레드라 200이면 25초쯤이다. 전 종목(2,700+)은 며칠에 걸쳐 채워진다 —
-    # 시총 배치와 달리 **값이 만료되므로** 한 바퀴 돌면 다시 오래된 것부터 갱신한다.
-    calendar_batch_limit: int = Field(default=200, ge=0)
+    # --- 종목 스냅샷 배치 (오늘의 일정 + 스크리너 지표) ---
+    # 하루 1회 배치가 한 번에 물어볼 종목 수. 종목당 yfinance 2회(info ~0.5초 +
+    # 밸류에이션 ~0.2초)이고 동시 8스레드라 200이면 20초쯤이다. 전 종목(2,700+)은
+    # 며칠에 걸쳐 채워진다 — 시총 배치와 달리 **값이 만료되므로**(실적발표일이
+    # 지나간다) 한 바퀴 돌면 다시 오래된 것부터 갱신한다.
+    #
+    # 일정과 지표를 한 배치가 함께 채운다. 나누면 같은 종목에 `get_info()` 를 두 번
+    # 치게 되고, 16회차에 야후가 그것 때문에 전 종목 요청을 거부했다.
+    snapshot_batch_limit: int = Field(default=200, ge=0)
     # 화면이 기본으로 보는 창(일). 너무 넓히면 '오늘의 일정'이 '이번 분기 일정'이 된다.
     calendar_default_days: int = Field(default=7, ge=1, le=90)
+    # 조건 검색 한 페이지 종목 수의 기본값. 상한은 엔드포인트가 따로 건다.
+    screener_page_size: int = Field(default=50, ge=1, le=100)
 
     # --- 등락률 랭킹 ---
     # 등락률을 스캔할 종목 수. 시가총액 상위부터 채운다 — 전 종목(2,700+)을
@@ -101,6 +107,16 @@ class Settings(BaseSettings):
     # 때문인데, 그 상태로 외부에 노출하면 누구나 토큰을 태울 수 있으므로 기동 시
     # 경고를 남긴다 (main.py lifespan).
     advice_api_key: str | None = None
+
+    # --- 관리자 ---
+    # 관리자 엔드포인트를 여는 공유 비밀키. **`ADVICE_API_KEY` 와 다른 값이어야 한다** —
+    # 매 AI 요청에 실려 나가는 키가 곧 관리자 키가 되면, 가장 넓게 노출되는 값이 가장
+    # 강한 권한을 갖는다 (`api/auth.require_admin_key` 주석).
+    #
+    # **비어 있으면 관리자 API 가 닫힌다.** `advice_api_key` 와 정반대다. 그쪽은
+    # 미설정이면 열어 두는데(로컬 개발이 키 없이 돌아야 하고 잃는 것이 토큰뿐이다),
+    # 여기서 같은 선택을 하면 설정을 빠뜨린 서버가 권한 부여 API 를 공개하게 된다.
+    admin_api_key: str | None = None
 
     # --- LLM (Google Gemini) ---
     # 미설정 시 SDK가 GOOGLE_API_KEY / GEMINI_API_KEY 환경 변수를 읽는다.
@@ -191,6 +207,16 @@ class Settings(BaseSettings):
         꺼져 있다는 사실을 기동 로그가 알려야 한다 (main.py).
         """
         return bool(self.advice_api_key)
+
+    @property
+    def admin_enabled(self) -> bool:
+        """관리자 엔드포인트가 열려 있는가. 기동 로그가 이 값을 알린다 (main.py).
+
+        `advice_auth_enabled` 와 뜻이 **반대**라는 점에 주의한다. 저쪽은 True 가
+        "잠겼다" 이고 여기는 True 가 "쓸 수 있다" 다 — 키가 없으면 잠기는 것이
+        아니라 기능 자체가 없다.
+        """
+        return bool((self.admin_api_key or "").strip())
 
 
 @lru_cache

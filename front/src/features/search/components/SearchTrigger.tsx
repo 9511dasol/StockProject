@@ -77,9 +77,13 @@ export function SearchTrigger({
       type="button"
       onClick={open}
       aria-label="종목 검색 열기 (Ctrl+K)"
-      // w-[250px] 은 상한이지 고정폭이 아니다 — min-w-0 이 있어야 768px 처럼 빠듯한
-      // 폭에서 이 필드가 줄어들며 제호·액션 버튼을 화면 밖으로 밀지 않는다.
-      className="flex w-[250px] min-w-0 items-center gap-2 border border-line-28 bg-field px-3 py-2 text-left hover:border-ink"
+      // 폭은 상한이지 고정폭이 아니다 — min-w-0 이 있어야 빠듯한 폭에서 이 필드가
+      // 줄어들며 제호·액션 버튼을 화면 밖으로 밀지 않는다.
+      //
+      // lg 에서 200px, xl 에서 250px 로 둔다. 이 덩어리에 컨트롤이 여섯까지 서는
+      // 화면(종목 상세)이 있어서, 가장 넓은 요소가 폭을 양보할 수 있어야 나머지가
+      // 한 줄에 남는다. 줄어드는 것은 안내 문구뿐이고 ⌘K 힌트는 그대로 보인다.
+      className="flex w-[200px] min-w-0 items-center gap-2 border border-line-28 bg-field px-3 py-2 text-left hover:border-ink xl:w-[250px]"
     >
       <Icon name="search" size={15} className="flex-none text-muted-35" />
       <span className="truncate text-muted-45" style={{ fontSize: 13 }}>

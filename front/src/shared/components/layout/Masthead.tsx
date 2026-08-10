@@ -42,9 +42,19 @@ export function Masthead({ caption, search, action }: MastheadProps) {
     <header className="flex items-end justify-between gap-3 border-b-2 border-ink pb-3 md:gap-6">
       <Wordmark caption={caption} />
 
-      {/* min-w-0: 768px 처럼 빠듯한 폭에서 이 덩어리가 제호를 밀어내는 대신
-          검색 필드가 줄어들게 한다 (SearchTrigger "field" 가 truncate 를 들고 있다) */}
-      <div className="flex min-w-0 items-center gap-2.5">
+      {/* **flex-wrap 이 안전망이다.**
+          이 줄에 컨트롤이 늘어난 뒤(담기·계정) 768px 부근에서 버튼들이 눌려
+          "AI 판 단 열 기" 처럼 글자가 세로로 접혔다. 원인은 둘이었다: 제호 제목이
+          whitespace-nowrap 이라 안 줄어드는데 이 덩어리만 min-w-0 이라 압박을 전부
+          받았고, 그 안의 버튼에 flex-none 이 없어 내용보다 작게 눌렸다.
+
+          버튼마다 flex-none·whitespace-nowrap 을 달아 **눌리지 않게** 하고, 그래도
+          안 들어가면 여기서 **다음 줄로 넘긴다.** 폭을 하나하나 계산해 맞추는 방식은
+          컨트롤을 하나 더할 때마다 다시 깨진다 — 실제로 그렇게 깨졌다.
+
+          min-w-0 은 남겨 둔다. 검색 필드(lg 이상에서만 보인다)가 줄어들 여지를
+          갖는 편이 줄바꿈보다 먼저 시도되는 선택지다. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2.5">
         {search}
         <ThemeToggle />
         {action}

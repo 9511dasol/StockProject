@@ -7,6 +7,8 @@
 // 라벨을 찾고 href 를 만들면, 같은 조합 로직이 시장·정렬 두 벌로 복사된다. 순수
 // 함수로 내려 두면 테스트가 되고(ranking.test.ts) 컴포넌트는 그리기만 남는다.
 
+import type { FilterOption } from "./filters";
+
 export const RANKING_SORTS = ["market_cap", "change"] as const;
 export const RANKING_BOARDS = ["ALL", "KOSPI", "KOSDAQ"] as const;
 
@@ -58,17 +60,13 @@ export const SORTED_COLUMN: Record<RankingSort, SortedColumn> = {
 };
 
 /**
- * 필터 칩 하나가 필요로 하는 것 전부.
+ * 필터 칩 하나가 필요로 하는 것 전부. 모양은 `model/filters` 가 소유한다 —
+ * 조건 검색의 칩과 같은 네 필드이고, 같은 `FilterChip` 이 그린다.
  *
  * `value` 를 남겨 두는 것은 React key 와 테스트 때문이다 — 라벨은 번역되면 바뀌지만
  * value 는 URL 계약이라 바뀌지 않는다.
  */
-export interface RankingFilterOption<Value extends string> {
-  value: Value;
-  label: string;
-  href: string;
-  selected: boolean;
-}
+export type RankingFilterOption<Value extends string> = FilterOption<Value>;
 
 /**
  * `?sort=` 를 안전한 값으로 좁힌다. 모르는 값은 조용히 기본값으로 떨어뜨린다.

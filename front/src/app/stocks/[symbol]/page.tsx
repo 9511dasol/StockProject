@@ -79,7 +79,15 @@ export default async function StockDetailPage({
     >
       <ViewSwitch
         initialView={query.view === "console" ? "console" : "editorial"}
-        editorial={<EditorialView detail={detail} indices={market.indices} />}
+        editorial={
+          <EditorialView
+            detail={detail}
+            indices={market.indices}
+            watched={watchlist.items.some(
+              (item) => item.code === detail.ref.code,
+            )}
+          />
+        }
         console={
           <ConsoleView
             detail={detail}

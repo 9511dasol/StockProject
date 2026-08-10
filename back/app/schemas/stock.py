@@ -106,6 +106,45 @@ class CalendarRecord(BaseModel):
     dates: dict[str, CalendarDates] = Field(default_factory=dict)
 
 
+class CompanyMetrics(BaseModel):
+    """종목 하나의 스크리너 지표. 값이 없으면 None.
+
+    단위를 이름에 박는 것은 `yfinance/fundamentals.py` 와 같은 이유다 — `returnOnEquity`
+    는 소수이고 `dividendYield` 는 이미 백분율이라, 이름이 `roe` 였다면 읽는 쪽에서
+    어느 규약으로 저장됐는지 알 수 없다.
+    """
+
+    #: 원. `info["marketCap"]` 에서 온다 — 밸류에이션 표의 Market Cap 은 야후의 다른
+    #: 가격 기준이라 10%가량 어긋나므로 쓰지 않는다 (`build_fundamentals` 주석).
+    market_cap: int | None = None
+    per: float | None = None
+    pbr: float | None = None
+    roe_pct: float | None = None
+    dividend_yield_pct: float | None = None
+    #: PER·PBR 을 주는 `get_valuation_measures()` 호출이 성공했는가.
+    #:
+    #: **False 면 `per`/`pbr` 의 None 은 "값이 없다" 가 아니라 "모른다" 다.** 저장
+    #: 계층이 이 값을 보고 덮어쓸지 말지 정한다 — 이 플래그가 없으면 호출 한 번
+    #: 실패했을 때 이미 적재된 PER 이 NULL 로 지워진다. `get_info()` 와 별개의
+    #: 호출이라 info 는 멀쩡한데 이쪽만 실패하는 경우가 실제로 생긴다.
+    valuation_ok: bool = False
+
+
+class SnapshotRecord(CalendarRecord):
+    """종목 스냅샷 배치 1회분 — 일정 + 지표.
+
+    `CalendarRecord` 를 상속하는 것은 **같은 응답에서 나오기 때문**이다. 일정 두 날짜와
+    지표 넷은 종목당 `get_info()` **한 번**으로 함께 얻는다(PER/PBR 만 밸류에이션 호출이
+    하나 더 붙는다). 배치를 둘로 나누면 같은 종목에 `get_info()` 를 두 번 치게 되고,
+    16회차에 야후가 그것 때문에 전 종목 요청을 거부했다.
+
+    따라서 `attempted`/`answered` 의 뜻과 응답률 가드는 일정과 지표에 **동시에** 적용된다.
+    """
+
+    #: `answered` 에 든 심볼만 키로 갖는다. 응답을 못 받은 종목은 아예 없다.
+    metrics: dict[str, CompanyMetrics] = Field(default_factory=dict)
+
+
 class StockSuggestion(BaseModel):
     """자동완성 후보 (명세 6.2)."""
 

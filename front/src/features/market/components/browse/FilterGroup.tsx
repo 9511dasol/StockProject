@@ -1,13 +1,13 @@
 import { Icon, type IconName } from "@/shared/ui";
-import type { RankingFilterOption } from "../../model/ranking";
-import { FilterChip } from "./FilterChip";
+import type { FilterOption } from "../../model/filters";
+import { FilterChip } from "../table";
 import { FILTER_LABEL } from "./tokens";
 
 export interface FilterGroupProps<Value extends string> {
   /** 이 그룹이 바꾸는 축 ("시장" · "정렬") */
   label: string;
   icon: IconName;
-  options: readonly RankingFilterOption<Value>[];
+  options: readonly FilterOption<Value>[];
 }
 
 /**

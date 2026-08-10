@@ -26,10 +26,43 @@ const GOOGLE_ON = Boolean(
 );
 const EMAIL_ON = Boolean(process.env.EMAIL_SERVER && process.env.EMAIL_FROM);
 
-export default async function LoginPage() {
+/**
+ * Auth.js 가 `?error=` 로 넘기는 코드 → 사람이 읽는 문장.
+ *
+ * **`Configuration` 을 "설정이 잘못됐습니다" 로 번역하면 안 된다.** 이 화면에 그
+ * 코드로 도착하는 가장 흔한 경로가 **사용자가 구글 화면에서 취소한 경우**이기
+ * 때문이다 — 취소는 `iss` 없는 에러 응답으로 돌아오고, Auth.js 는 그것을
+ * `CallbackRouteError` 로 감싸 이 코드로 내보낸다 (`auth.ts` 의 `pages.error` 주석).
+ *
+ * 그래서 문장을 **양쪽 다 포함하도록** 쓴다. 취소한 사람에게는 "다시 시도" 가
+ * 답이고, 진짜 설정 문제라면 로그에 원인이 남아 있다는 것을 알려 준다. 어느 쪽인지
+ * 화면이 단정하지 않는 편이 정직하다.
+ */
+const ERROR_MESSAGES: Record<string, string> = {
+  Configuration:
+    "로그인이 완료되지 않았습니다. 구글 화면에서 취소했다면 다시 시도하시면 됩니다. " +
+    "반복된다면 서버 로그에 원인이 남아 있습니다.",
+  AccessDenied: "이 계정으로는 로그인할 수 없습니다. 다른 계정으로 시도해 보세요.",
+  Verification:
+    "이 로그인 링크는 만료되었거나 이미 사용되었습니다. 링크를 다시 받아 주세요.",
+};
+
+const DEFAULT_ERROR = "로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+
+interface LoginPageProps {
+  /** Next 16 은 searchParams 를 Promise 로 준다 */
+  searchParams: Promise<{ error?: string }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   // 이미 로그인했으면 여기 머물 이유가 없다.
   const session = await auth();
   if (session?.user) redirect("/watchlist");
+
+  const { error } = await searchParams;
+  const errorMessage = error
+    ? (ERROR_MESSAGES[error] ?? DEFAULT_ERROR)
+    : null;
 
   const caption = `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX}`;
 
@@ -59,6 +92,24 @@ export default async function LoginPage() {
           쓰는 브라우저에만 남습니다. 로그인하면 <strong>지금까지 담아 둔 목록이
           계정으로 옮겨지고</strong>, 다른 기기에서도 같은 목록을 봅니다.
         </p>
+
+        {/* 실패 안내는 버튼 **위**에 둔다 — 아래 두면 다시 누를 버튼을 지나친 뒤에야
+            읽게 되고, 모바일에서는 화면 밖일 수도 있다. role="alert" 로 스크린리더가
+            페이지 도착과 함께 읽는다. */}
+        {errorMessage ? (
+          <p
+            role="alert"
+            className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
+            style={{ fontSize: 12.5, lineHeight: 1.6 }}
+          >
+            {/* 전용 '오류 색' 을 만들지 않는다. 이 팔레트에서 빨강·파랑은 등락 방향이
+                소유하고(`lib/format/direction`), 앰버는 AI 액션이다. 여기서 그 셋 중
+                하나를 빌리면 화면 전체의 색 규약이 흐려진다 — 실선 테두리와 글리프로
+                충분히 구분되고, 바로 아래 안내(점선)와도 다르게 읽힌다. */}
+            <Icon name="bell" size={15} className="mt-0.5 flex-none text-muted-45" />
+            {errorMessage}
+          </p>
+        ) : null}
 
         {!AUTH_ENABLED ? (
           <p

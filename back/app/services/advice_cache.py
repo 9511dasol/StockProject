@@ -235,6 +235,32 @@ async def reserve_slot() -> AsyncIterator[None]:
         release_slot()
 
 
+@dataclass(frozen=True)
+class CacheStats:
+    """지금 이 프로세스의 캐시 현황. 관리자 화면이 읽는 유일한 창이다."""
+
+    cached: int
+    capacity: int
+    in_flight: int
+
+
+def stats() -> CacheStats:
+    """캐시·동시 실행 현황.
+
+    **이 프로젝트에서 돈이 나가는 유일한 경로의 관측 지점이다.** 종목 하나를
+    분석하면 LLM 이 4회 나가고, 그것을 줄이는 장치가 이 캐시인데 지금까지 그것이
+    실제로 일하고 있는지 볼 방법이 없었다.
+
+    프로세스 메모리라 **재시작하면 0 이고, 워커가 여럿이면 그중 하나의 숫자**다.
+    누적 사용량이 아니라 현재 상태라는 뜻이고, 화면이 그렇게 말해야 한다.
+    """
+    return CacheStats(
+        cached=len(_cache),
+        capacity=settings.advice_cache_size,
+        in_flight=_running,
+    )
+
+
 def reset_for_tests() -> None:
     """테스트 격리용. 모듈 전역 상태가 테스트 사이에 새지 않게 한다."""
     global _running

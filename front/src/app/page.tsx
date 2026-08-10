@@ -9,6 +9,7 @@ import { SearchTrigger } from "@/features/search";
 import { SampleFrame } from "@/shared/components/feedback";
 import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
+import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
 import Link from "next/link";
@@ -51,13 +52,18 @@ export default async function MarketHomePage() {
         <Masthead
           caption={caption}
           action={
-            <Link
-              href="/watchlist"
-              className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
-              style={{ fontSize: 13 }}
-            >
-              관심 종목
-            </Link>
+            <>
+              <Link
+                href="/watchlist"
+                className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
+                style={{ fontSize: 13 }}
+              >
+                관심 종목
+              </Link>
+              {/* 로그인·로그아웃은 화면마다 다른 자리에 있으면 안 된다. 예전에는
+                  관심종목 화면에만 있어서 다른 곳에서는 로그인할 방법이 없었다. */}
+              <AccountMenu />
+            </>
           }
         />
 

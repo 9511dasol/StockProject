@@ -7,10 +7,12 @@ import {
 import { SearchTrigger } from "@/features/search";
 import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
+import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
 import Link from "next/link";
 import { BrowseHeader } from "./_components/BrowseHeader";
+import { BrowseTabs } from "./_components/BrowseTabs";
 
 /**
  * 종목 탐색 · 랭킹.
@@ -51,28 +53,35 @@ export default async function StockBrowsePage({
   return (
     <>
       <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
-        {/* 검색은 전역 팔레트라 전역 컨트롤(테마 토글·화면 이동)과 같은 덩어리에
-            둔다. 본문 필터 옆에 두면 '타이핑하면 표가 걸러진다' 로 읽힌다
-            (Masthead · RankingFilterBar 주석). */}
+        {/* **검색 필드를 두지 않는다.** 이 자리에 250px 짜리 필드가 있었는데,
+            나머지 컨트롤(테마 토글·관심 종목·계정)이 전부 컴팩트한 버튼이라
+            혼자 넓은 요소가 줄의 리듬을 깼다.
+
+            잃는 것이 거의 없다: 팔레트는 ⌘K 로 어디서나 열리고, 모바일은 하단
+            탭바에 검색 항목이 있으며, 홈은 본문 첫 블록이 통째로 검색이다(FindBand).
+            홈이 이미 마스트헤드 검색을 비워 두고 있으므로 오히려 그쪽과 맞는다.
+
+            조건 검색 탭(/stocks/screener)도 **같이** 비운다 — 한 화면의 두 탭이
+            제호 구성이 다르면 탭을 옮길 때마다 줄이 흔들린다. */}
         <Masthead
           caption={caption}
-          search={
-            <span className="hidden md:block">
-              <SearchTrigger />
-            </span>
-          }
           action={
-            <Link
-              href="/watchlist"
-              className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
-              style={{ fontSize: 13 }}
-            >
-              관심 종목
-            </Link>
+            <>
+              <Link
+                href="/watchlist"
+                className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
+                style={{ fontSize: 13 }}
+              >
+                관심 종목
+              </Link>
+              <AccountMenu />
+            </>
           }
         />
 
         <BrowseHeader scope={ranking.scope} />
+
+        <BrowseTabs current="ranking" />
 
         <RankingFilterBar query={query} />
 

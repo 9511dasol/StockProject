@@ -6,10 +6,14 @@ import { useAdvice } from "./AdviceProvider";
  * 마스트헤드 우측 버튼. 드로어와는 AdviceProvider 를 통해서만 연결된다.
  *
  * variant
- *  - "editorial" 2a 마스트헤드 (데스크탑)
+ *  - "editorial" 2a 헤드라인 아래 **액션 줄** (데스크탑)
  *  - "console"   2b 상단 바 — 앰버 RUN AI 버튼 (데스크탑)
  *  - "bar"       모바일 하단 고정 버튼. 2a·2b 의 상단 버튼이 좁은 폭에서 숨으므로
  *                모바일에서는 이것이 유일한 AI 진입점이다.
+ *
+ * "editorial" 은 한때 마스트헤드에 있었는데, 그 줄에 담기·계정까지 서면서 좁은 폭에서
+ * 무너졌다. 제호에는 전역 컨트롤(검색·테마·계정)만 남기고 종목 액션은 헤드라인 아래로
+ * 내렸다 — 대상 옆에 있는 편이 원래 맞기도 하다 (`EditorialView` 주석).
  */
 export function AdviceTrigger({
   variant = "editorial",
@@ -71,7 +75,18 @@ export function AdviceTrigger({
       type="button"
       onClick={() => setOpen(!open)}
       aria-expanded={open}
-      className="flex items-center gap-[7px] bg-ink px-[18px] py-[9px] font-medium text-on-ink transition-transform duration-150 hover:-translate-y-px"
+      // 이웃과 **같은 기하**를 쓴다: px-3 py-2 · 13px (담기·로그인과 동일).
+      //
+      // 예전에는 px-[18px] py-[9px] 이었다. 이 자리에 다른 컨트롤이 거의 없던
+      // 시절에는 그 여유가 "주 액션" 으로 읽혔는데, 담기·뷰 토글·테마 토글·로그인이
+      // 같은 줄에 서면서 혼자 1.5배 큰 버튼이 되어 정렬이 무너져 보였다.
+      //
+      // 강조는 **크기가 아니라 채움**이 한다. 주변이 전부 테두리 버튼이므로 솔리드
+      // 하나만으로 위계가 충분히 서고, 그러면 크기는 줄에 맞추는 편이 낫다.
+      //
+      // `flex-none whitespace-nowrap` 이 이 버튼이 눌려 글자가 세로로 접히는 것을
+      // 막는다 — 실제로 768px 부근에서 "AI 판 단 열 기" 가 됐다 (Masthead 주석).
+      className="flex flex-none items-center gap-[7px] whitespace-nowrap bg-ink px-3 py-2 font-medium text-on-ink transition-transform duration-150 hover:-translate-y-px"
       style={{ fontSize: 13 }}
     >
       <span aria-hidden className="dot block h-[5px] w-[5px] bg-up" />

@@ -1,9 +1,9 @@
 import { SORTED_COLUMN, type RankingSort } from "../../model/ranking";
 import type { RankedStock } from "../../services/getStockRanking";
+import { ResultSummary } from "../table";
 import { RankingCard } from "./RankingCard";
 import { RankingHeadRow } from "./RankingHeadRow";
 import { RankingRow } from "./RankingRow";
-import { RankingSummary } from "./RankingSummary";
 
 export interface RankingTableProps {
   rows: readonly RankedStock[];
@@ -57,7 +57,7 @@ export function RankingTable({ rows, total, sort }: RankingTableProps) {
         ))}
       </ol>
 
-      <RankingSummary shown={rows.length} total={total} />
+      <ResultSummary shown={rows.length} total={total} />
     </>
   );
 }

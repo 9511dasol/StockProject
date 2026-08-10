@@ -12,7 +12,11 @@ import {
   BiGridVertical,
   BiHome,
   BiLeftArrowAlt,
+  BiLogIn,
+  BiLogOut,
   BiMinus,
+  BiMoon,
+  BiNews,
   BiPlus,
   BiRefresh,
   BiRightArrowAlt,
@@ -20,6 +24,8 @@ import {
   BiSolidStar,
   BiSortDown,
   BiStar,
+  BiSun,
+  BiTerminal,
   BiUser,
   BiX,
 } from "react-icons/bi";
@@ -69,6 +75,21 @@ const REGISTRY = {
   "sort-desc": BiSortDown,
   /** 계정 — 제호 우측의 로그인 표시 */
   user: BiUser,
+  /** 로그인·로그아웃. 좁은 화면에서는 글자 없이 이 글리프만 남는다 (AccountMenu) */
+  login: BiLogIn,
+  logout: BiLogOut,
+  /**
+   * 테마(밝기) 전환 — 해·달.
+   *
+   * 뷰 전환 글리프(아래 terminal·article)와 **은유가 겹치지 않아야** 한다. 둘은
+   * 나란히 서는데 하는 일이 완전히 다르다: 이쪽은 색, 저쪽은 화면 구조다.
+   * 라벨만으로는 구분이 안 됐다 — 한때 둘 다 "EDITORIAL" 을 표시할 수 있었다.
+   */
+  moon: BiMoon,
+  sun: BiSun,
+  /** 뷰(레이아웃) 전환 — 터미널 콘솔(2b) · 기사형 에디토리얼(2a) */
+  terminal: BiTerminal,
+  article: BiNews,
 } as const satisfies Record<string, IconType>;
 
 /** 레지스트리에 있는 이름만 허용한다 — 새 아이콘은 위에 등록해야 쓸 수 있다. */

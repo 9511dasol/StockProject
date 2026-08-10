@@ -12,13 +12,14 @@ import {
   CONSOLE_LABEL_STYLE,
   type StockDetail,
 } from "@/features/stocks";
-import type { WatchItem } from "@/features/watchlist";
+import { WatchToggle, type WatchItem } from "@/features/watchlist";
 import {
   decimal,
   deltaColorClass,
   percent as fmtPercent,
   price as fmtPrice,
 } from "@/lib/format";
+import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Wordmark } from "@/shared/components/layout/Wordmark";
 import { Delta } from "@/shared/ui";
 import { ViewToggle } from "./ViewSwitch";
@@ -66,6 +67,8 @@ export function ConsoleView({
     <div data-theme="terminal">
       {/* pb: 모바일 하단 고정 AI 버튼 자리 */}
       <div className="flex min-h-screen flex-col bg-paper pb-[76px] text-ink md:pb-0">
+        {/* 상단 바에는 **전역 컨트롤만** 둔다 — 지수·검색·계정. 종목 액션(담기·뷰·AI)은
+            헤드라인 아래 액션 줄로 내렸다 (2a EditorialView 와 같은 판단). */}
         <ConsoleTopBar indices={indices} />
 
         <div className="flex flex-1 flex-col md:flex-row">
@@ -80,6 +83,23 @@ export function ConsoleView({
               한참 아래로 밀린다. 데스크탑 3분할에서는 DOM 순서 그대로 가운데다. */}
           <main className="order-first flex min-w-0 flex-1 flex-col border-line-14 md:order-none md:border-x">
             <ConsoleHeadline stock={detail.ref} quote={detail.quote} />
+
+            {/* 이 종목의 액션 줄. 담김 여부를 따로 받지 않는다 — 이 뷰는 이미 목록
+                전체를 들고 있고(좌측 레일이 그린다), 같은 사실을 두 경로로 받으면
+                한 화면 안에서 어긋난다. */}
+            <div className="flex flex-wrap items-center justify-end gap-2 border-b border-line-14 px-5 pb-3">
+              <WatchToggle
+                symbol={detail.ref.symbol}
+                code={detail.ref.code}
+                watched={watchlist.some((item) => item.code === detail.ref.code)}
+                variant="console"
+              />
+              <ViewToggle />
+              <span className="hidden md:block">
+                <AdviceTrigger variant="console" />
+              </span>
+            </div>
+
             <ConsoleChart candles={detail.candles} />
             <MetricGrid metrics={detail.metrics} />
             <ConsoleFooter notes={detail.apiNotes} />
@@ -100,7 +120,15 @@ export function ConsoleView({
   );
 }
 
-/** market(지수) + search + advice 를 엮으므로 app 계층에 남는다 */
+/**
+ * 콘솔 상단 바 — **전역 컨트롤만.** 지수 · 검색 · 계정.
+ *
+ * 종목 액션(담기·뷰 전환·AI)은 헤드라인 아래 액션 줄에 있다. 2a 와 같은 이유다:
+ * 이 줄에 여섯이 서면 좁은 폭에서 계정 하나가 다음 줄로 떨어져 바가 계단이 된다.
+ * 성격이 다른 것(어느 화면에나 있는 것 / 이 종목에만 뜻이 있는 것)을 섞지 않는다.
+ *
+ * market(지수)를 엮으므로 app 계층에 남는다.
+ */
 function ConsoleTopBar({ indices }: { indices: MarketIndex[] }) {
   return (
     <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-14 px-[18px] py-3">
@@ -126,10 +154,14 @@ function ConsoleTopBar({ indices }: { indices: MarketIndex[] }) {
         ))}
       </span>
 
-      <span className="hidden items-center gap-2 md:flex">
-        <SearchTrigger />
-        <ViewToggle />
-        <AdviceTrigger variant="console" />
+      {/* 계정은 좁은 화면에서도 남긴다 — 이 화면에는 하단 탭바가 없어 여기서
+          감추면 콘솔 뷰에서는 로그인·로그아웃에 도달할 방법이 아예 없다.
+          검색은 ⌘K 로 열리므로 md 부터만 보인다. */}
+      <span className="flex flex-none items-center gap-2">
+        <span className="hidden md:block">
+          <SearchTrigger />
+        </span>
+        <AccountMenu />
       </span>
     </header>
   );

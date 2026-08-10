@@ -4,6 +4,9 @@ export {
   type WatchlistMutations,
 } from "./hooks/useWatchlistMutations";
 
+/** 종목 상세에서 목록에 담는 유일한 통로. 이 버튼이 없어서 목록이 늘 비어 있었다 */
+export { WatchToggle, type WatchToggleProps } from "./components/WatchToggle";
+
 export { WatchlistHeader } from "./components/WatchlistHeader";
 export { GroupTabs } from "./components/GroupTabs";
 export { SortControl } from "./components/SortControl";

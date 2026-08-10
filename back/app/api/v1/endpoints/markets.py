@@ -14,8 +14,11 @@ from app.schemas.market import (
     MarketRanking,
     RankingBoard,
     RankingSort,
+    ScreenerQuery,
+    ScreenerResult,
+    ScreenerSort,
 )
-from app.services import calendar_service, market_service
+from app.services import calendar_service, market_service, screener_service, snapshot_service
 
 router = APIRouter(prefix="/markets", tags=["markets"])
 
@@ -72,10 +75,53 @@ async def get_market_calendar(
     진행률이 나가므로, 호출부는 빈 목록을 '데이터 없음'이 아니라 '아직 채우는 중'으로
     구분해 보여줄 수 있다.
     """
-    calendar_service.schedule_calendar_refresh()
+    snapshot_service.schedule_snapshot_refresh()
     return await calendar_service.get_calendar(
         repo,
         kind=kind,
         days=days if days is not None else settings.calendar_default_days,
         limit=limit,
     )
+
+
+@router.get("/screener", response_model=ScreenerResult, summary="스크리너 (조건 검색)")
+async def get_screener(
+    repo: ListedCompanyRepo,
+    board: Annotated[RankingBoard, Query()] = "ALL",
+    market_cap_min: Annotated[int | None, Query(ge=0)] = None,
+    market_cap_max: Annotated[int | None, Query(ge=0)] = None,
+    per_min: Annotated[float | None, Query()] = None,
+    per_max: Annotated[float | None, Query()] = None,
+    pbr_min: Annotated[float | None, Query()] = None,
+    pbr_max: Annotated[float | None, Query()] = None,
+    dividend_min: Annotated[float | None, Query(ge=0)] = None,
+    roe_min: Annotated[float | None, Query()] = None,
+    sort: Annotated[ScreenerSort, Query()] = "market_cap",
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0, le=5000)] = 0,
+) -> ScreenerResult:
+    """조건에 맞는 종목. 모집단은 **상장 전 종목**이고 값은 하루 1회 배치가 채운다.
+
+    `/ranking` 과 달리 등락률 스냅샷을 쓰지 않는다 — 그쪽 모집단은 시가총액 상위
+    200종목이라 조건 검색의 답이 될 수 없다. 대신 시세 열이 없다
+    (`services/screener_service` 모듈 주석에 그 맞바꿈을 적어 뒀다).
+
+    `per_min` 을 왜 열어 두는지는 `ScreenerQuery` 주석에 있다 — PER 은 음수가 될 수
+    있어서 상한만 걸면 적자 기업이 '가장 싼 종목'으로 맨 앞에 온다.
+
+    항상 즉시 응답한다. 수집(수십 초)은 배경 배치가 하고 여기서는 적재된 값을 읽는다.
+    """
+    snapshot_service.schedule_snapshot_refresh()
+    query = ScreenerQuery(
+        board=board,
+        market_cap_min=market_cap_min,
+        market_cap_max=market_cap_max,
+        per_min=per_min,
+        per_max=per_max,
+        pbr_min=pbr_min,
+        pbr_max=pbr_max,
+        dividend_min=dividend_min,
+        roe_min=roe_min,
+        sort=sort,
+    )
+    return await screener_service.get_screener(repo, query, limit=limit, offset=offset)

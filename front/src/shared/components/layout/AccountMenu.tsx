@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { auth, AUTH_ENABLED, signOut } from "@/auth";
+import { adminActorOf } from "@/lib/auth/admin";
 import { Icon } from "@/shared/ui";
 
 /**
@@ -16,6 +17,13 @@ import { Icon } from "@/shared/ui";
  * 세션을 읽는 데 클라이언트 훅(`useSession`)이 필요 없고, 그러려면 Provider 를
  * 트리에 얹어야 한다. 로그아웃만 form action 으로 처리하면 클라이언트 JS 가 0이다 —
  * 제호는 모든 화면에 있으므로 그 차이가 전 페이지에 적용된다.
+ *
+ * ## 좁은 화면에서 **사라지지 않는다**
+ *
+ * 예전에는 두 갈래 모두 `hidden md:flex` 였다. 제호 우측이 좁다는 이유였는데, 그
+ * 결과 모바일에서는 로그인할 방법도 로그아웃할 방법도 없었다 — 하단 탭바에도 계정
+ * 자리가 없으므로 완전히 도달 불가였다. 숨기는 대신 **글자를 접는다.** 글리프는
+ * 남으므로 44px 히트 영역과 `aria-label` 이 그대로 살아 있다.
  */
 export async function AccountMenu() {
   if (!AUTH_ENABLED) return null;
@@ -26,11 +34,12 @@ export async function AccountMenu() {
     return (
       <Link
         href="/login"
-        className="hidden items-center gap-1.5 border border-line-28 px-3 py-2 font-medium hover:border-ink md:flex"
+        aria-label="로그인"
+        className="flex flex-none items-center gap-1.5 whitespace-nowrap border border-line-28 px-2.5 py-2 font-medium hover:border-ink md:px-3"
         style={{ fontSize: 13 }}
       >
-        <Icon name="user" size={14} className="text-muted-45" />
-        로그인
+        <Icon name="login" size={15} className="text-muted-45" />
+        <span className="hidden md:inline">로그인</span>
       </Link>
     );
   }
@@ -40,16 +49,34 @@ export async function AccountMenu() {
   const label =
     session.user.name || session.user.email?.split("@")[0] || "내 계정";
 
+  // 관리자에게만 보인다. **이건 보안이 아니라 편의다** — 링크를 숨겨도 URL 은
+  // 칠 수 있고, 실제 차단은 `/admin` 의 `requireAdmin()` 이 404 로 한다.
+  const admin = adminActorOf(session);
+
   return (
     <form
       action={async () => {
         "use server";
         await signOut({ redirectTo: "/" });
       }}
-      className="hidden items-center gap-2 md:flex"
+      className="flex flex-none items-center gap-2"
     >
+      {admin ? (
+        <Link
+          href="/admin"
+          aria-label="관리자"
+          className="flex flex-none items-center gap-1.5 whitespace-nowrap border border-line-28 px-2.5 py-2 font-medium hover:border-ink md:px-3"
+          style={{ fontSize: 13 }}
+        >
+          <Icon name="chart" size={15} className="text-muted-45" />
+          <span className="hidden md:inline">관리자</span>
+        </Link>
+      ) : null}
+
+      {/* 계정 이름은 좁은 화면에서 접는다. 로그인 여부는 글리프가 로그인(→)에서
+          로그아웃(←)으로 바뀌는 것으로 이미 구분된다. */}
       <span
-        className="max-w-[120px] truncate text-muted-60"
+        className="hidden max-w-[120px] truncate text-muted-60 md:inline"
         style={{ fontSize: 12.5 }}
         title={session.user.email ?? undefined}
       >
@@ -57,10 +84,12 @@ export async function AccountMenu() {
       </span>
       <button
         type="submit"
-        className="border border-line-28 px-3 py-2 font-medium hover:border-ink"
+        aria-label={`로그아웃 (${label})`}
+        className="flex flex-none items-center gap-1.5 whitespace-nowrap border border-line-28 px-2.5 py-2 font-medium hover:border-ink md:px-3"
         style={{ fontSize: 13 }}
       >
-        로그아웃
+        <Icon name="logout" size={15} className="text-muted-45" />
+        <span className="hidden md:inline">로그아웃</span>
       </button>
     </form>
   );

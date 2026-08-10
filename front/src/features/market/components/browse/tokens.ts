@@ -15,8 +15,5 @@
 export const RANKING_GRID =
   "grid grid-cols-[40px_1.6fr_92px_112px_92px_124px] items-center gap-3";
 
-/** 표 머리 · 필터 축 라벨이 공유하는 조판 (mono · 대문자 · 넓은 자간) */
-export const RANKING_HEAD = "font-mono font-medium uppercase tracking-label-wide";
-
 export const FILTER_LABEL =
   "flex items-center gap-1.5 font-mono font-medium uppercase tracking-label text-muted-45";

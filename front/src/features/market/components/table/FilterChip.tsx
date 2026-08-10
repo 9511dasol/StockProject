@@ -1,18 +1,18 @@
 import Link from "next/link";
 
 export interface FilterChipProps {
-  /** 이 칩을 눌렀을 때 갈 주소. model 의 rankingHref 가 만든 것이다 */
+  /** 이 칩을 눌렀을 때 갈 주소. model 의 `rankingHref`·`screenerHref` 가 만든 것이다 */
   href: string;
   label: string;
   selected: boolean;
 }
 
 /**
- * 필터 칩 하나. `<button>` 이 아니라 **링크**다.
+ * 필터·조건 칩 하나. `<button>` 이 아니라 **링크**다.
  *
- * 필터 상태가 URL 에 있으므로 칩은 주소를 바꾸는 것 외에 하는 일이 없다. 링크로
- * 두면 이 화면 전체가 서버 컴포넌트로 남고(클라이언트 번들 0), 공유 가능한 주소와
- * 뒤로가기·새 탭으로 열기가 공짜로 따라온다.
+ * 상태가 URL 에 있으므로 칩은 주소를 바꾸는 것 외에 하는 일이 없다. 링크로 두면 이
+ * 화면 전체가 서버 컴포넌트로 남고(클라이언트 번들 0), 공유 가능한 주소와 뒤로가기·
+ * 새 탭으로 열기가 공짜로 따라온다.
  *
  * 선택 상태는 반전 solid 다 — 검색 팔레트 모드 칩과 같은 규칙.
  * 색만으로 상태를 말하지 않도록 `aria-current` 를 함께 붙인다.

@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from app.core.background import schedule_once
 from app.core.config import settings
 from app.domain.ranking import rank_companies
 from app.domain.symbols import krx_symbol_to_yfinance, normalize_stock_code
@@ -134,12 +135,6 @@ async def ensure_seeded(repo: ListedCompanyRepository) -> None:
             _seed.running = False
 
 
-_background_tasks: set[asyncio.Task[int]] = set()
-# 마지막 '시도' 시각. DB 조회 없이 스케줄 자체를 걸러내기 위한 메모리 가드다 —
-# 매 검색마다 세션을 열어 TTL 을 확인하면 그 자체가 낭비다.
-_last_refresh_attempt: datetime | None = None
-
-
 async def _refresh_market_caps_in_new_session() -> int:
     """요청 세션은 응답과 함께 닫히므로 백그라운드 작업은 자기 세션을 연다."""
     from app.core.database import AsyncSessionLocal
@@ -151,19 +146,16 @@ async def _refresh_market_caps_in_new_session() -> int:
 def _schedule_market_cap_refresh() -> None:
     """갱신을 백그라운드 태스크로 띄운다.
 
-    검색 요청이 시총 수집(수 초)을 기다리게 하지 않는다. 태스크 참조를 보관하는
-    것은 GC 가 실행 중인 태스크를 수거하지 못하게 하기 위함이다.
+    검색 요청이 시총 수집(수 초)을 기다리게 하지 않는다. `min_interval` 은 DB 를
+    보지 않는 메모리 가드다 — 매 검색마다 세션을 열어 마지막 갱신 시각을 확인하면
+    그 확인이 곧 낭비다 (`core/background` 주석).
+
+    테스트가 이 이름을 대역으로 세운다(`test_api_stocks.py`). 공용 스케줄러를
+    부르더라도 이 함수 자체는 남는다.
     """
-    global _last_refresh_attempt
-
-    now = datetime.now(UTC)
-    if _last_refresh_attempt and now - _last_refresh_attempt < _MARKET_CAP_TTL:
-        return
-    _last_refresh_attempt = now
-
-    task = asyncio.create_task(_refresh_market_caps_in_new_session())
-    _background_tasks.add(task)
-    task.add_done_callback(_background_tasks.discard)
+    schedule_once(
+        "market_cap", _refresh_market_caps_in_new_session, min_interval=_MARKET_CAP_TTL
+    )
 
 
 def _steps(used: ListedSource) -> list[SourceStep]:

@@ -14,8 +14,10 @@ import {
   ValuationRail,
   type StockDetail,
 } from "@/features/stocks";
+import { WatchToggle } from "@/features/watchlist";
 import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
+import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { ViewToggle } from "./ViewSwitch";
 
@@ -30,9 +32,12 @@ import { ViewToggle } from "./ViewSwitch";
 export function EditorialView({
   detail,
   indices,
+  watched,
 }: {
   detail: StockDetail;
   indices: MarketIndex[];
+  /** 이 종목이 이미 관심 목록에 있는가. 페이지가 목록을 이미 받아 오므로 추측하지 않는다 */
+  watched: boolean;
 }) {
   const caption = `${masthead(detail.now)} · ${MARKET_CAPTION_SUFFIX}`;
 
@@ -40,6 +45,13 @@ export function EditorialView({
     <>
       {/* pb-24: 모바일 하단 고정 AI 버튼에 마지막 섹션이 가리지 않게 띄운다. */}
       <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-24 pt-[26px] md:px-8 md:pb-[30px]">
+        {/* **제호에는 전역 컨트롤만 둔다** — 검색·테마·계정. 다른 화면과 같은 구성이다.
+            한때 여기에 담기·뷰 전환·AI 까지 여섯이 섰는데, 폭을 줄이면 로그인 혼자
+            둘째 줄로 내려가고 그 위 네 개만 남아 헤더가 계단처럼 보였다.
+
+            폭을 더 짜내는 대신 **성격으로 갈랐다.** 검색·테마·계정은 어느 화면에나
+            있는 것이고, 담기·AI·뷰 전환은 지금 보고 있는 종목에만 뜻이 있다.
+            후자는 아래 액션 줄로 내렸다 — 대상 옆에 있는 편이 원래 맞기도 하다. */}
         <Masthead
           caption={caption}
           search={
@@ -47,17 +59,27 @@ export function EditorialView({
               <SearchTrigger />
             </span>
           }
-          action={
-            <>
-              <ViewToggle />
-              <span className="hidden md:block">
-                <AdviceTrigger />
-              </span>
-            </>
-          }
+          action={<AccountMenu />}
         />
 
         <StockHeadline stock={detail.ref} quote={detail.quote} />
+
+        {/* 이 종목의 액션 줄. 대상(헤드라인) 바로 아래이고 오른쪽 정렬이라 제호의
+            컨트롤과 같은 세로선에 놓인다 — 액션을 찾는 눈이 한 열에 머문다.
+
+            모바일에서는 담기만 남는다. AI 는 하단 고정 바가 받고(좁은 폭에서 유일한
+            진입점) 뷰 전환은 콘솔 레이아웃이 좁은 화면에 맞지 않아 원래 숨는다. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <WatchToggle
+            symbol={detail.ref.symbol}
+            code={detail.ref.code}
+            watched={watched}
+          />
+          <ViewToggle />
+          <span className="hidden md:block">
+            <AdviceTrigger />
+          </span>
+        </div>
 
         <div className="grid items-start gap-7 md:grid-cols-[1fr_292px]">
           {/* min-w-0: 그리드 아이템의 기본 min-width:auto 가 차트·표를 밀어내
