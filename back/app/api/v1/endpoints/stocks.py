@@ -102,7 +102,10 @@ async def get_stock_fundamentals(
 )
 async def get_stock_suggestions(
     repo: ListedCompanyRepo,
-    query: Annotated[str, Query(min_length=1)],
+    # 상한이 없던 유일한 문자열 파라미터였다. 종목명은 40자를 넘지 않고, 길이가
+    # 자유로우면 `find_candidates` 의 선행 와일드카드 스캔 비용만 커진다.
+    # 프런트 BFF 도 같은 값으로 자른다 (`app/api/stocks/suggestions/route.ts`).
+    query: Annotated[str, Query(min_length=1, max_length=40)],
     limit: Annotated[int, Query(ge=1, le=10)] = 5,
 ) -> list[StockSuggestion]:
     return await listed_company_service.search(repo, query, limit)

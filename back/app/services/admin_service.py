@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.repositories.admin import AdminRepository, AdminUserRow
+from app.repositories.batch_run import BatchRunRepository
 from app.repositories.listed_company import ListedCompanyRepository
 from app.services import advice_cache
 
@@ -80,6 +81,36 @@ class DeleteReport:
         return sum(count for table, count in self.deleted.items() if table != "users")
 
 
+async def _require_users(repo: AdminRepository) -> None:
+    """`users` 를 읽을 수 없으면 503 으로 끊는다. **회원을 만지는 모든 경로가 지난다.**
+
+    예전에는 목록 조회에만 있었다. 그래서 상세·권한변경·삭제 세 경로는 `users` 가
+    아예 없는 DB 에서도 프로브를 건너뛰고 곧바로 500 을 냈다 — 같은 원인에 화면이
+    "백엔드에 닿지 못했습니다"(500) 와 "마이그레이션을 확인하세요"(503) 두 가지로
+    답하는 상태였고, 사용자가 보는 쪽이 대개 틀린 쪽이었다.
+
+    헬퍼로 올려 둔 이유는 그것뿐이다: **한 곳을 고치면 네 경로가 함께 고쳐진다.**
+    """
+    if await repo.users_are_readable():
+        return
+
+    raise UsersUnavailable(
+        "users 테이블을 읽을 수 없습니다. 백엔드가 프런트와 같은 Supabase 를 "
+        "보고 있는지, 마이그레이션이 적용됐는지 확인하세요 — 테이블은 "
+        "b3f1c2d47a90 이 만들고 role 컬럼은 c9b3e7d21a08 이 더합니다."
+    )
+
+
+async def get_user(repo: AdminRepository, user_id: str) -> AdminUserRow | None:
+    """회원 한 명. 없으면 None (404 는 라우터가 만든다).
+
+    라우터가 `repo.find_user` 를 직접 부르지 않게 한 겹을 둔 것은 프로브 때문이다 —
+    스키마가 없을 때 이 경로만 500 을 내면 화면이 틀린 원인을 안내한다.
+    """
+    await _require_users(repo)
+    return await repo.find_user(user_id)
+
+
 async def list_users(
     repo: AdminRepository, *, keyword: str = "", limit: int = 50, offset: int = 0
 ) -> UserPage:
@@ -89,11 +120,7 @@ async def list_users(
     비활성화**할 수 있게 하기 위해서다. 서버가 어차피 막지만, 누를 수 있는 버튼을
     두고 눌렀을 때 거절하는 것은 나쁜 화면이다.
     """
-    if not await repo.users_are_readable():
-        raise UsersUnavailable(
-            "users 테이블을 읽을 수 없습니다. 백엔드가 프런트와 같은 Supabase 를 "
-            "보고 있는지, NextAuth 마이그레이션(b3f1c2d47a90)이 적용됐는지 확인하세요."
-        )
+    await _require_users(repo)
 
     return UserPage(
         rows=await repo.list_users(keyword=keyword, limit=limit, offset=offset),
@@ -111,6 +138,8 @@ async def set_role(
     """
     if role not in ROLES:
         raise AdminError(f"알 수 없는 권한입니다: {role!r}")
+
+    await _require_users(repo)
 
     target = await repo.find_user(user_id)
     if target is None:
@@ -202,6 +231,8 @@ async def delete_user(
     삭제 한 번에 전 테이블을 훑을 이유가 없고, 같은 트랜잭션 안이라 원자적이다.
     전체 훑기는 여전히 스크립트의 몫이다 — DB 를 직접 만진 경우를 대비한 그물이다.
     """
+    await _require_users(repo)
+
     target = await repo.find_user(user_id)
     if target is None:
         raise AdminError("그 회원을 찾을 수 없습니다.")
@@ -270,6 +301,21 @@ async def _refuse_delete(
 
 
 @dataclass
+class BatchStatus:
+    """배치 하나의 최근 상태."""
+
+    name: str
+    last_run_at: str | None
+    last_run_ok: bool | None
+    attempted: int
+    answered: int
+    applied: int
+    detail: str | None
+    last_failure_at: str | None
+    last_failure_detail: str | None
+
+
+@dataclass
 class OpsSnapshot:
     """관리자 첫 화면이 보여줄 숫자들.
 
@@ -295,10 +341,47 @@ class OpsSnapshot:
     #: 자물쇠 상태. 꺼져 있다는 사실이 화면에 보여야 한다
     advice_locked: bool
     rag_enabled: bool
+    #: 배치 실행 기록 (`batch_runs`). 조용히 틀리는 경로의 **경보가 도착하는 곳**이다
+    batches: list[BatchStatus]
     generated_at: str
 
 
-async def get_ops_snapshot(listings: ListedCompanyRepository) -> OpsSnapshot:
+#: 실행 기록을 남기는 배치. 지금은 스냅샷 하나다.
+#:
+#: 시가총액·등락률 배치는 아직 기록자를 붙이지 않았다 — 목록으로 두는 것은 그때
+#: 이 상수 한 줄만 늘리면 되게 하기 위함이고, 화면도 목록을 그리므로 함께 나타난다.
+_RECORDED_BATCHES: tuple[str, ...] = ("snapshot",)
+
+
+async def _batch_statuses(runs: BatchRunRepository) -> list[BatchStatus]:
+    """배치마다 '마지막 실행' 과 '마지막 실패' 를 함께 읽는다.
+
+    둘을 함께 주는 이유는 스키마 주석에 있다 — 하나만으로는 "계속 성공" 과 "어제
+    실패했고 오늘 성공", 그리고 "실패가 없다" 와 "아예 돌지 않았다" 를 구분할 수 없다.
+    """
+    statuses: list[BatchStatus] = []
+    for name in _RECORDED_BATCHES:
+        last = await runs.last_run(name)
+        failure = await runs.last_failure(name)
+        statuses.append(
+            BatchStatus(
+                name=name,
+                last_run_at=last.finished_at.isoformat() if last else None,
+                last_run_ok=last.ok if last else None,
+                attempted=last.attempted if last else 0,
+                answered=last.answered if last else 0,
+                applied=last.applied if last else 0,
+                detail=last.detail if last else None,
+                last_failure_at=failure.finished_at.isoformat() if failure else None,
+                last_failure_detail=failure.detail if failure else None,
+            )
+        )
+    return statuses
+
+
+async def get_ops_snapshot(
+    listings: ListedCompanyRepository, runs: BatchRunRepository
+) -> OpsSnapshot:
     """운영 현황 한 벌.
 
     배치를 **돌리지 않는다.** 관리자 화면을 여는 것만으로 야후에 2,700회를 치면
@@ -326,5 +409,6 @@ async def get_ops_snapshot(listings: ListedCompanyRepository) -> OpsSnapshot:
         advice_max_concurrent=settings.advice_max_concurrent,
         advice_locked=settings.advice_auth_enabled,
         rag_enabled=settings.rag_enabled,
+        batches=await _batch_statuses(runs),
         generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )

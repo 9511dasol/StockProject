@@ -64,6 +64,44 @@ export interface AuditEntry {
   ok: boolean;
 }
 
+/** back/app/schemas/admin.py : BatchStatus */
+export interface WireBatchStatus {
+  name: string;
+  last_run_at: string | null;
+  last_run_ok: boolean | null;
+  attempted: number;
+  answered: number;
+  applied: number;
+  detail: string | null;
+  last_failure_at: string | null;
+  last_failure_detail: string | null;
+}
+
+export interface BatchStatus {
+  name: string;
+  /** 마지막 실행. **null 이면 한 번도 돌지 않았다** — 실패보다 더 나쁜 상태다 */
+  lastRunAt: string | null;
+  lastRunOk: boolean | null;
+  attempted: number;
+  answered: number;
+  applied: number;
+  detail: string | null;
+  /** 가장 최근 실패. 지금이 정상이어도 남는다 — 되풀이되는 실패를 보려면 필요하다 */
+  lastFailureAt: string | null;
+  lastFailureDetail: string | null;
+}
+
+/** 배치 이름 → 화면에 쓸 말. 백엔드 `_RECORDED_BATCHES` 와 짝이다 */
+const BATCH_LABELS: Record<string, string> = {
+  snapshot: "일정 · 지표 스냅샷",
+  market_cap: "시가총액",
+  movers: "등락률 스캔",
+};
+
+export function batchLabel(name: string): string {
+  return BATCH_LABELS[name] ?? name;
+}
+
 /** back/app/schemas/admin.py : OpsSnapshot */
 export interface WireOpsSnapshot {
   calendar_covered: number;
@@ -78,6 +116,7 @@ export interface WireOpsSnapshot {
   advice_max_concurrent: number;
   advice_locked: boolean;
   rag_enabled: boolean;
+  batches: WireBatchStatus[];
   generated_at: string;
 }
 
@@ -97,6 +136,12 @@ export interface OpsSnapshot {
   /** 자물쇠가 꺼져 있으면 화면이 경고한다 */
   adviceLocked: boolean;
   ragEnabled: boolean;
+  /**
+   * 배치 실행 기록. 진행률과 **다른 질문**에 답한다 — 진행률은 "얼마나 채웠나",
+   * 이쪽은 "그 채우는 일이 돌고 있나" 다. 커버리지가 며칠째 같은 숫자일 때
+   * 정상인지 배치가 죽은 것인지는 이쪽만 답할 수 있다.
+   */
+  batches: BatchStatus[];
   generatedAt: string;
 }
 

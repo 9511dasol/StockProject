@@ -52,12 +52,23 @@ class WatchlistRepository:
     async def find_by_code(self, owner_key: str, code: str) -> WatchlistItem | None:
         """6자리 코드로 찾는다 — 화면은 코드로 행을 식별한다.
 
-        저장은 심볼(`005930.KS`)이므로 접두 일치로 맞춘다. 코드는 6자리 고정이고
-        접미사는 `.KS`/`.KQ` 뿐이라 다른 종목과 겹칠 수 없다.
+        저장은 심볼(`005930.KS`)이므로 코드에 접미사를 붙여 **정확히 일치**하는 것을
+        찾는다. 후보는 `normalize_stock_candidates` 와 같은 셋이다(`.KS`·`.KQ`·접미사
+        없는 원본) — 코넥스도 `.KQ` 로 저장되므로 그 밖은 없다.
+
+        **예전에는 `symbol LIKE '{code}%'` 였고, 그것이 실제 결함이었다.** 라우터가
+        `code` 를 검증하지 않아 `%`·`_` 가 그대로 패턴에 실렸고, `DELETE /watchlist/%`
+        는 그 소유자의 **전 행에 매치**되어(정렬도 없는 `first()`) 임의의 한 종목을
+        지우고 200 을 돌려줬다. "6자리라 겹칠 수 없다" 는 그때 주석의 전제가 숫자
+        검증 없이는 성립하지 않았다.
+
+        라우터에 `^\\d{6}$` 를 걸었으므로 지금은 여기 도달하는 값이 이미 안전하다.
+        그래도 LIKE 를 남기지 않는다 — 검증은 호출부의 성질이고, 이 함수가 그것에
+        기대면 새 호출부 하나가 같은 사고를 되살린다.
         """
         stmt = select(WatchlistItem).where(
             WatchlistItem.owner_key == owner_key,
-            WatchlistItem.symbol.like(f"{code}%"),
+            WatchlistItem.symbol.in_([f"{code}.KS", f"{code}.KQ", code]),
         )
         return (await self._db.execute(stmt)).scalars().first()
 

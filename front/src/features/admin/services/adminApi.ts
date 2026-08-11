@@ -53,6 +53,19 @@ export async function fetchOps(actor: AdminActor): Promise<OpsSnapshot> {
     adviceMaxConcurrent: raw.advice_max_concurrent,
     adviceLocked: raw.advice_locked,
     ragEnabled: raw.rag_enabled,
+    // 목록이 비어 있을 수 있다 — 아직 마이그레이션 전인 DB 나 배치가 한 번도 돌지
+    // 않은 상태다. 화면이 그 둘을 구분해 말한다.
+    batches: (raw.batches ?? []).map((batch) => ({
+      name: batch.name,
+      lastRunAt: batch.last_run_at,
+      lastRunOk: batch.last_run_ok,
+      attempted: batch.attempted,
+      answered: batch.answered,
+      applied: batch.applied,
+      detail: batch.detail,
+      lastFailureAt: batch.last_failure_at,
+      lastFailureDetail: batch.last_failure_detail,
+    })),
     generatedAt: raw.generated_at,
   };
 }

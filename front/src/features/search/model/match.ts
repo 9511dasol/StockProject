@@ -69,15 +69,11 @@ export interface ParsedQuery {
 /**
  * 해외 티커 형태인가. 이 검사를 통과할 때만 "→ 해외 티커로 조회" 폴백 행을 띄운다.
  *
- * 첫 글자는 영문, 이어서 영문·점·하이픈 최대 5자 (BRK.B · RDS-A 같은 형태를 덮는다).
- * 한글·숫자만·6자 초과·공백 포함은 통과하지 못하고 '결과 없음'으로 간다 —
- * 아무 입력에나 조회 링크를 띄우면 오탈자를 유효한 종목처럼 보이게 만든다.
+ * 판정은 [`lib/stocks/symbol`](../../../lib/stocks/symbol.ts) 이 소유한다 — 종목 상세가
+ * "이 문자열을 상류로 보낼까" 를 물을 때 같은 모양을 본다. 정규식을 두 벌로 두면
+ * 한쪽만 고치는 자리가 된다.
  */
-const TICKER_PATTERN = /^[A-Za-z][A-Za-z.\-]{0,5}$/;
-
-export function isTickerLike(raw: string): boolean {
-  return TICKER_PATTERN.test(raw.trim());
-}
+export { isTickerLike } from "@/lib/stocks/symbol";
 
 export function parseQuery(raw: string): ParsedQuery {
   const head = raw[0];

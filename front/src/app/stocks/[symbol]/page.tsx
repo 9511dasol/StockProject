@@ -4,14 +4,50 @@ import { SearchTrigger } from "@/features/search";
 import { getStockDetail } from "@/features/stocks";
 import { getWatchlist } from "@/features/watchlist";
 import { API_BASE_URL } from "@/lib/config/env";
+import { isResolvableSymbol } from "@/lib/stocks/symbol";
 import { readOwnerKey } from "@/lib/watchlist/owner";
 import { Masthead } from "@/shared/components/layout/Masthead";
+import type { Metadata } from "next";
 import { BackendUnreachable } from "./_components/BackendUnreachable";
 import { ConsoleView } from "./_components/ConsoleView";
 import { EditorialView } from "./_components/EditorialView";
 import { StockDetailUnavailable } from "./_components/StockDetailUnavailable";
 import { SymbolNotResolved } from "./_components/SymbolNotResolved";
 import { ViewSwitch } from "./_components/ViewSwitch";
+
+/**
+ * 입력한 문자열을 화면에 보여줄 형태로.
+ *
+ * `decodeURIComponent` 가 **던질 수 있다.** `/stocks/%` 처럼 이스케이프가 깨진 값이
+ * 오면 `URIError` 가 나고, 그러면 원인과 무관한 에러 화면이 후보 고르기 화면을
+ * 대신한다. 실패하면 원문을 그대로 쓴다 — 못 읽은 값을 보여주는 것이 화면을
+ * 깨뜨리는 것보다 낫다.
+ */
+function readable(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * 종목일 수 없는 주소는 **색인하지 않는다.**
+ *
+ * 크롤러가 `/stocks/<아무문자열>` 을 따라오는 것 자체가 상류 호출 증폭이다. 응답이
+ * 404 가 아니라 200(후보 고르기)이라, 고지하지 않으면 검색엔진은 그것을 유효한
+ * 페이지로 보고 계속 긁는다. 조회는 하지 않고 **모양만** 보므로 비용이 없다.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ symbol: string }>;
+}): Promise<Metadata> {
+  const { symbol } = await params;
+  if (isResolvableSymbol(symbol)) return {};
+
+  return { robots: { index: false, follow: false } };
+}
 
 export default async function StockDetailPage({
   params,
@@ -43,7 +79,7 @@ export default async function StockDetailPage({
           caption="종목 코드 정규화 실패"
           search={<SearchTrigger />}
         />
-        <SymbolNotResolved query={decodeURIComponent(symbol)} />
+        <SymbolNotResolved query={readable(symbol)} />
       </main>
     );
   }
@@ -65,7 +101,7 @@ export default async function StockDetailPage({
     return (
       <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
         <Masthead caption="시세 응답 지연" search={<SearchTrigger />} />
-        <StockDetailUnavailable symbol={decodeURIComponent(symbol)} />
+        <StockDetailUnavailable symbol={readable(symbol)} />
       </main>
     );
   }

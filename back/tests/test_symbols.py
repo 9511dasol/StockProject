@@ -13,7 +13,7 @@ from app.domain.symbols import (
 )
 from app.integrations.yfinance.history import _candidates
 from app.schemas.stock import KrxListing
-from app.utils.text import get_initial_consonants, normalize_search_text
+from app.utils.text import escape_like, get_initial_consonants, normalize_search_text
 
 
 @pytest.mark.parametrize(
@@ -88,6 +88,27 @@ def test_candidates_try_resolved_symbol_first() -> None:
 def test_initial_consonants() -> None:
     assert get_initial_consonants("삼성전자") == "ㅅㅅㅈㅈ"
     assert get_initial_consonants("LG에너지솔루션") == "lgㅇㄴㅈㅅㄹㅅ"
+
+
+def test_initial_consonants_pass_through_like_metacharacters() -> None:
+    """**이 함수는 `%`·`_` 를 막지 않는다** — 막는 자리는 질의를 만드는 쪽이다.
+
+    이 성질을 테스트로 고정해 두는 이유: 여기서 문자를 더 버리도록 고치면 이미
+    적재된 `initial_consonants` 값과 질의가 어긋나 배치가 한 바퀴 돌기 전까지
+    조용히 못 찾는 상태가 된다. 와일드카드 차단은
+    `find_candidates` 의 `autoescape=True` 가 담당한다.
+    """
+    assert get_initial_consonants("ㅅ%") == "ㅅ%"
+    assert get_initial_consonants("A_C") == "a_c"
+
+
+def test_escape_like_neutralizes_wildcards() -> None:
+    """raw SQL 로 ILIKE 를 만드는 자리(`repositories/admin`)가 쓰는 이스케이프."""
+    assert escape_like("a_c") == r"a\_c"
+    assert escape_like("100%") == r"100\%"
+    # 역슬래시를 먼저 치환해야 한다 — 나중에 하면 방금 넣은 이스케이프까지 다시 이스케이프된다.
+    assert escape_like(r"a\_c") == r"a\\\_c"
+    assert escape_like("평범한 이름") == "평범한 이름"
 
 
 def test_normalize_search_text_drops_symbols() -> None:

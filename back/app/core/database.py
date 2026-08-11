@@ -53,10 +53,33 @@ async def get_db() -> AsyncIterator[AsyncSession]:
 
 
 async def create_all() -> None:
-    """개발 편의용 스키마 생성. 운영에서는 alembic을 사용한다."""
+    """개발 편의용 스키마 생성. 운영에서는 alembic 을 쓴다.
+
+    **alembic 이 이미 관리하는 DB 에서는 기동을 거부한다.** 둘이 같은 DB 에 손을 대는
+    것이 실제 사고의 조건이었다 — create_all 이 테이블을 선점하면 이후 `upgrade head`
+    가 `relation already exists` 로 멈추거나, autogenerate 가 "차이 없음" 을 보고 빈
+    마이그레이션을 낸다. 그 상태는 되돌리기 어렵고, 무엇보다 **조용하다.**
+
+    거부를 예외로 만드는 것이 핵심이다. 경고만 남기고 계속 뜨면 아무도 안 읽는다 —
+    그리고 이 조합에서 다음에 깨지는 것은 기동이 아니라 며칠 뒤의 마이그레이션이다.
+
+    `alembic_version` 이 없는 DB(=한 번도 마이그레이션을 돌리지 않은 순수 개발 DB)
+    에서는 그대로 만들어 준다. 그것이 이 기능의 유일한 정당한 용도다.
+    """
+    from sqlalchemy import inspect
+
     from app.models.base import Base
 
     async with engine.begin() as conn:
+        tables = await conn.run_sync(lambda sync: inspect(sync).get_table_names())
+        if "alembic_version" in tables:
+            raise RuntimeError(
+                "이 DB 는 alembic 이 관리합니다(alembic_version 존재). "
+                "DB_CREATE_ALL_ON_STARTUP 을 끄고 `alembic upgrade head` 를 쓰세요 — "
+                "둘을 함께 쓰면 스키마의 출처가 둘이 되고, 다음 마이그레이션이 "
+                "'relation already exists' 로 멈춥니다."
+            )
+
         await conn.run_sync(Base.metadata.create_all)
 
 

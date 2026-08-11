@@ -1,6 +1,7 @@
 import { apiGetCached, ApiError } from "@/lib/api";
 import { marketRevalidate, REVALIDATE_STATIC } from "@/lib/config/marketHours";
 import { USE_MOCK } from "@/lib/config/env";
+import { isResolvableSymbol } from "@/lib/stocks/symbol";
 import { MOCK_STOCK_DETAIL } from "../model/mock";
 import type { StockDetail } from "../model/types";
 import {
@@ -39,10 +40,22 @@ export type StockDetailResult =
  * 약 95%를 차지해, 함께 받으면 차트가 뉴스를 기다리게 된다.
  *
  * 재검증 주기는 장중 60초 / 장외 900초로 갈린다 (lib/config/marketHours).
+ *
+ * ## 모양 검사를 여기 두는 이유
+ *
+ * `/stocks/<아무문자열>` 이 상류 호출로 이어지는 것을 막는 문이다. 페이지가 아니라
+ * **이 함수**에 두는 것은, 여기가 상류로 나가는 유일한 문이라서다 — 페이지에 두면
+ * 새 호출부 하나가 검사 없이 지나간다. 게이트가 `not-found` 를 내면 호출부는 이미
+ * 있는 '후보 고르기' 화면을 그리므로 화면 코드는 바뀌지 않는다.
  */
 export async function getStockDetail(
   code: string,
 ): Promise<StockDetailResult> {
+  // 종목일 수 없는 문자열은 상류를 부르지 않는다. 백엔드는 KRX 목록에 없는 값을
+  // 그대로 야후 티커로 쓰므로(`normalize_stock_candidates`), 이 한 줄이 없으면
+  // 주소창이 곧 상류 호출 증폭구가 된다 (`lib/stocks/symbol` 주석).
+  if (!isResolvableSymbol(code)) return { status: "not-found" };
+
   if (USE_MOCK) {
     return code === MOCK_STOCK_DETAIL.ref.code
       ? { status: "ok", detail: MOCK_STOCK_DETAIL }

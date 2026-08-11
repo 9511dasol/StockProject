@@ -53,6 +53,13 @@ async def _warm_up() -> None:
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     if settings.db_create_all_on_startup:
+        # 켜져 있다는 사실 자체가 경고다. 기본값은 False 이고(`core/config` 주석),
+        # 이 경로는 alembic 을 아직 돌리지 않은 개발 DB 를 위한 것이다 —
+        # 이미 마이그레이션이 관리하는 DB 면 `create_all` 이 기동을 거부한다.
+        logger.warning(
+            "DB_CREATE_ALL_ON_STARTUP 이 켜져 있습니다 — 스키마를 모델에서 직접 만듭니다. "
+            "운영에서는 끄고 `alembic upgrade head` 를 쓰세요"
+        )
         await create_all()
     logger.info("%s 시작 (model=%s)", settings.app_name, settings.gemini_model)
 

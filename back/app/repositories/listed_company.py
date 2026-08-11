@@ -137,15 +137,28 @@ class ListedCompanyRepository:
         순위 계산은 파이썬에서 하지만(원본과 동일한 스코어링), 후보 집합을 SQL로 줄여
         전체 테이블을 ORM 객체로 적재하지 않는다. `candidate_limit`에 걸리면 경고를
         남긴다 — 조용히 잘리면 "다 봤다"로 오해되기 때문이다.
+
+        **`autoescape=True` 가 필요한 이유.** 예전에는 f-string 으로 패턴을 만들어
+        `%`·`_` 가 와일드카드로 새어 들어갔다. `keyword` 는 `normalize_search_text` 가
+        영숫자·한글만 남기므로 안전했지만 `initials` 는 아니다 —
+        `get_initial_consonants` 는 한글이 아닌 문자를 소문자로 **그대로 통과시킨다**
+        (`LG` → `lg` 가 되는 경로가 그것이다). 그래서 `ㅅ%` 같은 질의가 초성 검색을
+        전 종목 스캔으로 바꿀 수 있었다.
+
+        정규화 함수를 조이는 대신 여기서 이스케이프한다. `initial_consonants` 컬럼은
+        같은 함수로 **적재**되므로, 함수가 버리는 문자를 늘리면 이미 적재된 값과
+        질의가 어긋난다 — 배치가 한 바퀴 돌기 전까지 조용히 못 찾는 상태가 된다.
         """
         conditions = []
         if keyword:
             conditions += [
-                ListedCompany.search_symbol.like(f"{keyword}%"),
-                ListedCompany.search_name.like(f"%{keyword}%"),
+                ListedCompany.search_symbol.startswith(keyword, autoescape=True),
+                ListedCompany.search_name.contains(keyword, autoescape=True),
             ]
         if initials:
-            conditions.append(ListedCompany.initial_consonants.like(f"%{initials}%"))
+            conditions.append(
+                ListedCompany.initial_consonants.contains(initials, autoescape=True)
+            )
 
         if not conditions:
             return []

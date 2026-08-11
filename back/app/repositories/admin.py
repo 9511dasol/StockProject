@@ -24,6 +24,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.admin_audit import AdminAuditLog
+from app.utils.text import escape_like
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +62,27 @@ class AdminRepository:
         self._db = db
 
     async def users_are_readable(self) -> bool:
-        """`users` 를 읽을 수 있는가.
+        """`users` 를 **이 모듈이 쓰는 모양으로** 읽을 수 있는가.
 
         `orphan_service._users_are_readable` 와 **같은 이유로 세이브포인트 안에서**
         물어본다. Postgres 는 실패한 문장 하나가 트랜잭션 전체를 중단 상태로 만들어,
         예외를 삼켜도 그 세션으로는 이후 아무것도 못 한다.
+
+        **`select 1` 로는 부족했다.** 테이블만 있고 `role` 컬럼이 없는 DB(=NextAuth
+        마이그레이션은 돌았지만 `c9b3e7d21a08` 은 안 돌린 상태)에서도 "읽을 수 있다" 로
+        판정하고, 곧바로 `_select_users` 가 `u.role` 에서 `UndefinedColumn` 으로 터졌다.
+        그러면 준비해 둔 진단 문장은 한 번도 쓰이지 않고 화면은 500 을 받아 "백엔드에
+        닿지 못했습니다" 라는 **틀린 방향**을 안내한다 — 정작 필요한 말은 "마이그레이션을
+        돌리세요" 다.
+
+        그래서 프로브가 실제 의존 컬럼을 함께 본다. 프로브와 본 질의가 같은 것을 보지
+        않으면 프로브는 통과 도장을 찍는 일밖에 하지 않는다.
         """
         try:
             async with self._db.begin_nested():
-                await self._db.execute(text("select 1 from users limit 1"))
+                await self._db.execute(
+                    text('select role, "emailVerified" from users limit 1')
+                )
             return True
         except Exception as exc:  # noqa: BLE001 - 방언·권한·부재를 구분하지 않는다
             logger.info("users 테이블을 읽을 수 없습니다 (%s)", exc)
@@ -255,16 +268,22 @@ class AdminRepository:
 
 
 def _search_clause(keyword: str) -> tuple[str, dict[str, object]]:
-    """이메일·이름 부분 일치. 빈 키워드면 절을 만들지 않는다.
+    r"""이메일·이름 부분 일치. 빈 키워드면 절을 만들지 않는다.
 
     `ilike` 로 대소문자를 무시한다 — 이메일을 대문자로 적어 두고 소문자로 찾는 일이
     흔하고, 그때 "그런 회원 없음" 은 사실이 아니다.
+
+    **키워드를 이스케이프한다.** 검색창의 값이 패턴에 그대로 실리면 `%`·`_` 가
+    와일드카드가 된다. 여기서는 남의 데이터를 보는 사고가 아니라(관리자는 어차피 전
+    회원을 볼 수 있다) **틀린 결과**가 문제다: `a_c` 로 찾으면 `abc` 도 걸려서
+    "그 이메일이 있다" 는 잘못된 확인을 준다. 삭제 화면이 이메일 대조를 요구하는
+    흐름이라 그 오판의 값이 싸지 않다.
     """
     text_value = keyword.strip()
     if not text_value:
         return "", {}
 
     return (
-        "where u.email ilike :kw or u.name ilike :kw",
-        {"kw": f"%{text_value}%"},
+        r"where u.email ilike :kw escape '\' or u.name ilike :kw escape '\'",
+        {"kw": f"%{escape_like(text_value)}%"},
     )

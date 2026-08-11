@@ -39,6 +39,23 @@ def normalize_search_text(value: str) -> str:
     return NON_SEARCH_TEXT_PATTERN.sub("", clean_text(value)).lower()
 
 
+def escape_like(value: str) -> str:
+    r"""LIKE/ILIKE 패턴 안에서 와일드카드로 읽힐 문자를 막는다.
+
+    `%`(임의 길이)·`_`(임의 한 글자)를 글자 그대로 찾게 만든다. 쓰는 쪽은 SQL 에
+    `escape '\'` 를 함께 적어야 한다 — 이스케이프 문자는 표준에 기본값이 없다.
+
+    역슬래시를 **먼저** 치환한다. 나중에 하면 방금 우리가 넣은 이스케이프까지 다시
+    이스케이프해 `\%` 가 `\\%` 가 되고, 그러면 "역슬래시 뒤에 아무 문자열" 을 찾는
+    패턴이 된다.
+
+    ORM 쪽에는 이 함수를 쓰지 않는다 — SQLAlchemy 의 `contains(..., autoescape=True)`
+    가 같은 일을 하면서 `escape` 절까지 렌더한다. 이 함수가 필요한 것은 NextAuth
+    테이블처럼 **모델이 없어 raw SQL 로 읽는 자리**뿐이다 (`repositories/admin`).
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def get_initial_consonants(value: str) -> str:
     """한글 초성 문자열. 한글이 아닌 문자는 소문자로 그대로 통과시킨다."""
     result: list[str] = []

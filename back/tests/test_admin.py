@@ -20,9 +20,11 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.repositories.admin import AdminRepository
+from app.repositories.batch_run import BatchRunRepository
 from app.services import admin_service
 from app.services.admin_service import Actor, AdminError, UsersUnavailable
 
@@ -377,6 +379,46 @@ async def test_endpoint_translates_unavailable_to_503(
     assert response.status_code == 503
 
 
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("get", "/api/v1/admin/users", None),
+        ("get", "/api/v1/admin/users/whoever", None),
+        ("patch", "/api/v1/admin/users/whoever/role", {"role": "admin"}),
+        ("delete", "/api/v1/admin/users/whoever", None),
+    ],
+)
+async def test_every_user_path_gives_503_not_500(
+    client: AsyncClient, locked, method: str, path: str, body: dict | None
+) -> None:
+    """**네 경로가 같은 답을 해야 한다.**
+
+    예전에는 목록만 프로브를 지났다. 상세·권한변경·삭제는 프로브를 건너뛰고 곧바로
+    500 을 냈고, 그러면 같은 원인에 화면이 두 가지로 답한다 — 사용자가 보는 쪽은
+    대개 "백엔드에 닿지 못했습니다" 라는 **틀린 방향**이었다.
+    """
+    headers = {**locked, "X-Admin-Actor": "tester"}
+    response = await client.request(method, path, headers=headers, json=body)
+
+    assert response.status_code == 503, response.text
+
+
+async def test_probe_sees_the_columns_the_queries_use(db_session) -> None:
+    """테이블만 있고 `role` 이 없는 DB — 마이그레이션이 반쪽만 적용된 상태다.
+
+    `select 1 from users` 만 보던 프로브는 여기서 "읽을 수 있다" 로 판정하고, 곧바로
+    `u.role` 이 `UndefinedColumn` 으로 터졌다. **프로브와 본 질의가 같은 것을 보지
+    않으면 프로브는 통과 도장을 찍는 일밖에 하지 않는다.**
+    """
+    await db_session.execute(text('create table users (id uuid primary key, email text)'))
+
+    repo = AdminRepository(db_session)
+
+    assert await repo.users_are_readable() is False
+    with pytest.raises(UsersUnavailable):
+        await admin_service.list_users(repo)
+
+
 # ── 운영 현황 ──────────────────────────────────────────────────────────────
 
 
@@ -411,3 +453,38 @@ async def test_ops_reports_coverage_and_locks(client: AsyncClient, locked) -> No
     # 자물쇠가 꺼져 있다는 사실도 값으로 나간다. 화면이 그것을 경고로 그린다.
     assert body["advice_locked"] is False
     assert body["advice_capacity"] == settings.advice_cache_size
+
+
+async def test_ops_reports_last_run_and_last_failure_separately(
+    client: AsyncClient, locked, db_session: AsyncSession
+) -> None:
+    """**둘을 함께 줘야 세 상태가 구분된다.**
+
+    마지막 실행만 주면 "계속 성공" 과 "어제 실패했고 오늘 성공" 이 같아 보이고,
+    마지막 실패만 주면 "실패가 없다" 와 "배치가 아예 돌지 않았다" 가 같아 보인다.
+    후자가 더 나쁜 상태인데 로그에는 똑같이 아무것도 없다 — 그래서 이 표가 있다.
+    """
+    runs = BatchRunRepository(db_session)
+    await runs.record("snapshot", ok=False, attempted=30, answered=1, detail="응답률 3%")
+    await runs.record("snapshot", ok=True, attempted=30, answered=30, applied=12, detail="정상")
+
+    body = (await client.get("/api/v1/admin/ops", headers=locked)).json()
+    batch = next(item for item in body["batches"] if item["name"] == "snapshot")
+
+    # 마지막 실행은 성공이다.
+    assert batch["last_run_ok"] is True
+    assert batch["applied"] == 12
+    # 그런데 과거 실패는 그대로 남아 있다 — 되풀이되는 실패를 볼 수 있어야 한다.
+    assert batch["last_failure_detail"] == "응답률 3%"
+    assert batch["last_failure_at"] is not None
+
+
+async def test_ops_says_nothing_ran_when_there_is_no_record(
+    client: AsyncClient, locked
+) -> None:
+    """기록이 없으면 `last_run_at` 이 None 이다 — 화면이 "한 번도 돌지 않았다" 를 말한다."""
+    body = (await client.get("/api/v1/admin/ops", headers=locked)).json()
+    batch = next(item for item in body["batches"] if item["name"] == "snapshot")
+
+    assert batch["last_run_at"] is None
+    assert batch["last_run_ok"] is None

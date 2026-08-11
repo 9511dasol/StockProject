@@ -22,13 +22,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 
 from app.api.auth import require_admin_key
-from app.api.deps import DbSession, ListedCompanyRepo
+from app.api.deps import BatchRunRepo, DbSession, ListedCompanyRepo
 from app.repositories.admin import AdminRepository, AdminUserRow
 from app.schemas.admin import (
     AdminUser,
     AdminUserPage,
     AuditEntry,
     AuditPage,
+    BatchStatus,
     DeleteResult,
     OpsSnapshot,
     RoleUpdate,
@@ -110,14 +111,18 @@ def _translate(error: AdminError) -> HTTPException:
 
 
 @router.get("/ops", response_model=OpsSnapshot, summary="운영 현황")
-async def get_ops(listings: ListedCompanyRepo) -> OpsSnapshot:
-    """배치 진행률 · AI 캐시 · 자물쇠 상태.
+async def get_ops(listings: ListedCompanyRepo, runs: BatchRunRepo) -> OpsSnapshot:
+    """배치 진행률 · **배치 실행 기록** · AI 캐시 · 자물쇠 상태.
 
     **배치를 돌리지 않는다.** 다른 화면(`/markets/calendar`·`/markets/screener`)은
     열릴 때 배경 배치를 예약하지만, 관리자 화면은 관측이 목적이라 관측 행위가
     대상을 바꾸면 안 된다. 야후 상한(1회 ~500종목)도 그 판단을 뒷받침한다.
+
+    진행률(`*_covered`)과 실행 기록(`batches`)은 다른 질문에 답한다 — 앞은 "지금까지
+    얼마나 채웠나", 뒤는 "그 채우는 일이 **돌고 있나**" 다. 커버리지가 며칠째 같은
+    숫자일 때 그것이 정상인지 배치가 죽은 것인지는 뒤쪽만 답할 수 있다.
     """
-    snapshot = await admin_service.get_ops_snapshot(listings)
+    snapshot = await admin_service.get_ops_snapshot(listings, runs)
     return OpsSnapshot(
         calendar_covered=snapshot.calendar_covered,
         fundamentals_covered=snapshot.fundamentals_covered,
@@ -131,6 +136,20 @@ async def get_ops(listings: ListedCompanyRepo) -> OpsSnapshot:
         advice_max_concurrent=snapshot.advice_max_concurrent,
         advice_locked=snapshot.advice_locked,
         rag_enabled=snapshot.rag_enabled,
+        batches=[
+            BatchStatus(
+                name=batch.name,
+                last_run_at=batch.last_run_at,
+                last_run_ok=batch.last_run_ok,
+                attempted=batch.attempted,
+                answered=batch.answered,
+                applied=batch.applied,
+                detail=batch.detail,
+                last_failure_at=batch.last_failure_at,
+                last_failure_detail=batch.last_failure_detail,
+            )
+            for batch in snapshot.batches
+        ],
         generated_at=snapshot.generated_at,
     )
 
@@ -158,7 +177,17 @@ async def list_users(
 
 @router.get("/users/{user_id}", response_model=AdminUser, summary="회원 상세")
 async def get_user(repo: AdminRepo, user_id: str) -> AdminUser:
-    row = await repo.find_user(user_id)
+    """한 명. 스키마가 없으면 404 가 아니라 **503** 이다.
+
+    둘을 구분하는 이유: 404 는 "그런 회원이 없다", 503 은 "우리가 판단할 수 없다" 다.
+    후자를 404 로 내면 화면이 "없는 회원" 이라고 단정하는데, 실제로는 마이그레이션이
+    안 돌았을 뿐이라 그 안내가 사람을 엉뚱한 곳으로 보낸다.
+    """
+    try:
+        row = await admin_service.get_user(repo, user_id)
+    except AdminError as error:
+        raise _translate(error) from error
+
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "그 회원을 찾을 수 없습니다.")
     return _to_user(row)

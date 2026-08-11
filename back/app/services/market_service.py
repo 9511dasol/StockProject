@@ -59,36 +59,48 @@ async def _load_universe(repo: ListedCompanyRepository) -> list[ListedCompanyRec
 
 
 async def refresh_movers(repo: ListedCompanyRepository) -> MoversScan | None:
-    """등락률 스냅샷을 다시 만든다. 실패하면 직전 스냅샷을 그대로 둔다."""
+    """등락률 스냅샷을 다시 만든다. 실패하면 직전 스냅샷을 그대로 둔다.
+
+    ## 시도 시각을 `finally` 에서 찍는다
+
+    "실패해도 시각은 갱신한다"(실패 연타 방지)는 규칙이 세 갈래에 흩어져 있었고,
+    **한 갈래가 빠져 있었다** — `_load_universe` 의 DB 실패다. 그 예외는 try 밖이라
+    시각을 남기지 않고 밖으로 새어, `_is_fresh()` 가 계속 False 인 채
+    `/markets/movers` 요청마다 새 태스크가 같은 자리에서 죽었다. 배경 태스크였으므로
+    화면에는 흔적이 없고 홈만 조용히 직전 스냅샷으로 남는다.
+
+    `finally` 는 **조기 반환(이미 신선함)보다 뒤에** 있다. 그 경로까지 시각을 다시
+    찍으면 TTL 이 매 요청 앞으로 밀려 스냅샷이 영원히 갱신되지 않는다 — 규칙을 한
+    곳으로 모으면서 정확히 그 함정을 밟을 수 있는 자리다.
+    """
     global _scan, _scanned_at
 
     async with _scan_lock:
         # 락을 기다리는 동안 다른 요청이 이미 채웠을 수 있다.
+        # **이 반환은 try 밖이어야 한다** (위 주석).
         if _is_fresh():
             return _scan
 
-        universe = await _load_universe(repo)
-        if not universe:
-            logger.info("등락률 스캔: 상장사 목록이 비어 있어 건너뜁니다")
-            _scanned_at = datetime.now(UTC)
-            return _scan
-
-        label = f"시가총액 상위 {len(universe)}종목"
         try:
+            universe = await _load_universe(repo)
+            if not universe:
+                logger.info("등락률 스캔: 상장사 목록이 비어 있어 건너뜁니다")
+                return _scan
+
+            label = f"시가총액 상위 {len(universe)}종목"
             scan = await asyncio.to_thread(scan_movers, universe, universe_label=label)
+
+            if not scan.rows:
+                logger.warning("등락률 스캔 결과가 비어 직전 스냅샷을 유지합니다")
+                return _scan
+
+            _scan = scan
+            return scan
         except Exception:  # noqa: BLE001 - 랭킹 실패가 홈 화면을 죽이면 안 된다
             logger.exception("등락률 스캔 실패 — 직전 스냅샷을 유지합니다")
+            return _scan
+        finally:
             _scanned_at = datetime.now(UTC)
-            return _scan
-
-        # 시도 시각은 결과와 무관하게 갱신한다 (실패 연타 방지).
-        _scanned_at = datetime.now(UTC)
-        if not scan.rows:
-            logger.warning("등락률 스캔 결과가 비어 직전 스냅샷을 유지합니다")
-            return _scan
-
-        _scan = scan
-        return scan
 
 
 async def _refresh_in_new_session() -> None:

@@ -46,8 +46,12 @@ logger = logging.getLogger(__name__)
 #: "아직 도는 중인가" 를 판정한다.
 _running: dict[str, asyncio.Task[Any]] = {}
 
-#: 이름 → 마지막 '시도' 시각. `min_interval` 을 준 배치만 기록된다.
-_last_attempt: dict[str, datetime] = {}
+#: 이름 → **다음에 띄울 수 있는 가장 이른 시각.** `min_interval` 을 준 배치만 기록된다.
+#:
+#: '마지막 시도 시각' 이 아니라 '다음 허용 시각' 을 담는 이유: 실패한 배치는 다음
+#: 주기까지 기다릴 이유가 없다. 두 값을 한 dict 에 담아 두면 `retry_after` 가 그
+#: 시각만 앞으로 당기면 되고, 규칙이 한 곳에 남는다.
+_next_allowed: dict[str, datetime] = {}
 
 
 def _finished(name: str, task: asyncio.Task[Any]) -> None:
@@ -81,12 +85,37 @@ def schedule_once(
 
     if min_interval is not None:
         now = datetime.now(UTC)
-        last = _last_attempt.get(name)
-        if last is not None and now - last < min_interval:
+        allowed_at = _next_allowed.get(name)
+        if allowed_at is not None and now < allowed_at:
             return False
-        _last_attempt[name] = now
+        _next_allowed[name] = now + min_interval
 
     task = asyncio.create_task(factory(), name=f"background:{name}")
     _running[name] = task
     task.add_done_callback(lambda finished: _finished(name, finished))
     return True
+
+
+def retry_after(name: str, delay: timedelta) -> None:
+    """이 배치를 `delay` 뒤에 다시 시도할 수 있게 한다.
+
+    **실패한 배치가 다음 주기까지 잠기는 것을 막는 문이다.** 스냅샷 배치는
+    `min_interval` 이 하루인데, 시각은 태스크를 띄우기 **전에** 찍힌다(그래야 같은
+    요청 폭주가 배치를 여러 번 띄우지 않는다). 그래서 배치가 응답률 가드로 통째로
+    버려져도 다음 시도는 24시간 뒤였다 — 야후가 10분 뒤에 풀려도 하루를 기다린다.
+    프로세스를 재시작하는 것이 유일한 우회였고, 그건 운영 절차가 아니라 증상이다.
+
+    호출부는 **실패를 아는 쪽**이다. 여기서 성공·실패를 판정할 수 없다: 배치가
+    돌려주는 0 은 "막혔다" 일 수도 있고 "물어볼 게 없었다" 일 수도 있어서,
+    반환값으로 추론하면 정상 배치를 계속 재시도하게 된다.
+
+    이미 더 이른 시각이 잡혀 있으면 그대로 둔다 — 이 함수는 재시도를 **앞당기는**
+    것이고, 늦추는 데 쓰이면 두 호출 순서가 결과를 바꾼다.
+    """
+    candidate = datetime.now(UTC) + delay
+    current = _next_allowed.get(name)
+    if current is not None and current <= candidate:
+        return
+
+    _next_allowed[name] = candidate
+    logger.info("배경 배치 %s 를 %s 뒤에 다시 시도합니다", name, delay)

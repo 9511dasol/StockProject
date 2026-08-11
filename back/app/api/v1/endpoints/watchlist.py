@@ -21,8 +21,9 @@
 """
 
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Path, status
 
 from app.api.deps import ListedCompanyRepo, OwnerKey, WatchlistRepo
 from app.schemas.watchlist import (
@@ -37,6 +38,18 @@ from app.services import watchlist_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
+
+#: 행을 지목하는 6자리 종목 코드.
+#:
+#: **검증이 없으면 데이터가 지워진다.** `code` 는 저장소에서 심볼을 찾는 데 쓰이고,
+#: 예전 구현은 그것을 `LIKE '{code}%'` 에 그대로 실었다 — `DELETE /watchlist/%` 가
+#: 그 소유자의 임의의 한 종목을 지우고 200 을 돌려줬다(`repositories/watchlist.find_by_code`).
+#: 저장소 쪽 LIKE 도 함께 없앴지만, 애초에 들어올 수 없게 하는 것이 첫 번째 방어선이다.
+#:
+#: 422 로 끊는다 — 6자리가 아닌 코드는 "그 종목이 목록에 없다" 가 아니라 **요청이
+#: 잘못된 것**이다. 없는 종목을 지우라는 요청을 404 로 만들지 않는 판단(아래 주석)과
+#: 다른 층이다.
+StockCode = Annotated[str, Path(pattern=r"^\d{6}$", description="6자리 종목 코드")]
 
 
 @router.get("", response_model=Watchlist, summary="관심종목 목록 (그룹·순서·시세 포함)")
@@ -73,7 +86,7 @@ async def add_watchlist_item(
 
 @router.delete("/{code}", response_model=Watchlist, summary="관심종목 제거")
 async def remove_watchlist_item(
-    code: str, owner: OwnerKey, repo: WatchlistRepo, listings: ListedCompanyRepo
+    code: StockCode, owner: OwnerKey, repo: WatchlistRepo, listings: ListedCompanyRepo
 ) -> Watchlist:
     # 없는 것을 지우라는 요청을 404 로 만들지 않는다 — 결과 상태("그 종목은 목록에
     # 없다")가 요청자가 원한 그대로다. 연타·재시도가 오류로 보이면 안 된다.
@@ -123,7 +136,7 @@ async def claim_watchlist(
 
 @router.patch("/{code}", response_model=Watchlist, summary="그룹·알림·보유 수정")
 async def patch_watchlist_item(
-    code: str,
+    code: StockCode,
     payload: WatchlistItemPatch,
     owner: OwnerKey,
     repo: WatchlistRepo,

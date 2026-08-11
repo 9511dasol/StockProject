@@ -206,8 +206,17 @@ uv run alembic upgrade head   # document_chunks 포함
 uv run alembic check          # 모델과 DB가 어긋났는지
 ```
 
-`DB_CREATE_ALL_ON_STARTUP`은 운영에서 `false`로 둔다 — `create_all`이 마이그레이션과
-별개로 테이블을 만들면 이력이 어긋난다.
+`DB_CREATE_ALL_ON_STARTUP`의 **코드 기본값은 `false`다** — 환경변수를 빠뜨린 배포가
+안전한 쪽으로 떨어져야 한다. `create_all`이 마이그레이션과 별개로 테이블을 만들면
+이력이 어긋나고, 그 상태는 되돌리기 어려운 데다 조용하다. 그래서 `true`로 켜더라도
+`alembic_version`이 있는 DB에서는 **기동을 거부한다**.
+
+빈 DB에서 시작하는 절차는 이것뿐이다 — `create_all`은 거치지 않는다:
+
+```bash
+uv run alembic upgrade head   # 리비전 10개. 뿌리(b0d3a1c7e594)가 listed_companies 를 만든다
+uv run alembic check          # 모델과 DB 가 어긋났는지 (drift 0 이 기준선)
+```
 
 ## 남은 정리 작업
 

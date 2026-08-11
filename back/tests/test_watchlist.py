@@ -390,6 +390,69 @@ async def test_removing_a_missing_item_is_not_an_error(
     assert response.status_code == 200
 
 
+# ── 코드 파라미터 검증 (LIKE 와일드카드 결함) ───────────────────────────
+#
+# 예전 구현은 `symbol LIKE '{code}%'` 로 행을 찾았고 라우터는 code 를 검증하지 않았다.
+# 그래서 `DELETE /watchlist/%` 가 그 소유자의 **전 행에 매치**되어(정렬 없는 first())
+# 임의의 한 종목을 지우고 200 을 돌려줬다 — 오류 없이 남의 데이터가 사라지는 종류다.
+#
+# 테스트가 **응답 코드만 보지 않고 목록이 그대로인지 함께 확인한다.** 422 만 단언하면
+# 라우터 검증만 지켜지고, 저장소가 LIKE 로 되돌아가도 초록으로 남는다.
+
+
+# `%` 는 `%25` 로 실어 보낸다. 날 `%` 는 URL 에서 이스케이프 시작 문자라, 그대로 두면
+# 클라이언트가 어떻게 해석하는지가 이 테스트의 변수가 된다 — 검증하려는 것은 서버다.
+@pytest.mark.parametrize("code", ["%25", "_", "0059_0", "005930%25", "%255930"])
+async def test_wildcard_code_deletes_nothing(
+    client: AsyncClient, seeded: ListedCompanyRepository, code: str
+) -> None:
+    headers = {"X-Owner-Key": _ALICE}
+    for symbol in ("005930", "000660", "247540"):
+        assert (
+            await client.post("/api/v1/watchlist", json={"symbol": symbol}, headers=headers)
+        ).status_code == 200
+
+    response = await client.delete(f"/api/v1/watchlist/{code}", headers=headers)
+
+    assert response.status_code == 422
+    remaining = await client.get("/api/v1/watchlist", headers=headers)
+    assert sorted(row["code"] for row in remaining.json()["items"]) == [
+        "000660",
+        "005930",
+        "247540",
+    ]
+
+
+async def test_wildcard_code_patches_nothing(
+    client: AsyncClient, seeded: ListedCompanyRepository
+) -> None:
+    """PATCH 도 같은 경로로 엉뚱한 종목의 그룹·알림·보유수량을 바꿀 수 있었다."""
+    headers = {"X-Owner-Key": _ALICE}
+    await client.post("/api/v1/watchlist", json={"symbol": "005930"}, headers=headers)
+
+    response = await client.patch(
+        "/api/v1/watchlist/_", json={"group": "탈취"}, headers=headers
+    )
+
+    assert response.status_code == 422
+    listed = await client.get("/api/v1/watchlist", headers=headers)
+    assert [row["group"] for row in listed.json()["items"]] != ["탈취"]
+
+
+async def test_find_by_code_matches_the_exact_symbol_only(
+    db_session: AsyncSession, seeded: ListedCompanyRepository
+) -> None:
+    """저장소도 스스로 안전해야 한다 — 라우터 검증에 기대지 않는다."""
+    repo = WatchlistRepository(db_session)
+    await repo.add(_ALICE, "005930.KS", group="기본")
+
+    assert (await repo.find_by_code(_ALICE, "005930")) is not None
+    assert (await repo.find_by_code(_ALICE, "%")) is None
+    assert (await repo.find_by_code(_ALICE, "0059_0")) is None
+    # 소유자 격리는 그대로다.
+    assert (await repo.find_by_code(_BOB, "005930")) is None
+
+
 # ── 로그인 승계 엔드포인트 (12회차) ─────────────────────────────────────
 
 

@@ -33,14 +33,26 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
-from app.core.background import schedule_once
+from app.core.background import retry_after, schedule_once
 from app.core.config import settings
 from app.integrations.yfinance.snapshot import fetch_company_snapshots
+from app.repositories.batch_run import BatchRunRepository
 from app.repositories.listed_company import ListedCompanyRepository
 
 logger = logging.getLogger(__name__)
 
 _SNAPSHOT_TTL = timedelta(days=1)
+
+#: 배치 이름. `core/background` 가 이 문자열로 재시도 시각을 기억한다.
+_BATCH = "snapshot"
+
+#: 실패했을 때 다시 시도할 간격.
+#:
+#: 하루가 아니라 30분인 이유: 이 배치의 실패는 대개 **일시적**이다(야후가 조인 상태).
+#: 그런데 시각은 태스크를 띄우기 전에 찍히므로, 되돌리지 않으면 10분 뒤에 풀려도
+#: 다음 시도는 24시간 뒤가 된다. 반대로 너무 짧으면 조여진 상류를 계속 두드려
+#: 차단을 연장한다 — 야후의 실질 상한을 실측한 17회차 기록이 그 근거다.
+_RETRY_AFTER_FAILURE = timedelta(minutes=30)
 
 #: 이 비율보다 적게 응답하면 배치 결과를 통째로 버린다.
 #:
@@ -53,22 +65,38 @@ _MIN_RESPONSE_RATIO = 0.5
 _refresh_lock = asyncio.Lock()
 
 
-async def refresh_snapshots(repo: ListedCompanyRepository, *, force: bool = False) -> int:
+async def refresh_snapshots(
+    repo: ListedCompanyRepository,
+    *,
+    force: bool = False,
+    runs: BatchRunRepository | None = None,
+) -> int:
     """일정·지표를 하루 1회 갱신한다. 날짜를 얻은 종목 수를 돌려준다.
 
     실패해도 예외를 올리지 않는다 — 얹는 기능이고, 이것 때문에 홈이 죽으면 안 된다.
     값이 없으면 화면에서 섹션이 비어 보일 뿐이다.
+
+    `runs` 를 주면 실행 결과를 남긴다. **예약된 경로는 항상 준다**
+    (`_refresh_in_new_session`) — 없으면 관리자 화면이 "배치가 도는가" 에 답할 수
+    없다. 직접 부르는 경로(스크립트·테스트)에서는 생략할 수 있고, 그때는 기록만
+    빠진다. 기록 실패가 배치를 실패시키지 않는 것과 같은 이유다: 관측을 잃는 것과
+    데이터를 잃는 것의 무게가 다르다.
     """
     async with _refresh_lock:
         try:
             if not force:
                 latest = await repo.latest_calendar_update()
                 if latest and datetime.now(UTC) - latest < _SNAPSHOT_TTL:
+                    # 실행하지 않았으므로 기록하지 않는다 — 이것을 남기면 표가
+                    # "안 돌아도 되는 날" 로 가득 차서 진짜 사건이 묻힌다.
                     return 0
 
             symbols = await repo.symbols_for_calendar_refresh(settings.snapshot_batch_limit)
             if not symbols:
                 logger.info("스냅샷 배치: 물어볼 종목이 없습니다 (상장사 목록이 비었는가)")
+                await _record(
+                    runs, ok=False, detail="물어볼 종목이 없습니다 (상장사 목록이 비었는가)"
+                )
                 return 0
 
             record = await asyncio.to_thread(fetch_company_snapshots, symbols)
@@ -92,6 +120,21 @@ async def refresh_snapshots(repo: ListedCompanyRepository, *, force: bool = Fals
                     record.attempted,
                     answered,
                     100 * answered / record.attempted if record.attempted else 0,
+                )
+                # 아무것도 쓰지 않았으므로 하루를 기다릴 이유가 없다. 되돌리지 않으면
+                # 이 실행이 다음 24시간의 몫을 써 버린 셈이 된다.
+                retry_after(_BATCH, _RETRY_AFTER_FAILURE)
+                await _record(
+                    runs,
+                    ok=False,
+                    attempted=record.attempted,
+                    answered=answered,
+                    detail=(
+                        f"응답률 {100 * answered / record.attempted:.0f}% — 배치를 버렸습니다. "
+                        "공급자가 요청을 막고 있을 가능성이 큽니다."
+                        if record.attempted
+                        else "물어본 종목이 없습니다"
+                    ),
                 )
                 return 0
 
@@ -130,18 +173,75 @@ async def refresh_snapshots(repo: ListedCompanyRepository, *, force: bool = Fals
                 filled_metrics,
                 record.as_of,
             )
+            # **지표 0건은 성공으로 기록하지 않는다.** 위 로그가 이미 error 인 사건인데
+            # 표에 ok 로 남으면 관리자 화면이 "마지막 실행 정상" 이라고 말한다 —
+            # 경보를 만들어 두고 그것을 가리는 셈이다.
+            await _record(
+                runs,
+                ok=bool(filled_metrics) or not answered,
+                attempted=record.attempted,
+                answered=answered,
+                applied=filled_dates,
+                detail=(
+                    f"일정 {filled_dates}종목 · 지표 {filled_metrics}종목 반영"
+                    if filled_metrics or not answered
+                    else (
+                        f"{answered}종목이 응답했지만 PER/PBR 은 0건입니다 — "
+                        "get_valuation_measures 가 막혔거나 표 라벨이 바뀌었을 수 있습니다"
+                    )
+                ),
+            )
             return filled_dates
-        except Exception:  # noqa: BLE001 - 배치 실패가 홈을 죽이면 안 된다
+        except Exception as exc:  # noqa: BLE001 - 배치 실패가 홈을 죽이면 안 된다
             logger.exception("스냅샷 배치 실패 — 기존 값으로 계속합니다")
+            retry_after(_BATCH, _RETRY_AFTER_FAILURE)
+            await _record(runs, ok=False, detail=f"{type(exc).__name__}: {exc}"[:500])
             return 0
 
 
+async def _record(
+    runs: BatchRunRepository | None,
+    *,
+    ok: bool,
+    attempted: int = 0,
+    answered: int = 0,
+    applied: int = 0,
+    detail: str | None = None,
+) -> None:
+    """실행 결과를 남긴다. 저장소가 없으면(직접 호출 경로) 아무것도 하지 않는다.
+
+    **기록 실패가 배치를 실패시키지 않는다.** 이 함수가 예외를 올리면 성공한 배치가
+    바깥 `except` 로 잡혀 "실패" 로 기록되려 하고, 그 기록도 같은 이유로 실패한다.
+    관측을 잃는 것과 데이터를 잃는 것은 무게가 다르다.
+    """
+    if runs is None:
+        return
+
+    try:
+        await runs.record(
+            _BATCH,
+            ok=ok,
+            attempted=attempted,
+            answered=answered,
+            applied=applied,
+            detail=detail,
+        )
+    except Exception:  # noqa: BLE001 - 관측 실패가 배치를 되돌리면 안 된다
+        logger.exception("배치 실행 기록에 실패했습니다 — 배치 결과는 그대로 둡니다")
+
+
 async def _refresh_in_new_session() -> int:
-    """요청 세션은 응답과 함께 닫히므로 백그라운드 작업은 자기 세션을 연다."""
+    """요청 세션은 응답과 함께 닫히므로 백그라운드 작업은 자기 세션을 연다.
+
+    **예약된 경로는 항상 기록한다.** 여기가 실제로 도는 유일한 자리이므로, 여기서
+    `runs` 를 빠뜨리면 관리자 화면의 배치 현황이 영원히 비어 있게 된다.
+    """
     from app.core.database import AsyncSessionLocal
 
     async with AsyncSessionLocal() as session:
-        return await refresh_snapshots(ListedCompanyRepository(session))
+        return await refresh_snapshots(
+            ListedCompanyRepository(session), runs=BatchRunRepository(session)
+        )
 
 
 def schedule_snapshot_refresh() -> None:
@@ -153,5 +253,8 @@ def schedule_snapshot_refresh() -> None:
 
     테스트가 이 이름을 대역으로 세운다(`test_calendar.py` · `test_screener.py` ·
     `test_admin.py`). 공용 스케줄러를 부르더라도 이 함수 자체는 남는다.
+
+    실패했을 때는 `refresh_snapshots` 가 `retry_after` 로 그 간격을 30분으로 당긴다 —
+    아무것도 쓰지 못한 실행이 다음 하루를 잡아먹지 않게.
     """
-    schedule_once("snapshot", _refresh_in_new_session, min_interval=_SNAPSHOT_TTL)
+    schedule_once(_BATCH, _refresh_in_new_session, min_interval=_SNAPSHOT_TTL)

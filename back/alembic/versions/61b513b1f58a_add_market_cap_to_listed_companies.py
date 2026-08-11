@@ -8,8 +8,13 @@
 내려가므로 동작에 차이가 없다. **이미 적용된 리비전이라 다시 쓰지 않는다.**
 새 마이그레이션에는 쓰지 말 것 (`alembic/env.py` 주석 참고).
 
+**뿌리가 아니게 됐다.** 예전에는 이 리비전이 `down_revision=None` 이라 사슬이
+"있지도 않은 테이블에 컬럼을 더하는 것" 으로 시작했다. 빈 DB 에 `upgrade head` 를
+돌리면 여기서 `UndefinedTable` 로 멈췄다는 뜻이다. `b0d3a1c7e594`(baseline)를 앞에
+넣어 그 구멍을 메웠다 — 이 파일에서 바뀐 것은 `down_revision` 한 줄뿐이다.
+
 Revision ID: 61b513b1f58a
-Revises:
+Revises: b0d3a1c7e594
 Create Date: 2026-07-31 14:11:04.042956
 
 """
@@ -21,7 +26,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '61b513b1f58a'
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = 'b0d3a1c7e594'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

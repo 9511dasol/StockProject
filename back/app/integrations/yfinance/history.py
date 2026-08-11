@@ -7,14 +7,14 @@ import logging
 from datetime import date, timedelta
 from typing import Any
 
-from app.core.exceptions import StockNotFoundError
+from app.core.exceptions import ProviderUnavailableError, StockNotFoundError
 from app.domain.constants import STOCK_TIMEFRAMES
 from app.domain.symbols import (
     get_common_stock_name,
     get_korean_stock_name,
     normalize_stock_candidates,
 )
-from app.integrations.yfinance.client import get_stock_name, load_yfinance
+from app.integrations.yfinance.client import get_stock_name, is_rate_limited, load_yfinance
 from app.integrations.yfinance.news import fetch_stock_news
 from app.integrations.yfinance.reports import fetch_analyst_reports
 from app.schemas.stock import KrxListing, StockHistory, StockRow
@@ -149,6 +149,21 @@ def fetch_stock_history(
         try:
             history = ticker.history(**history_kwargs)
         except Exception as exc:
+            # **레이트리밋은 '다음 후보' 가 아니다.** 상류가 우리를 막은 것이므로 다른
+            # 접미사를 물어도 같은 답이 오고, 물어보는 행위 자체가 차단을 연장한다.
+            # 여기서 끊으면 6자리 코드 한 건당 상류 호출이 3회에서 1회로 줄어든다.
+            if is_rate_limited(exc):
+                # 조용한 실패의 유일한 조기 경보라 info 가 아니라 warning 이다.
+                logger.warning(
+                    "%s 히스토리 조회가 레이트리밋에 걸렸습니다 (%s) → 남은 후보를 "
+                    "포기하고 503 으로 올립니다",
+                    candidate,
+                    exc,
+                )
+                raise ProviderUnavailableError(
+                    "시세 공급자가 요청을 제한하고 있습니다. 잠시 뒤 다시 시도해주세요."
+                ) from exc
+
             logger.info("%s 히스토리 조회 실패 (%s) → 다음 후보", candidate, exc)
             continue
 

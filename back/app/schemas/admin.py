@@ -73,6 +73,28 @@ class AuditPage(BaseModel):
     total: int = 0
 
 
+class BatchStatus(BaseModel):
+    """배치 하나의 최근 상태. `batch_runs` 두 질의를 합친 것이다.
+
+    **마지막 실행과 마지막 실패를 함께 담는다.** 마지막 실행만 주면 "어제 실패했고
+    오늘 성공" 과 "계속 성공" 이 구분되지 않고, 마지막 실패만 주면 "실패가 없다" 와
+    "배치가 아예 돌지 않았다" 가 구분되지 않는다. 후자가 더 나쁜 상태다.
+    """
+
+    name: str
+    #: 마지막 실행 (성공·실패 무관). None 이면 **한 번도 돌지 않았다**
+    last_run_at: str | None = None
+    last_run_ok: bool | None = None
+    #: 그 실행이 물어본/응답받은/반영한 종목 수
+    attempted: int = 0
+    answered: int = 0
+    applied: int = 0
+    detail: str | None = None
+    #: 가장 최근 실패. 지금이 정상이어도 남는다 — 되풀이되는 실패를 보려면 필요하다
+    last_failure_at: str | None = None
+    last_failure_detail: str | None = None
+
+
 class OpsSnapshot(BaseModel):
     """`GET /admin/ops` — 운영 현황.
 
@@ -100,5 +122,9 @@ class OpsSnapshot(BaseModel):
     #: 자물쇠·기능 상태. 꺼져 있다는 사실이 화면에 보여야 한다
     advice_locked: bool = False
     rag_enabled: bool = False
+
+    #: 배치 실행 기록. **목록인 것은 의도다** — 지금은 스냅샷 배치 하나만 기록하지만,
+    #: 시가총액·등락률 배치가 같은 기록자를 채택할 때 스키마를 바꾸지 않아도 된다.
+    batches: list[BatchStatus] = Field(default_factory=list)
 
     generated_at: str

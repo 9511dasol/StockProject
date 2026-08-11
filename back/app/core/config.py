@@ -37,8 +37,22 @@ class Settings(BaseSettings):
     # 기본값은 로컬 Postgres 다. 실제 값은 `.env` 의 DATABASE_URL(Supabase)이 준다.
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
     db_echo: bool = False
-    # 개발 편의용. 운영에서는 alembic 마이그레이션을 쓰고 False로 둔다.
-    db_create_all_on_startup: bool = True
+    #: 기동 때 `Base.metadata.create_all()` 로 테이블을 만들지.
+    #:
+    #: **기본값이 False 다. 예전에는 True 였고 그것이 두 사고의 뿌리였다.**
+    #:
+    #: ① 환경변수를 빠뜨린 배포가 **위험한 쪽으로** 떨어졌다. 새 DB 에서 create_all 이
+    #:    테이블을 선점하면 이후 `alembic upgrade head` 가 `relation already exists` 로
+    #:    멈추거나, autogenerate 가 "차이 없음" 을 보고 빈 마이그레이션을 낸다.
+    #: ② 그 기본값이 **마이그레이션 사슬의 구멍을 가리고 있었다.** `listed_companies` 를
+    #:    만드는 리비전이 아예 없었는데도 아무도 몰랐다 — 기동할 때마다 create_all 이
+    #:    대신 만들어 줬기 때문이다(`b0d3a1c7e594` 가 그 구멍을 메웠다). 편의 기능이
+    #:    스키마의 실제 출처가 되면 그 출처가 틀렸다는 사실도 함께 숨는다.
+    #:
+    #: 개발자는 `.env` 에서 켤 수 있다. 대신 켠 채로 뜨면 기동 로그가 경고하고,
+    #: 이미 alembic 이 관리하는 DB(=`alembic_version` 이 있는 DB)에서는 **기동을
+    #: 거부한다** — 그 조합이 위 ①을 만드는 정확한 조건이다 (`core/database.create_all`).
+    db_create_all_on_startup: bool = False
 
     # --- 외부 HTTP ---
     http_timeout_seconds: float = Field(default=20.0, gt=0)

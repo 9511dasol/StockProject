@@ -123,11 +123,20 @@ export function FinalDecision({
         </>
       ) : null}
 
+      {/*
+        **"예시 데이터." 를 지웠다.** 이 줄은 조건 분기 밖이라 실제 LLM 판단에도 항상
+        붙었다 — 진짜 결과를 사용자에게 예시라고 알려 주는 셈이었고, 홈의 목 블록이
+        `SampleFrame` 으로 정직하게 밝히는 것과 정반대 방향의 거짓이다.
+
+        여기에 다시 붙이지 말 것: 이 컴포넌트는 데이터가 목인지 알 수 없다(받는 것은
+        `Decision` 하나다). 예시임을 밝히는 일은 목을 **넘기는 쪽**이 `SampleFrame`
+        으로 한다. 규칙 기반 폴백은 이미 위쪽 배지가 말한다.
+      */}
       <p
         className="font-mono border-t border-on-ink-15 pt-[9px] text-on-ink-45"
         style={{ fontSize: 10, lineHeight: 1.6 }}
       >
-        투자 판단의 참고 자료이며 투자 권유가 아닙니다. 예시 데이터.
+        투자 판단의 참고 자료이며 투자 권유가 아닙니다.
       </p>
     </section>
   );

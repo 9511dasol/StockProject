@@ -7,11 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_advice_key
 from app.core.database import get_db
+from app.repositories.batch_run import BatchRunRepository
 from app.repositories.investor_profile import InvestorProfileRepository
 from app.repositories.listed_company import ListedCompanyRepository
 from app.repositories.watchlist import WatchlistRepository
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
+
+
+def get_batch_run_repository(db: DbSession) -> BatchRunRepository:
+    return BatchRunRepository(db)
+
+
+BatchRunRepo = Annotated[BatchRunRepository, Depends(get_batch_run_repository)]
 
 
 def get_listed_company_repository(db: DbSession) -> ListedCompanyRepository:

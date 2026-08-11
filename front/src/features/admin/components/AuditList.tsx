@@ -1,3 +1,4 @@
+import { stamp } from "@/lib/format";
 import { actionLabel, type AuditEntry } from "../model/types";
 
 export interface AuditListProps {
@@ -56,10 +57,6 @@ export function AuditList({ rows }: AuditListProps) {
   );
 }
 
-function stamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+// 시각 포맷터를 여기서 다시 구현하지 않는다. 예전 지역 구현은 `getHours()` 를 써서
+// **서버 지역 시각**이었고, UTC 컨테이너에서는 감사 로그만 같은 화면의 다른 캡션(KST)과
+// 9시간 어긋났다. `lib/format` 의 `stamp` 가 KST 로 고정한다.

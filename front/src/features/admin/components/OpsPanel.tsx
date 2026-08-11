@@ -1,5 +1,6 @@
+import { stamp } from "@/lib/format";
 import { Icon } from "@/shared/ui";
-import type { OpsSnapshot } from "../model/types";
+import { batchLabel, type BatchStatus, type OpsSnapshot } from "../model/types";
 
 export interface OpsPanelProps {
   ops: OpsSnapshot;
@@ -27,9 +28,24 @@ export function OpsPanel({ ops }: OpsPanelProps) {
         />
         <Coverage label="시가총액" done={ops.marketCapCovered} total={ops.universeSize} />
         <p className="num text-muted-45" style={{ fontSize: 10 }}>
-          마지막 배치 · 일정 {stamp(ops.lastCalendarBatch)} · 지표{" "}
-          {stamp(ops.lastFundamentalsBatch)}
+          마지막 적재 · 일정 {when(ops.lastCalendarBatch)} · 지표{" "}
+          {when(ops.lastFundamentalsBatch)}
         </p>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <SectionTitle>배치 실행</SectionTitle>
+        {/* 위 적재율과 **다른 질문**에 답한다. 적재율이 며칠째 같은 숫자일 때 그것이
+            정상인지 배치가 죽은 것인지는 여기서만 알 수 있다. 지금까지 그 답은
+            서버 로그에만 있었다. */}
+        {ops.batches.length > 0 ? (
+          ops.batches.map((batch) => <BatchRow key={batch.name} batch={batch} />)
+        ) : (
+          <p className="text-muted-45" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+            실행 기록이 없습니다. 배치가 한 번도 돌지 않았거나, 스키마가 아직
+            적용되지 않았습니다 (<code>alembic upgrade head</code>).
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -126,12 +142,68 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** ISO → `08-10 05:34`. 배치는 날짜와 시각이 둘 다 필요하다 (하루 1회라도). */
-function stamp(iso: string | null): string {
-  if (!iso) return "없음";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "없음";
+/**
+ * 배치 하나의 최근 상태.
+ *
+ * **세 상태를 구분해 말한다.** "한 번도 안 돌았다" 가 "실패했다" 보다 나쁜데, 둘을
+ * 뭉개면 화면이 조용해서 정상으로 보인다.
+ *
+ *   기록 없음  → 배치가 아예 돌지 않았다 (가장 나쁘다)
+ *   마지막 실패 → 지금 고장 나 있다
+ *   마지막 성공 → 정상. 다만 **과거 실패는 그대로 보여준다** — 되풀이되는 실패는
+ *                지금이 성공이어도 봐야 하는 사건이다
+ */
+function BatchRow({ batch }: { batch: BatchStatus }) {
+  // 실패는 `text-down` 이다. 이 팔레트에서 빨강(`--up`)은 **상승**이라, 실패에 쓰면
+  // 잘된 일처럼 읽힌다. 검색의 소스 단계 표시(`SourceFallbackBanner`)가 이미 실패를
+  // 같은 색으로 그린다 — 새 규칙을 만드는 대신 그것을 따른다.
+  const failing = batch.lastRunOk === false;
 
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return (
+    <div className="flex flex-col gap-1 border-t border-dotted border-line-22 pt-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <span style={{ fontSize: 12.5 }}>
+          {batchLabel(batch.name)}
+          {failing ? (
+            <span className="ml-1.5 font-medium text-down">실패</span>
+          ) : null}
+        </span>
+        <span className="num text-muted-60" style={{ fontSize: 11 }}>
+          {when(batch.lastRunAt)}
+          {batch.attempted > 0
+            ? ` · ${batch.answered}/${batch.attempted} 응답 · ${batch.applied} 반영`
+            : ""}
+        </span>
+      </div>
+
+      {batch.detail ? (
+        <p
+          className={failing ? "text-down" : "text-muted-45"}
+          style={{ fontSize: 10.5, lineHeight: 1.5 }}
+        >
+          {batch.detail}
+        </p>
+      ) : null}
+
+      {/* 지금은 정상인데 과거에 실패한 경우만 따로 밝힌다 — 지금 실패 중이면 위
+          문구가 이미 그 이유를 말하고 있어 두 번 쓰면 무엇이 최신인지 흐려진다. */}
+      {!failing && batch.lastFailureAt ? (
+        <p className="text-muted-45" style={{ fontSize: 10, lineHeight: 1.5 }}>
+          마지막 실패 {when(batch.lastFailureAt)}
+          {batch.lastFailureDetail ? ` · ${batch.lastFailureDetail}` : ""}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * ISO → `08.10 05:34`. 없으면 "없음".
+ *
+ * 포맷터를 이 파일에서 다시 구현하지 않는다. 예전에는 `new Date(...).getHours()` 로
+ * 직접 만들었는데 그건 **서버 지역 시각**이라, UTC 컨테이너에서는 같은 화면의 다른
+ * 캡션(KST)과 9시간 어긋났다. `lib/format` 의 `stamp` 는 KST 로 고정한다.
+ */
+function when(iso: string | null): string {
+  return iso ? stamp(iso) : "없음";
 }
