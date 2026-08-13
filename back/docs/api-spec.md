@@ -4,7 +4,9 @@
 코드가 정본이며, 이 문서는 코드(`endpoints/` · `services/` · `schemas/` · `integrations/`)에서
 확인한 동작만 기술한다.
 
-- 기준 코드: `app/api/v1/endpoints/stocks.py`, `app/api/v1/endpoints/markets.py`, `app/main.py`
+- 기준 코드: `app/api/v1/endpoints/`(stocks · markets · watchlist · profile · admin) ·
+  `app/api/auth.py` · `app/api/deps.py` · `app/core/exceptions.py` · `app/main.py`
+- 범위: **오퍼레이션 29개 전부**. 목록은 1.2, 자물쇠·헤더는 1.6 에 있다.
 - **화면을 새로 짤 때는 [`api-screens.md`](api-screens.md)를 본다** — 화면별로 어떤 API를 어떤
   순서로 부르는지, 성능 예산과 아직 없는 API가 정리돼 있다. 이 문서는 엔드포인트별 상세다.
 - 대응 기획 문서: [`docs/product-plan.md`](../../docs/product-plan.md) 6.1–6.4 / 7장
@@ -20,8 +22,8 @@
 |---|---|---|
 | Base URL (개발) | `http://127.0.0.1:8000` | `uv run fastapi dev` |
 | API prefix | `/api/v1` | `settings.api_v1_prefix` |
-| 인증 | 없음 (전 엔드포인트 공개) | 라우터에 security dependency 없음 |
-| 요청 본문 형식 | `application/json` | POST 두 건 |
+| 인증 | 공유 비밀키 헤더 2종 + 소유자 식별 헤더 1종 (1.6) | `api/auth.py` · `api/deps.py` |
+| 요청 본문 형식 | `application/json` | POST · PUT · PATCH |
 | 응답 형식 | `application/json` (스트리밍만 `text/event-stream`) | |
 | CORS 허용 출처 | 기본 `http://localhost:3000`, `CORS_ORIGINS`로 변경 | `app/main.py` |
 
@@ -29,45 +31,44 @@
 
 ### 1.2 엔드포인트 목록
 
-| # | 메서드 | 경로 | 요약 | 명세 |
-|---|---|---|---|---|
-| 1 | GET | `/health` | 헬스체크 | — |
-| 2 | GET | `/api/v1/markets/overview` | 카테고리별 시장 개요 | 6.1 |
-| 2b | GET | `/api/v1/markets/ranking` | 시가총액 · 등락률 랭킹 (탐색 화면) | 6.1 |
-| 2c | GET | `/api/v1/markets/calendar` | 오늘의 일정 (실적발표 · 배당락) | 6.1 |
-| 3 | GET | `/api/v1/stocks/history` | 주가 히스토리 + 보조지표 (+뉴스·리포트) | 6.3 |
-| 4 | GET | `/api/v1/stocks/content` | 종목 뉴스 · 애널리스트 리포트 | 6.3 |
-| 5 | GET | `/api/v1/stocks/fundamentals` | 재무 · 밸류에이션 | 6.3 |
-| 6 | GET | `/api/v1/stocks/suggestions` | 종목명 · 코드 · 초성 자동완성 | 6.2 |
-| 7 | GET | `/api/v1/stocks/listed-companies` | 상장사 목록 준비 상태 | 6.2 |
-| 8 | POST | `/api/v1/stocks/advice` | AI 멀티 에이전트 투자 판단 | 6.4 |
-| 9 | POST | `/api/v1/stocks/advice/stream` | 위와 동일 + SSE 단계 스트리밍 | 6.4 |
+전 29개 오퍼레이션이다. **자물쇠** 열은 1.6 의 헤더를 가리킨다.
 
-`/api/v1/markets/movers`(등락률 랭킹)와 `/api/v1/markets/ranking`(탐색 목록)도 구현돼 있으나
-이 문서에는 아직 개별 절이 없다. 두 엔드포인트의 화면 계약은
-[`api-screens.md`](api-screens.md) §2.2·§2.2b 에 있다.
+| # | 메서드 | 경로 | 요약 | 자물쇠 | 절 |
+|---|---|---|---|---|---|
+| 1 | GET | `/health` | 헬스체크 | — | 2 |
+| 2 | GET | `/api/v1/markets/overview` | 카테고리별 시장 개요 | — | 3 |
+| 3 | GET | `/api/v1/stocks/history` | 주가 히스토리 + 보조지표 (+뉴스·리포트) | — | 4 |
+| 4 | GET | `/api/v1/stocks/content` | 종목 뉴스 · 애널리스트 리포트 | — | 5 |
+| 5 | GET | `/api/v1/stocks/fundamentals` | 재무 · 밸류에이션 | — | 6 |
+| 6 | GET | `/api/v1/stocks/suggestions` | 종목명 · 코드 · 초성 자동완성 | — | 7 |
+| 7 | GET | `/api/v1/stocks/listed-companies` | 상장사 목록 준비 상태 | — | 8 |
+| 8 | POST | `/api/v1/stocks/advice` | AI 멀티 에이전트 투자 판단 | `X-Advice-Key` · `X-Owner-Key`(선택) | 9.2 |
+| 9 | POST | `/api/v1/stocks/advice/stream` | 위와 동일 + SSE 단계 스트리밍 | `X-Advice-Key` · `X-Owner-Key`(선택) | 9.3 |
+| 10 | GET | `/api/v1/markets/movers` | 상승률 · 하락률 상위 | — | 10 |
+| 11 | GET | `/api/v1/markets/ranking` | 시가총액 · 등락률 랭킹 (탐색 화면) | — | 11 |
+| 12 | GET | `/api/v1/markets/calendar` | 오늘의 일정 (실적발표 · 배당락) | — | 12 |
+| 13 | GET | `/api/v1/markets/screener` | 스크리너 (조건 검색) | — | 13 |
+| 14 | GET | `/api/v1/watchlist` | 관심종목 목록 | `X-Owner-Key` | 14.1 |
+| 15 | POST | `/api/v1/watchlist` | 관심종목 추가 | `X-Owner-Key` | 14.2 |
+| 16 | DELETE | `/api/v1/watchlist/{code}` | 관심종목 제거 | `X-Owner-Key` | 14.3 |
+| 17 | PATCH | `/api/v1/watchlist/{code}` | 그룹 · 알림 · 보유 수정 | `X-Owner-Key` | 14.4 |
+| 18 | PUT | `/api/v1/watchlist/order` | 순서 변경 | `X-Owner-Key` | 14.5 |
+| 19 | POST | `/api/v1/watchlist/claim` | 익명 목록을 계정으로 승계 | `X-Owner-Key` | 14.6 |
+| 20 | GET | `/api/v1/profile` | 내 투자 성향 조회 | `X-Owner-Key` | 15.1 |
+| 21 | PUT | `/api/v1/profile` | 투자 성향 저장 · 수정 | `X-Owner-Key` | 15.2 |
+| 22 | DELETE | `/api/v1/profile` | 투자 성향 삭제 | `X-Owner-Key` | 15.3 |
+| 23 | POST | `/api/v1/profile/claim` | 익명 프로파일 승계 | `X-Owner-Key` | 15.4 |
+| 24 | GET | `/api/v1/admin/ops` | 운영 현황 | `X-Admin-Key` | 16.1 |
+| 25 | GET | `/api/v1/admin/users` | 회원 목록 | `X-Admin-Key` | 16.2 |
+| 26 | GET | `/api/v1/admin/users/{user_id}` | 회원 상세 | `X-Admin-Key` | 16.3 |
+| 27 | PATCH | `/api/v1/admin/users/{user_id}/role` | 권한 변경 | `X-Admin-Key` + `X-Admin-Actor` | 16.4 |
+| 28 | DELETE | `/api/v1/admin/users/{user_id}` | 회원 삭제 | `X-Admin-Key` + `X-Admin-Actor` | 16.5 |
+| 29 | GET | `/api/v1/admin/audit` | 감사 로그 | `X-Admin-Key` | 16.6 |
 
-`ranking` 은 `movers` 와 **같은 스냅샷**을 다르게 자른다 — 시총순/등락률순 정렬,
-`board` 로 KOSPI/KOSDAQ 필터(심볼 접미사 `.KS`/`.KQ` 기준), `total`/`rank`/`market_cap` 포함.
-DB 의 `market` 컬럼은 `유가`·`코스닥` 같은 한글이라 필터에 쓸 수 없다.
+OpenAPI 태그는 `meta`(1), `markets`(2·10–13), `stocks`(3–9), `watchlist`(14–19),
+`profile`(20–23), `admin`(24–29)이다.
 
-`calendar` 는 앞의 둘과 **데이터 출처가 다르다.** 요청 시점에 공급자를 부르지 않고
-`listed_companies` 에 적재된 날짜를 읽는다 — yfinance 는 종목당 1회 호출(~1초)이라
-"이번 주 실적발표" 를 실시간으로 찾으려면 전 종목을 훑어야 하기 때문이다. 하루 1회
-배치가 오래된 것부터 채우므로, 초기에는 **일정이 없는 것**과 **아직 안 물어본 것**이
-똑같이 빈 목록으로 보인다. 그래서 응답에 `covered`/`universe_size` 를 함께 낸다 —
-화면이 "예정된 일정 없음" 과 "수집 중" 을 구분하지 못하면 그건 거짓말이 된다.
-
-| 파라미터 | 기본 | 설명 |
-|---|---|---|
-| `kind` | (없음) | `earnings` \| `ex_dividend`. 비우면 둘 다 섞어 날짜순 |
-| `days` | `CALENDAR_DEFAULT_DAYS`(7) | 오늘부터 며칠. 1~90 |
-| `limit` | 20 | 1~100 |
-
-응답 `events[]` 는 종목이 아니라 **일정 하나**가 한 줄이다 — 같은 종목에 실적발표와
-배당락이 모두 있으면 두 줄이 나온다. 한 줄로 합치면 날짜순 정렬이 불가능해진다.
-
-OpenAPI 태그는 `meta`(1), `markets`(2), `stocks`(3–9)이다.
+화면별로 **어떤 API 를 어떤 순서로** 부르는지는 [`api-screens.md`](api-screens.md) 를 본다.
 
 ### 1.3 공통 오류 응답
 
@@ -77,6 +78,18 @@ OpenAPI 태그는 `meta`(1), `markets`(2), `stocks`(3–9)이다.
 ```json
 { "error": { "code": "stock_not_found", "message": "주가 데이터를 찾을 수 없습니다. 예: AAPL, MSFT, 005930.KS" } }
 ```
+
+**봉투가 두 가지라는 점에 주의한다.** 위 형태는 `AppError` 계열(서비스·통합 계층)에만
+적용된다. 라우터가 직접 던지는 `HTTPException`(자물쇠 거절 401, 소유자 헤더 누락 400,
+동시 실행 상한 429, 관심종목 404·409 등)은 FastAPI 기본 핸들러가 처리하므로 **`detail`
+한 필드**로 나간다.
+
+```json
+{ "detail": "관심종목에 없는 종목입니다" }
+```
+
+호출부는 두 형태를 모두 읽을 수 있어야 한다 — `error.message` 가 없으면 `detail` 을 본다.
+어느 엔드포인트가 어느 형태인지는 1.4 의 **출처** 열에 있다.
 
 FastAPI 파라미터 검증 실패(422)만 `fields`가 추가된다.
 
@@ -94,6 +107,8 @@ FastAPI 파라미터 검증 실패(422)만 `fields`가 추가된다.
 
 ### 1.4 오류 코드 사전
 
+`{ "error": { "code", "message" } }` 봉투로 나가는 것들이다 (출처: `core/exceptions.py`).
+
 | HTTP | `code` | `message` | 발생 조건 |
 |---:|---|---|---|
 | 400 | `unsupported_timeframe` | 지원하지 않는 조회 단위입니다. | `timeframe`이 `day`/`week`/`month`가 아님 |
@@ -109,6 +124,26 @@ FastAPI 파라미터 검증 실패(422)만 `fields`가 추가된다.
 | 503 | `provider_unavailable` | 시세 공급자를 사용할 수 없습니다. | `yfinance` import 실패 |
 
 `status_code >= 500`은 ERROR 로그, 그 미만은 INFO 로그를 남긴다.
+
+아래는 라우터·의존성이 던지는 `HTTPException` 이다. 본문이 `{ "detail": "..." }` 이고
+`code` 가 없다.
+
+| HTTP | 발생 위치 | `detail` | 발생 조건 |
+|---:|---|---|---|
+| 400 | 모든 `X-Owner-Key` 엔드포인트 | 소유자 식별자(X-Owner-Key)가 필요합니다 | 헤더 누락·공백 |
+| 400 | 〃 | 소유자 식별자가 너무 깁니다 | 80자 초과 |
+| 400 | `/watchlist/claim` · `/profile/claim` | 같은 소유자에게는 승계할 수 없습니다 | `from_key == X-Owner-Key` |
+| 400 | 관리자 쓰기 2건 | 행위자(X-Admin-Actor)가 필요합니다… | 헤더 누락 (16.4·16.5) |
+| 401 | `/stocks/advice*` | AI 판단 엔드포인트에 접근할 수 없습니다. | `X-Advice-Key` 불일치 (키가 설정된 경우만) |
+| 401 | `/admin/*` | 관리자 엔드포인트에 접근할 수 없습니다. | `X-Admin-Key` 불일치 |
+| 404 | `POST /watchlist` | KRX 목록에서 찾을 수 없는 종목입니다: … | 심볼 확정 실패 |
+| 404 | `PATCH /watchlist/{code}` | 관심종목에 없는 종목입니다 | 그 소유자의 목록에 없음 |
+| 404 | `GET /admin/users/{id}` | 그 회원을 찾을 수 없습니다. | 없는 회원 |
+| 409 | `POST /watchlist` | 관심종목은 200개까지 담을 수 있습니다 | 소유자당 상한 |
+| 409 | 관리자 권한 변경·삭제 | (서비스 메시지 그대로) | 마지막 관리자 강등·자기 강등 등 |
+| 429 | `/stocks/advice*` | (동시 실행 상한 메시지) | 진행 중 판단이 `ADVICE_MAX_CONCURRENT`(기본 4) 이상. `Retry-After: 20` 동봉 |
+| 503 | `/admin/*` | 관리자 기능이 설정되지 않았습니다. | `ADMIN_API_KEY` 미설정 |
+| 503 | 관리자 회원 조회·변경 | (서비스 메시지 그대로) | `users` 스키마 없음 — "없는 회원"이 아니라 "판단 불가" |
 
 ### 1.5 폴백 정책 (오류로 나가지 않는 실패)
 
@@ -130,6 +165,45 @@ FastAPI 파라미터 검증 실패(422)만 `fields`가 추가된다.
 즉 `llm_unavailable` / `llm_refused`는 정의돼 있지만 `agents/decision.py`가 모든 예외를
 흡수하므로 `/stocks/advice`에서 502로 관측되지 않는다. `agents[*].status`가 전부 `"done"`이고
 `decision_source`가 `"llm"`이어야 LLM 경로가 실제로 동작한 것이다.
+
+### 1.6 헤더 — 자물쇠와 식별자
+
+**브라우저는 FastAPI 를 직접 호출하지 않는다.** 네 헤더 모두 Next BFF(서버 측)가 붙이며,
+값은 서버 환경변수와 세션·쿠키에만 있다.
+
+```
+브라우저 ──(세션 쿠키)──▶ Next BFF ──(아래 헤더들)──▶ FastAPI
+```
+
+| 헤더 | 대상 | 성격 | 미제출 시 |
+|---|---|---|---|
+| `X-Advice-Key` | `/stocks/advice` · `/advice/stream` | 서버-서버 공유 비밀키 | 401 (키가 설정된 경우만) |
+| `X-Admin-Key` | `/admin/*` 전체 | 서버-서버 공유 비밀키 | 401 |
+| `X-Owner-Key` | `/watchlist/*` · `/profile*` (필수), `/stocks/advice*` (선택) | 소유자 **식별자** | 필수 경로는 400, 선택 경로는 무시 |
+| `X-Admin-Actor`(+`-Email`) | 관리자 **쓰기** 2건 | 감사 로그 기록용 | 400 |
+
+**셋의 성질이 서로 다르다.**
+
+- **`X-Advice-Key`** — 잠그는 이유는 하나다. 돈이 나가는 경로가 이 둘뿐이기 때문이다
+  (LLM 호출 = 종목 1개당 4회). 나머지 엔드포인트는 남이 불러도 토큰이 줄지 않아 잠그지
+  않는다. **미설정이면 인증을 건너뛴다** — 로컬 개발이 키 없이 돌아야 하기 때문이고,
+  꺼져 있다는 사실은 기동 로그가 매번 경고한다.
+- **`X-Admin-Key`** — 위와 **정반대로, 미설정이면 503 으로 막는다.** 설정을 빠뜨린 서버가
+  관리자 API 를 열어 두는 것보다 관리자 화면이 안 열리는 편이 낫다. 두 키는 **절대 같은
+  값을 쓰지 않는다** — AI 키는 매 판단 요청에 실려 나가므로 표면이 넓고, 그 값이 관리자
+  권한까지 갖게 되면 안 된다. 그리고 이 키는 관리자 **인증이 아니다**: 누가 관리자인지는
+  프런트가 세션과 `users.role` 로 판단하고, 이 키는 그 판단을 우회한 직접 호출을 막는
+  2차 방어선이다.
+- **`X-Owner-Key`** — **인증이 아니라 식별이다.** 값은 `anon:<uuid>`(로그인 전, 서버가
+  발급해 httpOnly 쿠키에 둔 난수) 또는 `user:<uuid>`(로그인 후, `users.id`)이고,
+  엔드포인트는 **둘을 구분하지 않는다.** 남의 키를 알면 그 목록을 볼 수 있다는 한계가
+  남아 있다. 빈 값이나 고정값으로 떨어뜨리지 않고 400 으로 끊는 이유는, 그렇게 하면
+  **모든 익명 사용자가 하나의 목록을 공유**하게 되기 때문이다.
+- **`X-Admin-Actor`** — 권한이 아니라 **기록**이다. 백엔드는 이 값을 검증할 수 없고
+  (세션은 프런트에 있다) 감사 로그에 "프런트가 이렇게 주장했다"를 적을 뿐이다. 그래도
+  없으면 거절한다 — 누가 했는지 모르는 감사 로그는 기록이 아니다.
+
+관련 환경변수: `ADVICE_API_KEY`(백엔드) ↔ 프런트에 같은 값, `ADMIN_API_KEY` 도 같은 규칙.
 
 ---
 
@@ -741,6 +815,8 @@ GET /api/v1/stocks/listed-companies
 ```http
 POST /api/v1/stocks/advice
 Content-Type: application/json
+X-Advice-Key: <서버 측 공유 비밀키>
+X-Owner-Key: user:1f2e…            # 선택 — 개인화 판단을 받을 때만
 
 { "symbol": "005930.KS" }
 ```
@@ -748,6 +824,17 @@ Content-Type: application/json
 | 필드 | 필수 | 제한 |
 |---|---:|---|
 | `symbol` | 예 | 1~80자. `/stocks/history`와 동일한 해석 규칙(별칭·6자리 코드 허용) |
+
+**헤더** (1.6)
+
+| 헤더 | 필수 | 없을 때 |
+|---|---:|---|
+| `X-Advice-Key` | `ADVICE_API_KEY` 가 설정돼 있으면 예 | 401 |
+| `X-Owner-Key` | 아니요 | `personal` 이 `null` 인 종전 응답 그대로 |
+
+개인화는 **얹는 기능이지 전제 조건이 아니다** — 로그인하지 않은 사람도 시장 판단은
+그대로 받는다. `X-Owner-Key` 가 있고 그 소유자에게 프로파일이 있을 때만 `personal` 이
+채워진다.
 
 `timeframe`은 `day`, 봉 수는 504(약 2년)로 **고정**이다 — 요청으로 바꿀 수 없다.
 뉴스·리포트는 포함해서 조회한다(에이전트 컨텍스트에 필요).
@@ -771,6 +858,16 @@ Content-Type: application/json
   "buy_conditions": ["종가가 단기 이동평균 위에서 유지되는지 확인"],
   "risk_notes": ["뉴스 이벤트, 실적 발표, 환율 및 금리 변화에 따라 판단이 빠르게 바뀔 수 있습니다."],
   "decision_source": "llm",
+  "personal": {
+    "market_verdict": "BUY", "market_confidence": 76,
+    "fit_score": 38, "fit_level": "low",
+    "verdict": "WATCH", "label": "관망 권장", "adjusted": true,
+    "concerns": [
+      { "axis": "변동성 부담", "severity": "high",
+        "message": "이 종목의 20일 변동성은 고객님의 손실 회피 성향에 비해 높습니다." }
+    ],
+    "guardrails": ["그래도 매수한다면 평소 수량의 1/3", "손절선 -8% 선설정"]
+  },
   "updated_at": "2026-08-03T01:20:31+00:00"
 }
 ```
@@ -790,15 +887,36 @@ Content-Type: application/json
 | `buy_conditions` | string[] | 매수 조건 체크리스트 (빈 배열 가능) |
 | `risk_notes` | string[] | 리스크 메모 (빈 배열 가능) |
 | `decision_source` | `llm`\|`fallback` | 최종 판단의 출처 |
+| `personal` | PersonalVerdict \| null | 프로파일이 있을 때만. 아래 |
 | `updated_at` | string | UTC ISO-8601 (초 단위) |
+
+**`personal` — 2축 판단** (`PersonalVerdict`)
+
+상단의 `verdict`/`decision_label` 은 **시장 판단 그대로 두고** 개인화 결과를 별도 블록으로
+얹는다. 같은 필드를 덮어쓰면 화면이 "시장은 BUY 인데 당신에게는 관망"이라는 불일치를
+그릴 수 없고, 프로파일 없는 기존 클라이언트의 동작도 바뀐다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `market_verdict` · `market_confidence` | | 보정 전 시장 판단 (상단과 같은 값) |
+| `fit_score` · `fit_level` | 0~100 / `high`\|`medium`\|`low` | 프로파일 × 종목 지표 적합도. **LLM·네트워크 없이** 산출된다 |
+| `verdict` | `BUY`\|`WATCH`\|`AVOID` | 보정 후 최종 판단. **절대 상향되지 않는다** |
+| `label` | string | 사용자에게 보여줄 짧은 판단 |
+| `adjusted` | boolean | 프로파일이 실제로 판단을 움직였는지. 화면의 '왜 갈렸나' 블록을 켜는 근거 |
+| `concerns[]` | `{axis, severity, message}` | 점수가 깎인 이유. `message` 는 그대로 노출 가능한 문장 |
+| `guardrails[]` | string[] | "그래도 사겠다면" — 막지 않고 방법을 준다 |
 
 **오류**
 
-| HTTP | code | 조건 |
+| HTTP | code / detail | 조건 |
 |---:|---|---|
+| 401 | `detail` | `X-Advice-Key` 불일치 (키가 설정된 경우만) |
 | 404 | `stock_not_found` | 주가 조회 실패 |
 | 422 | `validation_error` | `symbol` 누락·길이 위반 |
+| 429 | `detail` + `Retry-After: 20` | 진행 중 판단이 `ADVICE_MAX_CONCURRENT`(기본 4) 이상 |
 | 503 | `provider_unavailable` | yfinance 미설치 |
+
+429 가 503 이 아닌 이유: 서버는 멀쩡하고 잠시 뒤 다시 보내면 되는 상황이라는 뜻이 정확하다.
 
 LLM 실패는 오류가 아니다 — 200으로 응답하고 `decision_source`/`agents[].status`에 드러난다.
 
@@ -813,11 +931,18 @@ LLM 실패는 오류가 아니다 — 200으로 응답하고 `decision_source`/`
 ```http
 POST /api/v1/stocks/advice/stream
 Content-Type: application/json
+X-Advice-Key: <서버 측 공유 비밀키>
+X-Owner-Key: user:1f2e…            # 선택
 
 { "symbol": "005930.KS" }
 ```
 
-요청 본문은 `/advice`와 동일하다.
+요청 본문과 헤더 모두 `/advice`와 동일하다. **화면이 실제로 부르는 경로는 이쪽이다** —
+프런트는 비스트리밍 `/advice` 를 쓰지 않으므로 `personal`(2축 판단)도 여기 실린다.
+
+401·429 는 **스트림이 열리기 전에** 판정한다. 제너레이터 안에서 상한을 잡으면 이미
+`200 text/event-stream` 헤더가 나간 뒤라, 클라이언트가 거절 대신 "빈 스트림"을 받아
+거절인지 장애인지 구분할 수 없다.
 
 **응답 200** — `text/event-stream`
 
@@ -868,6 +993,7 @@ stage 3은 `asyncio.as_completed`로 **먼저 끝난 에이전트부터** 나온
     "buy_conditions": [],
     "risk_notes": [],
     "decision_source": "llm",
+    "personal": { "...": "PersonalVerdict — 9.2 와 같은 규약. 프로파일이 있을 때만" },
     "updated_at": "2026-08-03T01:20:31+00:00"
   },
   "error": null
@@ -888,8 +1014,8 @@ stage 3은 `asyncio.as_completed`로 **먼저 끝난 에이전트부터** 나온
 규칙 기반으로 흡수하므로 여기까지 오지 않는다.
 
 **중요: HTTP 상태 코드는 오류 판별에 쓸 수 없다.** 스트림이 이미 시작된 뒤 발생한 실패는
-`stage: 0` 프레임으로 전달되므로 상태 코드는 200이다. 요청 본문 검증 실패(422)만 일반
-JSON 오류로 돌아온다.
+`stage: 0` 프레임으로 전달되므로 상태 코드는 200이다. 스트림이 열리기 **전에** 판정되는
+것만 일반 JSON 오류로 돌아온다 — 401(키), 422(본문 검증), 429(동시 실행 상한).
 
 **클라이언트 구현 주의** — POST이므로 브라우저의 `EventSource`를 쓸 수 없다.
 `fetch` + `ReadableStream`으로 직접 파싱한다.
@@ -926,7 +1052,490 @@ while (true) {
 
 ---
 
-## 10. 스키마 사전
+## 10. GET /api/v1/markets/movers
+
+시가총액 상위 종목을 스캔해 만든 전일 대비 등락률 랭킹.
+
+```http
+GET /api/v1/markets/movers?limit=5
+```
+
+| 파라미터 | 필수 | 기본 | 범위 |
+|---|---:|---:|---|
+| `limit` | 아니요 | 5 | 1~20. 상승·하락 **각각** 이 개수만큼 |
+
+**항상 즉시 응답한다.** 스캔(수 초)은 배경에서 돌고 여기서는 최신 스냅샷만 자른다.
+스냅샷이 아직 없으면 `gainers`/`losers` 가 빈 배열이므로, 호출부는 빈 목록을
+'데이터 없음'으로 다루면 된다.
+
+**응답 200** — `MarketMovers`
+
+```json
+{
+  "as_of": "2026-08-11",
+  "source": "YFINANCE",
+  "universe_label": "시가총액 상위 200종목",
+  "universe_size": 200,
+  "scanned": 187,
+  "gainers": [
+    {
+      "name": "에코프로비엠", "symbol": "247540.KQ", "code": "247540",
+      "market": "코스닥", "price": 152300, "change": 12400,
+      "change_percent": 8.86, "spark": [139900, 141200, 152300]
+    }
+  ],
+  "losers": [],
+  "updated_at": "2026-08-12T00:31:07+00:00"
+}
+```
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `as_of` | string \| null | 기준 봉 날짜 `YYYY-MM-DD`. 스캔이 비면 `null` |
+| `source` | `"YFINANCE"` \| `"KRX"` | 등락률을 얻어온 경로 |
+| `universe_label` | string | 화면에 그대로 노출하는 모집단 설명 |
+| `universe_size` | number | 모집단으로 넘긴 종목 수 (실패분 포함) |
+| `scanned` | number | 등락률을 실제로 산출한 종목 수. `universe_size` 보다 작을 수 있다 |
+| `gainers[]` / `losers[]` | `MoverRow[]` | 등락률 내림/오름차순 상위 `limit` 건 |
+| `updated_at` | string | 응답 생성 시각 (UTC ISO-8601) |
+
+`MoverRow` 는 17장 스키마 사전에 있다.
+
+---
+
+## 11. GET /api/v1/markets/ranking
+
+종목 탐색 화면용 목록. `/movers` 와 **같은 스냅샷**을 다르게 자른다.
+
+```http
+GET /api/v1/markets/ranking?sort=market_cap&board=KOSPI&limit=50&offset=0
+```
+
+| 파라미터 | 필수 | 기본 | 값 |
+|---|---:|---:|---|
+| `sort` | 아니요 | `market_cap` | `market_cap` · `change` |
+| `board` | 아니요 | `ALL` | `ALL` · `KOSPI` · `KOSDAQ` |
+| `limit` | 아니요 | 50 | 1~100 |
+| `offset` | 아니요 | 0 | 0~2000 |
+
+`board` 판정은 **심볼 접미사**(`.KS`/`.KQ`) 기준이다. DB 의 `market` 컬럼은
+`유가`·`코스닥` 같은 한글이라 필터에 쓸 수 없다.
+
+`/movers` 와 나눈 이유: movers 는 부호로 갈린 **두** 목록이고, 이쪽은 필터가 적용된
+**한** 목록 + `total` 이라 응답 형태가 다르다. 랭킹 때문에 스캔이 추가로 돌지는 않는다.
+
+**응답 200** — `MarketRanking`
+
+```json
+{
+  "as_of": "2026-08-11",
+  "source": "YFINANCE",
+  "universe_label": "시가총액 상위 200종목",
+  "sort": "market_cap",
+  "board": "KOSPI",
+  "total": 132,
+  "rows": [
+    {
+      "name": "삼성전자", "symbol": "005930.KS", "code": "005930",
+      "market": "유가", "price": 71500, "change": 300, "change_percent": 0.42,
+      "spark": [70800, 71200, 71500],
+      "board": "KOSPI", "market_cap": 426000000000000, "rank": 1
+    }
+  ],
+  "updated_at": "2026-08-12T00:31:07+00:00"
+}
+```
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `total` | number | 필터 적용 **후** 전체 건수. 페이지네이션의 근거 |
+| `rows[]` | `RankingRow[]` | `MoverRow` + `board` · `market_cap` · `rank` |
+| `rows[].market_cap` | number \| null | 원. 배치가 아직 안 채운 종목은 `null` |
+| `rows[].rank` | number | 1부터. `offset` 을 반영한 절대 순위라 페이지를 넘겨도 이어진다 |
+
+---
+
+## 12. GET /api/v1/markets/calendar
+
+오늘부터 `days` 일 안의 실적발표 · 배당락.
+
+```http
+GET /api/v1/markets/calendar?kind=earnings&days=7&limit=20
+```
+
+| 파라미터 | 필수 | 기본 | 값 |
+|---|---:|---:|---|
+| `kind` | 아니요 | (없음) | `earnings` · `ex_dividend`. 비우면 둘 다 섞어 날짜순 |
+| `days` | 아니요 | `CALENDAR_DEFAULT_DAYS`(7) | 1~90 |
+| `limit` | 아니요 | 20 | 1~100 |
+
+**데이터 출처가 앞의 둘과 다르다.** 요청 시점에 공급자를 부르지 않고 `listed_companies`
+에 적재된 날짜를 읽는다 — yfinance 는 종목당 1회 호출(~1초)이라 "이번 주 실적발표"를
+실시간으로 찾으려면 전 종목을 훑어야 하기 때문이다. 하루 1회 배치가 오래된 것부터
+채우므로, 초기에는 **일정이 없는 것**과 **아직 안 물어본 것**이 똑같이 빈 목록으로 보인다.
+그래서 `covered`/`universe_size` 를 함께 낸다 — 화면이 "예정된 일정 없음"과 "수집 중"을
+구분하지 못하면 그건 거짓말이 된다.
+
+응답 `events[]` 는 종목이 아니라 **일정 하나**가 한 줄이다. 같은 종목에 실적발표와
+배당락이 모두 있으면 두 줄이 나온다 — 한 줄로 합치면 날짜순 정렬이 불가능해진다.
+
+**응답 200** — `MarketCalendar`
+
+```json
+{
+  "as_of": "2026-08-11",
+  "days": 7,
+  "total": 23,
+  "events": [
+    {
+      "name": "삼성전자", "symbol": "005930.KS", "code": "005930",
+      "board": "KOSPI", "kind": "earnings", "date": "2026-08-14",
+      "d_day": 2, "market_cap": 426000000000000
+    }
+  ],
+  "covered": 412,
+  "universe_size": 2703,
+  "updated_at": "2026-08-12T00:31:07+00:00"
+}
+```
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `as_of` | string \| null | **일정 배치가 마지막으로 돈 날.** 한 번도 안 돌았으면 `null` |
+| `days` | number | 조회 창 |
+| `total` | number | 창 안의 전체 건수. `events` 는 `limit` 으로 잘린다 |
+| `events[].kind` | `"earnings"` \| `"ex_dividend"` | |
+| `events[].d_day` | number | 남은 일수. 0 이면 오늘. 음수는 나오지 않는다 |
+| `covered` / `universe_size` | number | 일정이 채워진 종목 수 / 전체 종목 수 (배치 진행률) |
+| `updated_at` | string | **응답을 만든 시각.** `as_of` 와 다르다 — 이것만 보면 값이 최신이라고 오해한다 |
+
+---
+
+## 13. GET /api/v1/markets/screener
+
+조건 검색. 모집단은 **상장 전 종목**이고 값은 하루 1회 배치가 채운다.
+
+```http
+GET /api/v1/markets/screener?board=ALL&per_min=0&per_max=15&sort=per&limit=50
+```
+
+| 파라미터 | 기본 | 범위 | 설명 |
+|---|---:|---|---|
+| `board` | `ALL` | `ALL`·`KOSPI`·`KOSDAQ` | |
+| `market_cap_min` / `market_cap_max` | (없음) | ≥0 | 원 |
+| `per_min` / `per_max` | (없음) | — | |
+| `pbr_min` / `pbr_max` | (없음) | — | |
+| `dividend_min` | (없음) | ≥0 | % 이상 |
+| `roe_min` | (없음) | — | % 이상 |
+| `sort` | `market_cap` | `market_cap`·`per`·`pbr`·`dividend_yield`·`roe` | 방향은 **축이 정한다** (아래) |
+| `limit` | 50 | 1~100 | |
+| `offset` | 0 | 0~5000 | |
+
+정렬 방향을 파라미터로 열지 않은 이유: "PER 높은 순"은 조건 검색에서 아무도 찾지 않는
+목록이고, 방향을 열면 화면·URL·백엔드 셋에 뜻 없는 조합이 생긴다. 축별 방향은
+`market_cap`·`dividend_yield`·`roe` = 내림차순, `per`·`pbr` = 오름차순이다.
+
+**`per_min` 을 왜 두나** — PER 은 음수가 될 수 있다(순손실). `per_max=15` 만 걸면
+PER −3 인 적자 회사가 '가장 싼 종목'으로 맨 앞에 온다. 화면 프리셋은 하한을 항상 함께 건다.
+
+**조건에 걸린 컬럼이 NULL 이면 그 종목은 빠진다.** SQL 이 그렇게 동작하고 그게 맞다 —
+"PER 15 이하"를 물었는데 PER 을 모르는 종목이 섞이면 그 목록은 조건을 만족하지 않는다.
+배치가 아직 안 채운 종목이 조용히 사라져 보이므로 `covered` 로 진행률을 함께 낸다.
+
+**응답 200** — `ScreenerResult`
+
+```json
+{
+  "as_of": "2026-08-11",
+  "sort": "per", "order": "asc", "board": "ALL",
+  "total": 218,
+  "rows": [
+    {
+      "name": "삼성전자", "symbol": "005930.KS", "code": "005930",
+      "board": "KOSPI", "market_cap": 426000000000000,
+      "per": 11.2, "pbr": 1.08, "roe_pct": 9.6, "dividend_yield_pct": 2.05, "rank": 1
+    }
+  ],
+  "covered": 1890,
+  "universe_size": 2703,
+  "updated_at": "2026-08-12T00:31:07+00:00"
+}
+```
+
+`/ranking` 과 달리 **가격·등락률·스파크라인이 없다.** 그쪽 모집단은 시가총액 상위
+200종목이라 조건 검색의 답이 될 수 없어 등락률 스냅샷을 쓰지 않는다. 대신 시세 열이
+빠졌고, 시세는 종목 상세로 넘긴다.
+
+---
+
+## 14. 관심종목 (`/api/v1/watchlist`)
+
+여섯 오퍼레이션 모두 **`X-Owner-Key` 가 필수**이고(1.6), **응답은 언제나 목록 전체**
+(`Watchlist`)다.
+
+한 건만 돌려주지 않는 이유: 화면이 그룹 집계·합계를 스스로 다시 계산해야 하고, 그
+계산이 서버와 어긋나는 순간 사용자는 새로고침해야만 맞는 숫자를 본다. 목록은 최대
+200행이라 통째로 주는 비용이 그 위험보다 싸다.
+
+**공통 응답 200** — `Watchlist`
+
+```json
+{
+  "items": [
+    {
+      "name": "삼성전자", "symbol": "005930.KS", "code": "005930", "market": "유가",
+      "group": "관찰", "position": 0,
+      "price": 71500, "change_percent": 0.42, "spark": [70800, 71200, 71500],
+      "holding": { "quantity": 10, "avg_price": 68000 },
+      "alert": { "enabled": true, "condition": "75,000원 도달 시" }
+    }
+  ],
+  "groups": [{ "name": "관찰", "count": 1 }],
+  "total_count": 1, "group_count": 1, "active_alerts": 1,
+  "total_return_percent": 5.15,
+  "updated_at": "2026-08-12T00:31:07+00:00"
+}
+```
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `items[].group` | string | 기본 `"관찰"` |
+| `items[].position` | number | 사용자가 끈 순서. **값이 아니라 대소 관계만** 의미가 있다 |
+| `items[].price` · `change_percent` · `spark` | number / number[] | **저장하지 않는다.** 조회 시점의 시세이고, 상류가 막히면 `0` / 빈 배열 |
+| `items[].holding` | object \| null | 수량과 평단은 **둘 다 있거나 둘 다 없다** |
+| `total_count` · `group_count` · `active_alerts` | number | 헤더 캡션용 집계. 화면이 `items.length` 로 유도하지 않도록 서버가 따로 준다 |
+| `total_return_percent` | number | 보유 종목 전체의 평가손익률(%). 보유가 없으면 0 |
+| `updated_at` | string | **시세를 붙인 시각.** 저장 데이터의 수정 시각이 아니다 |
+
+### 14.1 GET /api/v1/watchlist
+
+파라미터 없음. 목록이 비어 있어도 200 이다.
+
+### 14.2 POST /api/v1/watchlist
+
+```json
+{ "symbol": "005930", "group": "관찰" }
+```
+
+| 필드 | 필수 | 제약 |
+|---|---:|---|
+| `symbol` | 예 | 1~40자. **6자리 코드도 `005930.KS` 도 받는다** — 서버가 KRX 목록으로 확정한다 |
+| `group` | 아니요 | 40자 이하. 생략하면 `"관찰"` |
+
+이미 담긴 종목을 다시 눌러도 오류가 아니다. 상한(200)은 **새로 담을 때만** 본다 —
+사용자가 아무것도 바꾸지 않았는데 실패를 보면 안 되기 때문이다.
+
+오류: 404(KRX 목록에서 확정 실패) · 409(소유자당 200개 상한).
+
+### 14.3 DELETE /api/v1/watchlist/{code}
+
+`code` 는 **6자리 숫자**여야 한다(`^\d{6}$`). 아니면 422 다.
+
+> 이 검증이 없으면 데이터가 지워진다. 예전 구현은 `code` 를 `LIKE '{code}%'` 에 그대로
+> 실었고, `DELETE /watchlist/%` 가 그 소유자의 임의의 한 종목을 지우고 200 을 돌려줬다.
+> 저장소 쪽 LIKE 도 함께 없앴지만, 애초에 들어올 수 없게 하는 것이 첫 번째 방어선이다.
+
+**없는 것을 지워도 200 이다.** 결과 상태("그 종목은 목록에 없다")가 요청자가 원한
+그대로이고, 연타·재시도가 오류로 보이면 안 된다.
+
+### 14.4 PATCH /api/v1/watchlist/{code}
+
+```json
+{ "group": "보유", "alert": { "enabled": true, "condition": "75,000원 도달 시" },
+  "holding": { "quantity": 10, "avg_price": 68000 } }
+```
+
+**보내지 않은 필드는 건드리지 않는다.** `"holding": null` 을 **명시적으로** 보내면
+보유 해제다 — 서비스 계층이 `model_fields_set` 으로 그 둘을 구분한다.
+
+| 필드 | 제약 |
+|---|---|
+| `group` | 40자 이하 |
+| `alert.enabled` | boolean |
+| `alert.condition` | 120자 이하 자유 텍스트. 발송 경로는 아직 없다 |
+| `holding.quantity` | 정수 ≥ 0 |
+| `holding.avg_price` | > 0 |
+
+오류: 404(그 소유자의 목록에 없는 코드) · 422(코드 형식).
+
+### 14.5 PUT /api/v1/watchlist/order
+
+```json
+{ "codes": ["005930", "000660", "247540"] }
+```
+
+**새 순서 전체를 코드 배열로 받는다**(1~500개). "이 종목을 3번으로" 같은 부분 갱신이
+아닌 이유: 드래그 한 번이 여러 행의 상대 순서를 바꾸고, 부분 갱신으로 표현하면
+클라이언트와 서버가 서로 다른 순서를 갖는 중간 상태가 생긴다.
+
+### 14.6 POST /api/v1/watchlist/claim
+
+```json
+{ "from_key": "anon:1f2e…" }
+```
+
+로그인 직후 한 번 부른다. 익명(`anon:`)으로 모은 목록을 헤더의 `X-Owner-Key`(로그인
+계정)로 옮긴다. **받는 쪽을 본문으로 받지 않는 이유**: 그러면 아무 계정으로나 옮길 수
+있게 된다. 본문에는 내놓는 쪽만 담는다.
+
+`from_key == X-Owner-Key` 면 400 이다. 유니크 제약 때문에 어차피 아무것도 안 옮겨지지만,
+그 호출이 오는 것 자체가 배선이 잘못됐다는 신호라 조용히 넘어가지 않게 막는다.
+
+---
+
+## 15. 투자 성향 프로파일 (`/api/v1/profile`)
+
+`X-Owner-Key` 필수. 관심종목과 같은 소유자 체계다.
+
+**이 엔드포인트는 사주를 모른다.** 받는 것은 0~100 숫자 5개와 표시용 문장 하나뿐이고,
+그 숫자가 사주에서 왔는지 설문에서 왔는지는 `source` 가 말해 줄 뿐 처리는 같다.
+사주 원문·오행은 이 계층에 들어오지 않는다.
+
+**`InvestorProfile`**
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `risk_appetite` | 0~100 | 위험 감수도 |
+| `patience` | 0~100 | 보유기간 선호. 낮을수록 단타 |
+| `decisiveness` | 0~100 | 결정 속도. 높을수록 충동적 |
+| `loss_aversion` | 0~100 | 손실 회피 강도 |
+| `herd_tendency` | 0~100 | 군중 추종 성향 |
+| `source` | `saju` \| `survey` \| `user_edited` | 기본 `survey` |
+| `saju_summary` | string \| null | **화면 표시 전용.** 판단 계산에 절대 들어가지 않는다 |
+
+### 15.1 GET /api/v1/profile
+
+```json
+{ "profile": null, "updated_at": null }
+```
+
+**아직 없으면 404 가 아니라 `profile: null` 로 200 이다.** "안 만들었다"는 오류가 아니라
+온보딩 전이라는 정상 상태이고, 404 로 주면 처음 방문한 사용자마다 에러 경로를 타서
+진짜 장애와 구분되지 않는다.
+
+### 15.2 PUT /api/v1/profile
+
+본문은 `InvestorProfile` 전체. 온보딩 저장과 사용자 보정을 **같은 PUT** 으로 받는다 —
+화면이 "이미 있는가"를 먼저 묻지 않아도 되고, 재시도가 중복 행을 만들지 않는다
+(`owner_key` 유니크 + upsert). 응답은 15.1 과 같은 형태다.
+
+### 15.3 DELETE /api/v1/profile
+
+204. 없는 것을 지우라는 요청도 성공이다.
+
+### 15.4 POST /api/v1/profile/claim
+
+본문·규칙 모두 14.6 과 같다(`from_key` 하나). 프런트가 로그인 직후 두 승계를 같은 값으로
+잇달아 부르므로 형태를 일부러 공유한다. 응답은 15.1 형태.
+
+---
+
+## 16. 관리자 (`/api/v1/admin`)
+
+**라우터 전체가 `X-Admin-Key` 로 잠겨 있다**(엔드포인트마다 붙이는 방식이 아니다 —
+새 엔드포인트를 추가하며 가드를 빠뜨리면 그 하나만 조용히 공개되기 때문이다).
+쓰기 2건은 `X-Admin-Actor` 도 필수다. 두 헤더의 성격은 1.6 을 본다.
+
+### 16.1 GET /api/v1/admin/ops
+
+배치 진행률 · 배치 실행 기록 · AI 캐시 · 자물쇠 상태. 파라미터 없음.
+
+**배치를 돌리지 않는다.** 다른 화면(`/markets/calendar`·`/screener`)은 열릴 때 배경
+배치를 예약하지만, 관리자 화면은 관측이 목적이라 관측 행위가 대상을 바꾸면 안 된다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `calendar_covered` · `fundamentals_covered` · `market_cap_covered` | number | 진행률. 분모는 셋 다 `universe_size` |
+| `universe_size` | number | `.KS`/`.KQ` 모집단 |
+| `last_calendar_batch` · `last_fundamentals_batch` | string \| null | 마지막 배치 시각(ISO) |
+| `advice_cached` · `advice_capacity` | number | AI 판단 캐시. **프로세스 메모리라 재시작하면 0** — 누적이 아니라 현재 상태 |
+| `advice_in_flight` · `advice_max_concurrent` | number | 진행 중 판단 수 / 동시 상한(429 의 근거) |
+| `advice_locked` · `rag_enabled` | boolean | 자물쇠·기능 상태. **꺼져 있다는 사실이 화면에 보여야 한다** |
+| `batches[]` | `BatchStatus[]` | 아래 |
+| `generated_at` | string | 응답 생성 시각 |
+
+`BatchStatus` 는 **마지막 실행과 마지막 실패를 함께** 담는다. 마지막 실행만 주면
+"어제 실패·오늘 성공"과 "계속 성공"이 구분되지 않고, 마지막 실패만 주면 "실패가 없다"와
+"배치가 아예 돌지 않았다"가 구분되지 않는다 — 후자가 더 나쁜 상태다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `name` | string | 배치 이름 |
+| `last_run_at` | string \| null | `null` 이면 **한 번도 돌지 않았다** |
+| `last_run_ok` | boolean \| null | |
+| `attempted` · `answered` · `applied` | number | 물어본 / 응답받은 / 반영한 종목 수 |
+| `last_failure_at` · `last_failure_detail` | string \| null | 지금이 정상이어도 남는다 |
+
+진행률과 실행 기록은 다른 질문에 답한다 — 앞은 "지금까지 얼마나 채웠나", 뒤는
+"그 일이 **돌고 있나**"다. 커버리지가 며칠째 같을 때 그것이 정상인지 배치가 죽은
+것인지는 뒤쪽만 답할 수 있다.
+
+### 16.2 GET /api/v1/admin/users
+
+| 파라미터 | 기본 | 범위 |
+|---|---:|---|
+| `q` | `""` | 200자 이하. 이메일·이름 부분 일치 |
+| `limit` | 50 | 1~100 |
+| `offset` | 0 | 0~100000 |
+
+**응답** — `AdminUserPage`: `rows[]` · `total`(검색 적용 후) · `admin_count` · `updated_at`.
+관리자를 먼저, 그다음 이메일순이다. `admin_count` 는 화면이 **마지막 관리자의 강등
+버튼을 미리 잠그는** 근거다.
+
+`AdminUser` 의 `watchlist_count`·`has_profile`·`active_sessions` 는 우리가 붙인 통계다.
+특히 `watchlist_count` 는 **삭제 확인 화면이 보여준다** — 이 계정을 지우면 무엇이 함께
+사라지는지 모르고 누르면 안 된다.
+
+### 16.3 GET /api/v1/admin/users/{user_id}
+
+한 명(`AdminUser`). 없으면 404, **`users` 스키마 자체가 없으면 503** 이다. 둘을 구분하는
+이유: 404 는 "그런 회원이 없다", 503 은 "우리가 판단할 수 없다"다. 후자를 404 로 내면
+화면이 "없는 회원"이라고 단정하는데 실제로는 마이그레이션이 안 돌았을 뿐이다.
+
+### 16.4 PATCH /api/v1/admin/users/{user_id}/role
+
+```json
+{ "role": "admin" }
+```
+
+`role` 은 `user` \| `admin`. `X-Admin-Actor` 필수. 응답은 갱신된 `AdminUser`.
+
+거절 사유는 **본문 메시지로 그대로 나간다**(409) — "마지막 관리자입니다" 같은 문장은
+화면이 다시 쓸 필요 없이 사용자에게 보여줄 수 있는 말이다. **거절도 감사 로그에 남는다.**
+
+### 16.5 DELETE /api/v1/admin/users/{user_id}
+
+`X-Admin-Actor` 필수.
+
+```json
+{ "deleted_watchlist": 12, "deleted_profiles": 1 }
+```
+
+회원과 그 사람의 데이터를 **같은 트랜잭션으로** 함께 지운다. 관심종목·투자 성향은
+외래키가 아니라 `owner_key` 문자열로 연결돼 있어 CASCADE 가 처리하지 못하고, 여기서
+지우지 않으면 고아가 남는다. 응답은 무엇이 함께 사라졌는지 밝힌다.
+
+### 16.6 GET /api/v1/admin/audit
+
+| 파라미터 | 기본 | 범위 |
+|---|---:|---|
+| `limit` | 50 | 1~200 |
+
+최근 관리자 행위(`rows[]`)와 전체 건수(`total`). **거절된 시도도 함께 나온다**(`ok=false`) —
+화면이 성공과 다르게 그려야 한다.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `created_at` | string | ISO |
+| `actor_user_id` · `actor_email` | string / null | **프런트가 주장한 행위자.** 백엔드는 검증하지 않는다 |
+| `action` | string | 행위 이름 |
+| `target_user_id` · `target_email` | string \| null | 대상 |
+| `detail` | string \| null | 거절 사유 등 |
+| `ok` | boolean | 거절이면 `false` |
+
+---
+
+## 17. 스키마 사전
 
 ### StockRow
 
@@ -1022,14 +1631,41 @@ while (true) {
 | `summary` | string | 3문장 이내(프롬프트 제약). `fallback`이면 지표 서술 문장 |
 | `error` | string \| null | `fallback`일 때의 원인 (`"빈 응답"` 등) |
 
+### MoverRow
+
+`/markets/movers` · `/markets/ranking` 이 공유하는 시세 한 줄.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `name` | string | KRX 상호 |
+| `symbol` | string | yfinance 심볼 (`247540.KQ`) |
+| `code` | string | 라우팅용 6자리 코드 |
+| `market` | string \| null | KRX 시장 구분 **원문** (`유가`·`코스닥`·`코넥스`) |
+| `price` | number | |
+| `change` | number \| null | |
+| `change_percent` | number | |
+| `spark` | number[] | 스파크라인 원본 종가 |
+
+### RankingRow
+
+`MoverRow` + `board`(`KOSPI`\|`KOSDAQ`, **심볼 접미사에서 유도**) · `market_cap`(원, `null` 가능) ·
+`rank`(1부터, `offset` 반영).
+
+`market`(한글 원문)과 `board`(프런트 계약)는 다른 값이다 — 필터에 쓰는 것은 `board` 쪽이다.
+
+### InvestorProfile · PersonalVerdict · FitScore
+
+15장(프로파일)과 9장(AI 판단)에 각각 표로 있다. `PersonalVerdict.verdict` 는 **절대
+상향되지 않는다** — 프로파일은 판단을 보수적인 쪽으로만 움직인다.
+
 ### 전체 스키마
 
 Pydantic 정의는 `app/schemas/`에 있고, 서버 기동 후 `http://127.0.0.1:8000/openapi.json`에서
-기계 판독 가능한 형태로 받을 수 있다.
+기계 판독 가능한 형태로 받을 수 있다 (오퍼레이션 29개 · 컴포넌트 스키마 49개).
 
 ---
 
-## 11. 프런트 호출 시나리오
+## 18. 프런트 호출 시나리오
 
 **홈 화면**
 
@@ -1067,11 +1703,50 @@ POST /api/v1/stocks/advice           # 결과만 필요할 때
 ```
 
 스트리밍은 stage 1에서 차트, stage 3마다 에이전트 카드, stage 4에서 최종 판단을 채우는
-식으로 화면을 점진적으로 완성한다.
+식으로 화면을 점진적으로 완성한다. `X-Owner-Key` 를 함께 보내고 그 소유자에게 프로파일이
+있으면 `personal`(2축 판단)이 실린다 — **화면이 실제로 부르는 경로는 스트리밍 쪽**이므로,
+개인화 결과도 이쪽에 실려야 사용자에게 도달한다.
+
+**종목 탐색 · 스크리너**
+
+```
+GET /api/v1/markets/ranking?sort=market_cap&board=KOSPI    # 목록·페이지네이션
+GET /api/v1/markets/screener?per_min=0&per_max=15&sort=per  # 조건 검색
+GET /api/v1/markets/movers?limit=5                          # 홈의 급등·급락 카드
+GET /api/v1/markets/calendar?days=7                         # 오늘의 일정
+```
+
+넷 다 즉시 응답한다(적재된 값을 읽을 뿐이다). 목록이 비면 `covered`/`universe_size` 로
+"없음"과 "수집 중"을 구분해 표시한다.
+
+**관심종목 · 프로파일 (로그인 전후)**
+
+```
+GET  /api/v1/watchlist            # X-Owner-Key: anon:<uuid>  (로그인 전)
+POST /api/v1/watchlist            # 추가 → 목록 전체가 돌아온다
+# 로그인 직후 한 번, 같은 from_key 로 나란히
+POST /api/v1/watchlist/claim      { "from_key": "anon:<uuid>" }   # X-Owner-Key: user:<uuid>
+POST /api/v1/profile/claim        { "from_key": "anon:<uuid>" }
+```
+
+**관리자 화면**
+
+```
+GET /api/v1/admin/ops                 # 배치·캐시·자물쇠 상태
+GET /api/v1/admin/users?q=&limit=50   # 회원 목록
+GET /api/v1/admin/audit?limit=50      # 감사 로그 (거절 포함)
+```
 
 ---
 
-## 12. 참고: 현재 없는 기능
+## 19. 참고: 현재 없는 기능
 
-`docs/product-plan.md` 7.5의 `POST /conversations/{id}/stock-advice`(인증된 대화방 투자 판단)는
-현재 백엔드에 구현돼 있지 않다. 라우터에 인증·대화방 관련 엔드포인트는 존재하지 않는다.
+- `docs/product-plan.md` 7.5의 `POST /conversations/{id}/stock-advice`(인증된 대화방 투자
+  판단)는 구현돼 있지 않다. 대화방 관련 엔드포인트는 라우터에 없다.
+- **백엔드에 로그인·세션 엔드포인트가 없다.** 인증은 프런트(NextAuth)가 하고, 백엔드는
+  그 결과를 `X-Owner-Key`(`user:<uuid>`)와 `X-Admin-Actor` 라는 **검증하지 않는 문자열**로
+  전달받는다(1.6). 따라서 사용자별 요금·한도처럼 백엔드가 신원을 신뢰해야 하는 기능은
+  아직 만들 수 없다.
+- 알림 발송 경로가 없다. `alert.condition` 은 저장만 되는 자유 텍스트다(14.4).
+- 사주 엔진 연동은 없다. `/profile` 은 숫자 5개를 받을 뿐이고, 사주 → 숫자 매핑은
+  `integrations/saju/` 경계가 생긴 뒤 그쪽이 이 PUT 을 부른다.
