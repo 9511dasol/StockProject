@@ -8,7 +8,7 @@ import { Skeleton, SkeletonScreen } from "@/shared/components/feedback";
  */
 export default function StockBrowseLoading() {
   return (
-    <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+    <main className="mx-auto w-full max-w-shell px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
       <SkeletonScreen label="종목 목록을 불러오는 중입니다">
         <div className="flex flex-col gap-4">
           {/* 제호 — 우측 덩어리는 검색 필드 + 토글 + 관심 종목 */}

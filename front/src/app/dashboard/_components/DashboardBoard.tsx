@@ -15,6 +15,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Icon } from "@/shared/ui";
 import { MAX_BULK_SYMBOLS, useBulkAdvice } from "@/features/advice";
@@ -28,6 +29,7 @@ import {
   WatchCard,
   WatchlistHeader,
   WatchRow,
+  WatchRowCompact,
   useWatchlistMutations,
   type AlertRule,
   type RowAiStatus,
@@ -36,20 +38,54 @@ import {
   type Watchlist,
 } from "@/features/watchlist";
 
+/** 데스크탑 보기 — nav+상세 분할 / 표(전체 폭) */
+type BoardLayout = "split" | "table";
+
 /**
- * 관심종목 화면의 상태 소유자.
+ * 대시보드의 상태 소유자 — 좌측 종목 nav 와 그 컨트롤.
  *
  * features/ 가 아니라 app/<route>/_components/ 에 둔 이유: 이 화면은
  * features/watchlist(표)와 features/advice(일괄 AI 분석)를 함께 써야 하는데,
  * feature 끼리는 직접 import 할 수 없다. 두 feature 를 잇는 조립은 app 계층의
  * 일이고, 이 컴포넌트는 다른 라우트에서 재사용하지 않는다 (CONVENTIONS 예외 항목).
+ *
+ * ## 이 컴포넌트가 레이아웃에 있는 이유
+ *
+ * `layout.tsx` 가 렌더한다. 종목을 고르면 오른쪽(`detail`)만 바뀌고 이 컴포넌트는
+ * 다시 마운트되지 않는다 — 그룹·정렬·선택, 그리고 **돌고 있는 일괄 AI 분석**이
+ * 선택을 바꿔도 그대로 살아 있다.
+ *
+ * ## 보기가 둘인 이유
+ *
+ * nav 폭은 340px 다. `WatchRow` 가 한 줄에 담는 열 개(보유·평가손익·알림 조건까지)를
+ * 여기 넣으면 전부 잘린다. 좁은 칸에 우겨넣어 아무것도 못 읽게 만드는 대신, **훑는
+ * 보기(nav+상세)와 관리하는 보기(표)** 를 나눴다. 표 보기는 전체 폭 8열이고, 알림
+ * 조건 편집·보유 확인은 거기서 한다 — 합치면서 잃은 기능이 없다.
+ *
+ * ## 시장 타일은 왜 오른쪽 칸이 아니라 아래인가
+ *
+ * `tiles` 를 상세 옆(3열)이나 상세 아래(오른쪽 칸 안)에 두는 대신 **두 열 아래
+ * 전체 폭**에 깐다. 오른쪽 칸 안에 넣으면 1012px 로 좁아지는데 지수 4카드·등락 2열은
+ * 넓을수록 읽기 쉽고, 무엇보다 그렇게 두면 **모바일에서 사라진다** — 분할 격자가
+ * `hidden md:grid` 라서다. 아래에 두면 폭도 얻고 모든 폭에서 보인다.
  */
-export function WatchlistBoard({ initial }: { initial: Watchlist }) {
+export function DashboardBoard({
+  initial,
+  detail,
+  tiles,
+}: {
+  initial: Watchlist;
+  /** 오른쪽 상세 칸 — 레이아웃이 넘겨주는 자식 라우트(서버 컴포넌트) */
+  detail: React.ReactNode;
+  /** 상세 아래 전체 폭에 깔리는 시장 타일 */
+  tiles: React.ReactNode;
+}) {
   const [group, setGroup] = useState(ALL_GROUP);
   const [sort, setSort] = useState<SortKey>("order");
   const [selected, setSelected] = useState<string[]>([]);
   const [reordering, setReordering] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [boardLayout, setBoardLayout] = useState<BoardLayout>("split");
 
   // 목록은 더 이상 로컬 state 가 아니다. 변경 API 가 매번 **목록 전체**를 돌려주므로
   // 서버가 확인해 준 것을 그대로 그린다 — 그룹 집계·알림 수·평가손익 같은 파생값을
@@ -73,7 +109,20 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
   );
 
   /**
-   * '직접 정렬'일 때만 순서를 바꾼다.
+   * 지금 오른쪽에 떠 있는 종목.
+   *
+   * 주소에서 읽는다 — 레이아웃은 자식의 `params` 를 볼 수 없고, 부모가 자식에게서
+   * 값을 받아 올 방법도 없다. `/dashboard`(코드 없음)는 페이지가 **첫 종목**을
+   * 그리므로 여기서도 같은 값을 골라야 목록의 표시가 실제 화면과 맞는다.
+   */
+  const pathname = usePathname();
+  const codeInPath = pathname.startsWith("/dashboard/")
+    ? pathname.slice("/dashboard/".length)
+    : null;
+  const activeCode = codeInPath || visible[0]?.code || null;
+
+  /**
+   * 직접 정렬일 때만 순서를 바꾼다.
    *
    * 정렬이 걸린 상태에서는 화면 순서(visible)와 저장 순서(items)가 다르다.
    * 그때 arrayMove 를 items 기준으로 돌리면, 화면은 정렬로 다시 그려져 아무
@@ -156,11 +205,14 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
           active={group}
           onChange={setGroup}
         />
-        <SortControl
-          value={sort}
-          totalReturnPercent={store.watchlist.totalReturnPercent}
-          onChange={setSort}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <LayoutToggle value={boardLayout} onChange={setBoardLayout} />
+          <SortControl
+            value={sort}
+            totalReturnPercent={store.watchlist.totalReturnPercent}
+            onChange={setSort}
+          />
+        </div>
       </div>
 
       {reordering && sort !== "order" ? (
@@ -216,37 +268,71 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
         onDragEnd={onDragEnd}
       >
         <SortableContext items={codes} strategy={verticalListSortingStrategy}>
-          {/* 데스크탑 표 — CSS 그리드라 표 구조가 없어 ARIA 로 알려준다 */}
-          <div
-            role="table"
-            aria-label="관심 종목"
-            aria-rowcount={visible.length + 1}
-            className="hidden md:block"
-          >
-            <TableHeader />
-            {visible.length === 0 ? (
-              <EmptyState group={group} />
-            ) : (
-              visible.map((item) => (
-                <WatchRow
-                  key={item.code}
-                  item={item}
-                  reordering={reorderable}
-                  selected={selected.includes(item.code)}
-                  aiStatus={aiStatus(item.code)}
-                  onSelect={(next) => toggleSelect(item.code, next)}
-                  onToggleAlert={() =>
-                    patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
-                  }
-                  onChangeCondition={(condition) =>
-                    patchAlert(item, { ...item.alert, condition })
-                  }
-                />
-              ))
-            )}
-          </div>
+          {boardLayout === "split" ? (
+            /* 좌측 nav + 상세.
+               `hidden md:grid` 라 모바일에서는 상세가 화면에 없다. 다만 HTML 은
+               내려간다 — 서버는 뷰포트를 모르므로 CSS 로만 가릴 수 있다. 대신
+               상세 조회는 대부분 Next 데이터 캐시 HIT 이라(장중 60초/장외 900초)
+               비용이 상류로 나가지는 않는다. */
+            <div className="hidden gap-6 md:grid md:grid-cols-[340px_1fr] md:items-start">
+              {/* `nav` 다 — 이 목록의 일은 "어느 종목을 볼지 고르는 것" 이고, 행
+                  전체가 링크다. 표가 아니므로 `role="table"` 을 씌우지 않는다:
+                  스크린리더에 "표 6행 7열" 이라고 알려 봐야 셀이 없다. */}
+              <nav aria-label="담아 둔 종목" className="flex flex-col">
+                {visible.length === 0 ? (
+                  <EmptyState group={group} />
+                ) : (
+                  visible.map((item) => (
+                    <WatchRowCompact
+                      key={item.code}
+                      item={item}
+                      href={`/dashboard/${item.code}`}
+                      active={item.code === activeCode}
+                      reordering={reorderable}
+                      selected={selected.includes(item.code)}
+                      aiStatus={aiStatus(item.code)}
+                      onSelect={(next) => toggleSelect(item.code, next)}
+                    />
+                  ))
+                )}
+              </nav>
 
-          {/* 모바일 2단 카드 */}
+              <div className="min-w-0">{detail}</div>
+            </div>
+          ) : (
+            /* 표 보기 — 예전 화면 그대로. CSS 그리드라 표 구조가 없어 ARIA 로 알려준다 */
+            <div
+              role="table"
+              aria-label="관심 종목"
+              aria-rowcount={visible.length + 1}
+              className="hidden md:block"
+            >
+              <TableHeader />
+              {visible.length === 0 ? (
+                <EmptyState group={group} />
+              ) : (
+                visible.map((item) => (
+                  <WatchRow
+                    key={item.code}
+                    item={item}
+                    reordering={reorderable}
+                    selected={selected.includes(item.code)}
+                    aiStatus={aiStatus(item.code)}
+                    onSelect={(next) => toggleSelect(item.code, next)}
+                    onToggleAlert={() =>
+                      patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
+                    }
+                    onChangeCondition={(condition) =>
+                      patchAlert(item, { ...item.alert, condition })
+                    }
+                  />
+                ))
+              )}
+            </div>
+          )}
+
+          {/* 모바일 2단 카드 — 분할이 성립하지 않는 폭이라 목록만 둔다.
+              행을 누르면 `/stocks/[code]` 전체 화면으로 간다 (WatchCard). */}
           <div className="md:hidden">
             {visible.length === 0 ? (
               <EmptyState group={group} />
@@ -268,6 +354,10 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* 시장 타일 — 두 열 **아래**, 전체 폭. 오른쪽 칸 안에 넣으면 1012px 로 좁아지고
+          `hidden md:grid` 안이라 모바일에서 통째로 사라진다 (컴포넌트 주석). */}
+      {tiles}
 
       {selected.length > 0 ? (
         <BulkActionBar
@@ -321,6 +411,46 @@ export function WatchlistBoard({ initial }: { initial: Watchlist }) {
   );
 }
 
+/**
+ * 데스크탑 보기 전환. 모바일에는 분할이 없으므로 이 컨트롤도 없다.
+ *
+ * URL 이 아니라 클라이언트 상태다 — 정렬·그룹과 달리 **공유할 가치가 없는**
+ * 개인 취향이고, URL 에 실으면 상세 라우트마다 물고 다녀야 한다.
+ */
+function LayoutToggle({
+  value,
+  onChange,
+}: {
+  value: BoardLayout;
+  onChange: (next: BoardLayout) => void;
+}) {
+  const options: { key: BoardLayout; label: string }[] = [
+    { key: "split", label: "분할" },
+    { key: "table", label: "표" },
+  ];
+
+  return (
+    <div className="hidden border border-line-25 md:flex" role="group" aria-label="보기">
+      {options.map((option) => (
+        <button
+          key={option.key}
+          type="button"
+          aria-pressed={value === option.key}
+          onClick={() => onChange(option.key)}
+          className={`px-2.5 py-1 font-medium ${
+            value === option.key
+              ? "bg-ink text-on-ink"
+              : "text-muted-60 hover:bg-surface-hover"
+          }`}
+          style={{ fontSize: 11.5 }}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function EmptyState({ group }: { group: string }) {
   return (
     <div className="flex flex-col items-center gap-2 border-b border-dotted border-line-22 py-12">
@@ -331,9 +461,9 @@ function EmptyState({ group }: { group: string }) {
         empty
       </p>
       <p className="text-muted-60" style={{ fontSize: 12.5 }}>
-        {group === "전체"
+        {group === ALL_GROUP
           ? "관심 종목이 없습니다. ⌘K 검색에서 ⇥ 로 추가하세요."
-          : `'${group}' 그룹에 종목이 없습니다.`}
+          : `${group} 그룹에 종목이 없습니다.`}
       </p>
     </div>
   );

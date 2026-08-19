@@ -62,7 +62,7 @@ export default async function StockDetailPage({
   // 이 fetch 들은 뷰(2a/2b)와 무관하게 한 번만 일어난다: 뷰 전환은 클라이언트에서
   // 표시만 바꾸므로 서버로 다시 오지 않는다.
   // 관심종목은 소유자별 데이터라 쿠키의 신원이 필요하다. proxy.ts 가 렌더보다
-  // 먼저 굽고, 여기서는 읽어서 넘기기만 한다 (app/watchlist/page.tsx 와 같은 형태).
+  // 먼저 굽고, 여기서는 읽어서 넘기기만 한다 (app/dashboard/layout.tsx 와 같은 형태).
   const ownerKey = await readOwnerKey();
   const [result, market, watchlist] = await Promise.all([
     getStockDetail(symbol),
@@ -74,7 +74,7 @@ export default async function StockDetailPage({
   // 입력한 문자열을 화면에 남겨야 무엇을 못 찾았는지 말할 수 있다.
   if (result.status === "not-found") {
     return (
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
+      <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
         <Masthead
           caption="종목 코드 정규화 실패"
           search={<SearchTrigger />}
@@ -88,7 +88,7 @@ export default async function StockDetailPage({
   // 여기서는 재시도가 소용없고 서버를 켜는 것이 조치다.
   if (result.status === "offline") {
     return (
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
+      <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
         <Masthead caption="백엔드 연결 실패" search={<SearchTrigger />} />
         <BackendUnreachable baseUrl={API_BASE_URL} />
       </main>
@@ -99,7 +99,7 @@ export default async function StockDetailPage({
   // 인라인으로 보여준다 — 빈 화면이나 크래시가 아니다.
   if (result.status === "timeout") {
     return (
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
+      <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
         <Masthead caption="시세 응답 지연" search={<SearchTrigger />} />
         <StockDetailUnavailable symbol={readable(symbol)} />
       </main>

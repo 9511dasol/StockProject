@@ -3,7 +3,7 @@ import { Skeleton, SkeletonScreen } from "@/shared/components/feedback";
 /** 홈 골격. 지수 4카드 → 진입 가이드 3타일 → 등락 상위 2열 → 우측 API 메모 */
 export default function MarketHomeLoading() {
   return (
-    <main className="mx-auto w-full max-w-[1180px] px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+    <main className="mx-auto w-full max-w-shell px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
       <SkeletonScreen label="시장 현황을 불러오는 중입니다">
         <div className="flex flex-col gap-[22px]">
           <div className="flex items-end justify-between gap-4 border-b-2 border-ink pb-3">

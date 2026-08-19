@@ -161,6 +161,14 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   /* 터치 히트 영역 최소치 — 44×44 (WCAG 2.5.5 / iOS HIG) */
   --tap: 44px;
+
+  /* ── 화면 최대 폭 ──
+     모든 제품 화면이 이 값 하나를 쓴다(`max-w-shell`). 화면마다 다른 폭을 두면
+     이동할 때 제호와 본문의 왼쪽 축이 흔들려, 같은 사이트가 아닌 것처럼 읽힌다.
+
+     1180 → 1440. 1180 은 1440·1920 모니터에서 좌우를 크게 버렸다. 여기서 더
+     늘리지 않는 이유는 본문 가독성이다 — 표는 넓을수록 좋지만 문장은 아니다. */
+  --shell: 1440px;
 }
 
 [data-theme="terminal"] {
@@ -375,6 +383,9 @@
   --tracking-label: 0.16em;
   --tracking-label-tight: 0.06em;
   --tracking-label-wide: 0.14em;
+
+  /* max-w-shell — 모든 제품 화면의 컨테이너 폭 */
+  --container-shell: var(--shell);
 
   --shadow-drawer: var(--elev-drawer);
   --shadow-modal: var(--elev-modal);

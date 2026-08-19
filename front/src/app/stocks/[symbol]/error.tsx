@@ -15,7 +15,7 @@ export default function StockDetailError({
   }, [error]);
 
   return (
-    <main className="mx-auto w-full max-w-[1180px] px-4 pb-[30px] pt-[26px] md:px-8">
+    <main className="mx-auto w-full max-w-shell px-4 pb-[30px] pt-[26px] md:px-8">
       <ErrorScreen
         scope="stock detail"
         title="종목 정보를 불러오지 못했습니다"

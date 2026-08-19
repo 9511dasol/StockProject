@@ -13,6 +13,7 @@ export { SortControl } from "./components/SortControl";
 export { TableHeader } from "./components/TableHeader";
 export { WatchRow } from "./components/WatchRow";
 export { WatchCard } from "./components/WatchCard";
+export { WatchRowCompact } from "./components/WatchRowCompact";
 export { BulkActionBar } from "./components/BulkActionBar";
 /** 표 머리·행·로딩 골격이 같은 컬럼을 써야 하므로 경계 밖으로 연다 */
 export { WATCH_GRID } from "./components/grid";

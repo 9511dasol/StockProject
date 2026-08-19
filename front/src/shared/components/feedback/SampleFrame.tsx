@@ -10,13 +10,23 @@
 export function SampleFrame({
   label = "예시",
   title,
+  when = true,
   children,
 }: {
   label?: string;
   /** 스크린리더용 설명. 뱃지만으로는 무엇이 예시인지 알 수 없다. */
   title: string;
+  /**
+   * 예시일 때만 틀을 씌운다. 같은 블록이 실데이터일 수도 예시일 수도 있는 자리
+   * (등락 상위는 랭킹 스냅샷이 비었을 때만 목으로 내려간다)에서 호출부가
+   * `when ? <SampleFrame> : <>` 을 각자 적지 않게 여기서 받는다 — 홈과 대시보드가
+   * 같은 헬퍼를 따로 갖고 있었다.
+   */
+  when?: boolean;
   children: React.ReactNode;
 }) {
+  if (!when) return <>{children}</>;
+
   return (
     <div
       className="relative border border-dashed border-line-30 bg-surface/40 p-3"

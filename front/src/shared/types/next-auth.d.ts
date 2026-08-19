@@ -27,3 +27,13 @@ declare module "next-auth" {
     role?: string;
   }
 }
+
+/**
+ * 세션 전략이 `jwt` 라(비밀번호 로그인이 그것만 지원한다 — `auth.ts`) 권한은 **토큰을
+ * 거쳐** 세션에 닿는다. `session({ session, token })` 이 읽는 필드라 여기도 보강한다.
+ */
+declare module "next-auth/jwt" {
+  interface JWT {
+    role?: "user" | "admin";
+  }
+}

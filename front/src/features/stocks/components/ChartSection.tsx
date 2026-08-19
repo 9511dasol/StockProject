@@ -26,8 +26,13 @@ export function ChartSection({ candles }: { candles: Candle[] }) {
       </SectionLabel>
       <ChartLegend />
       {/* 음수 마진만으로 풀블리드. 100vw 를 쓰면 세로 스크롤바 폭까지 더해져
-          데스크탑에서 가로 스크롤이 생긴다. */}
-      <div className="-mx-4 md:mx-0 md:max-w-[748px]">
+          데스크탑에서 가로 스크롤이 생긴다.
+
+          예전에는 `md:max-w-[748px]` 로 폭을 묶어 뒀다(README 가 지정한 데스크탑
+          치수). 화면 폭을 1440 으로 올리면서 걷어냈다 — 본문 칸이 1000px 을 넘는데
+          차트만 748 에 멈추면 그 오른쪽이 통째로 빈다. 차트는 문장이 아니라 표에
+          가까워서, 넓어지면 봉 하나당 픽셀이 늘어 읽기 쉬워진다. */}
+      <div className="-mx-4 md:mx-0">
         <StockChart
           candles={candles}
           height={344}

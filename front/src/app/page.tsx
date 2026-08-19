@@ -1,3 +1,4 @@
+import { currentUser } from "@/auth";
 import {
   CalendarList,
   getMarketHome,
@@ -25,41 +26,34 @@ import { FindBand } from "./_components/FindBand";
  */
 export const dynamic = "force-dynamic";
 
-/** 예시 데이터일 때만 틀을 씌운다 — 실데이터로 바뀌면 그대로 통과시킨다. */
-function Sample({
-  when,
-  title,
-  children,
-}: {
-  when: boolean;
-  title: string;
-  children: React.ReactNode;
-}) {
-  if (!when) return <>{children}</>;
-  return <SampleFrame title={title}>{children}</SampleFrame>;
-}
-
 export default async function MarketHomePage() {
-  const market = await getMarketHome();
+  const [market, user] = await Promise.all([getMarketHome(), currentUser()]);
+  const signedIn = Boolean(user);
 
   const caption = `${masthead(market.asOf)} · ${MARKET_CAPTION_SUFFIX}`;
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-[22px] px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+      <main className="mx-auto flex w-full max-w-shell flex-col gap-[22px] px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
         {/* 홈만 마스트헤드 검색을 비운다 — 바로 아래 히어로가 같은 일을 더 크게 한다.
             둘을 다 두면 같은 동작이 12px 간격으로 두 번 나와 어느 쪽이 본체인지 흐려진다. */}
         <Masthead
           caption={caption}
           action={
             <>
-              <Link
-                href="/watchlist"
-                className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
-                style={{ fontSize: 13 }}
-              >
-                관심 종목
-              </Link>
+              {/* 담아 둔 종목을 여는 곳은 대시보드 하나다(`/watchlist` 는 그쪽으로
+                  합쳐졌다). 로그인해야 열리므로 안 한 사람에게는 두지 않는다 —
+                  누르면 로그인으로 튕기는 미끼가 된다. 로그인 자체는 바로 옆
+                  AccountMenu 가 안내한다. */}
+              {signedIn ? (
+                <Link
+                  href="/dashboard"
+                  className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
+                  style={{ fontSize: 13 }}
+                >
+                  대시보드
+                </Link>
+              ) : null}
               {/* 로그인·로그아웃은 화면마다 다른 자리에 있으면 안 된다. 예전에는
                   관심종목 화면에만 있어서 다른 곳에서는 로그인할 방법이 없었다. */}
               <AccountMenu />
@@ -77,7 +71,7 @@ export default async function MarketHomePage() {
             `xl:grid-cols-[1fr_328px]` 였는데, 그 둘을 걷어낸 뒤로는 레일에 API 메모
             한 줄만 남아 1280px 이상에서 큰 여백이 생겼다. 2열을 없애니 두 목록이
             각각 넓어져 종목명이 덜 잘린다. */}
-        <Sample when={market.moversAreSample} title="등락률 상위">
+        <SampleFrame when={market.moversAreSample} title="등락률 상위">
           {/* 데스크탑은 2열, 모바일은 탭 전환 */}
           <div className="hidden grid-cols-2 gap-[26px] md:grid">
             <MoverList
@@ -94,10 +88,10 @@ export default async function MarketHomePage() {
           <div className="md:hidden">
             <MoversTabs gainers={market.gainers} losers={market.losers} />
           </div>
-        </Sample>
+        </SampleFrame>
 
         {/* 등락 상위 **다음**이다. 등락률은 "지금 무슨 일이 일어났나"이고 일정은
-            "곧 무슨 일이 일어나나"라, 읽는 순서가 그렇다. `Sample` 로 감싸지 않는
+            "곧 무슨 일이 일어나나"라, 읽는 순서가 그렇다. `SampleFrame` 으로 감싸지 않는
             이유는 이 블록에 예시 데이터가 없기 때문이다 — 없으면 없다고 말한다. */}
         <CalendarList block={market.calendar} />
 

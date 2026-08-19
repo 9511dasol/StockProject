@@ -30,7 +30,7 @@ export interface AdminShellProps {
  */
 export function AdminShell({ actor, current, children }: AdminShellProps) {
   return (
-    <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 pb-[30px] pt-[26px] md:px-8">
+    <main className="mx-auto flex w-full max-w-shell flex-col gap-4 px-4 pb-[30px] pt-[26px] md:px-8">
       <Masthead caption={`${masthead(new Date().toISOString())} · 관리자`} />
 
       <section className="flex flex-col gap-[7px]">

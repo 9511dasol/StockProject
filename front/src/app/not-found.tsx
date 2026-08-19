@@ -38,9 +38,9 @@ const DESTINATIONS: readonly NotFoundDestination[] = [
     icon: "compass",
   },
   {
-    href: "/watchlist",
-    label: "관심 종목",
-    hint: "보유·알림·AI 일괄 판단",
+    href: "/dashboard",
+    label: "대시보드",
+    hint: "담아 둔 종목 · 보유 · 알림 · AI 판단",
     icon: "star",
   },
   {
@@ -66,7 +66,7 @@ export default function NotFound() {
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-[22px] px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+      <main className="mx-auto flex w-full max-w-shell flex-col gap-[22px] px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
         <Masthead
           caption="404 · 요청한 지면 없음"
           search={

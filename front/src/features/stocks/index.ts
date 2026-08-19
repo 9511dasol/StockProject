@@ -2,6 +2,7 @@ export { getStockDetail } from "./services/getStockDetail";
 
 export { StockHeadline } from "./components/StockHeadline";
 export { ChartSection } from "./components/ChartSection";
+export { StockDetailBody } from "./components/StockDetailBody";
 export { StockChart } from "./components/StockChart";
 export { DetailTabs } from "./components/DetailTabs";
 export { NewsList } from "./components/NewsList";

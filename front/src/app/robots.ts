@@ -32,7 +32,7 @@ export default function robots(): MetadataRoute.Robots {
       // 관례(Google·Bing)에 기대 그것만 다시 열어 준다 — 목록(`/stocks`)은 슬래시가
       // 없어 애초에 걸리지 않는다.
       allow: ["/", "/stocks/screener"],
-      disallow: ["/stocks/", "/api/", "/admin/", "/watchlist"],
+      disallow: ["/stocks/", "/api/", "/admin/", "/watchlist", "/dashboard", "/login", "/signup", "/verify"],
     },
   };
 }

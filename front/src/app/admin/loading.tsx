@@ -11,7 +11,7 @@ export default function AdminLoading() {
   return (
     <main
       aria-busy="true"
-      className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 pb-[30px] pt-[26px] md:px-8"
+      className="mx-auto flex w-full max-w-shell flex-col gap-4 px-4 pb-[30px] pt-[26px] md:px-8"
     >
       <div className="h-[52px] animate-pulse border-b-2 border-ink" />
       <div className="h-[42px] w-[180px] animate-pulse bg-surface" />

@@ -1,6 +1,8 @@
 "use server";
 
 import { deleteUser, updateRole } from "@/features/admin";
+import { createAccount, looksLikeEmail, normalizeEmail } from "@/lib/auth/accounts";
+import { passwordProblem } from "@/lib/auth/password";
 import { ApiError } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth/admin";
 import type { Role } from "@/features/admin";
@@ -82,4 +84,57 @@ export async function deleteUserAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/users");
   // 지워진 회원의 상세로 돌아갈 수 없다 — 목록으로 보낸다.
   redirect("/admin/users?done=deleted");
+}
+
+/**
+ * 계정 발급 — **지금 이 서비스에서 계정이 생기는 유일한 경로다.**
+ *
+ * 공개 가입(`/signup`)은 개발자 모드에서만 열리므로, 배포에서는 여기가 전부다.
+ *
+ * ## 왜 FastAPI 가 아니라 프런트가 쓰는가
+ *
+ * 이 액션은 `users` 에 **비밀번호 해시와 함께** 행을 만든다. 그 테이블은 NextAuth
+ * 어댑터의 것이고 프런트가 직접 붙는다 (`lib/auth/pool.ts`). 권한 변경·삭제가
+ * FastAPI 를 거치는 것과 달라 보이지만, 그쪽은 관심종목·투자 성향까지 함께 지우는
+ * **도메인 작업**이라 백엔드의 일이다. 계정 생성은 인증 테이블 안에서 끝난다.
+ *
+ * ## 만들자마자 인증 표시를 붙인다
+ *
+ * `verified: true` 다. 관리자가 이미 그 사람을 알고 발급하는 것이라 확인 메일을
+ * 기다릴 이유가 없고, 그렇게 두면 메일이 안 갈 때 계정이 영영 잠긴다
+ * (`auth.ts` 의 authorize 가 `emailVerified` 를 본다).
+ *
+ * ## 비밀번호를 화면에 한 번 보여주고 끝낸다
+ *
+ * 해시만 저장하므로 **다시 볼 방법이 없다.** 그래서 발급 직후 화면에 한 번 띄우고,
+ * 관리자가 그것을 당사자에게 전달한다. 주소(`?password=`)에 실려 브라우저 기록에
+ * 남는 것은 알고 있는 대가다 — 임시 비밀번호이고, 받은 사람이 바꾸는 것이 전제다.
+ * (변경 화면은 아직 없다. 남은 일이다.)
+ */
+export async function createAccountAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  const name = String(formData.get("name") ?? "");
+  const password = String(formData.get("password") ?? "");
+
+  const back = (params: Record<string, string>): never => {
+    const query = new URLSearchParams(params).toString();
+    redirect(`/admin/users${query ? `?${query}` : ""}`);
+  };
+
+  if (!looksLikeEmail(email)) back({ error: "이메일 주소를 확인해 주세요." });
+
+  const problem = passwordProblem(password);
+  if (problem) back({ error: problem });
+
+  const created = await createAccount({ email, password, name, verified: true });
+
+  // 여기서는 중복을 **그대로 알려준다.** 공개 가입 폼과 달리 이 화면은 이미 관리자만
+  // 볼 수 있고, 회원 목록에서 같은 사실을 검색으로 확인할 수 있다. 숨기면 관리자가
+  // "왜 안 만들어졌지" 를 알 방법이 없다.
+  if (!created.ok) back({ error: `${email} 은(는) 이미 등록된 이메일입니다.` });
+
+  revalidatePath("/admin/users");
+  back({ created: email, password });
 }

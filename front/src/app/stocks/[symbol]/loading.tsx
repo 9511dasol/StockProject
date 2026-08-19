@@ -9,7 +9,7 @@ import { Skeleton, SkeletonScreen } from "@/shared/components/feedback";
 export default function StockDetailLoading() {
   return (
     // 컨테이너 폭·패딩을 EditorialView 와 똑같이 둔다 — 다르면 로드 완료 순간 화면이 튄다.
-    <main className="mx-auto w-full max-w-[1180px] px-4 pb-[30px] pt-[26px] md:px-8">
+    <main className="mx-auto w-full max-w-shell px-4 pb-[30px] pt-[26px] md:px-8">
       <SkeletonScreen label="종목 정보를 불러오는 중입니다">
         <div className="flex flex-col gap-5">
           <div className="flex items-end justify-between gap-4 border-b-2 border-ink pb-3">

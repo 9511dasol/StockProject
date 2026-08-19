@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { auth, AUTH_ENABLED, signIn } from "@/auth";
+import { AuthError } from "next-auth";
+import { auth, AUTH_ENABLED, PASSWORD_LOGIN_ENABLED, signIn } from "@/auth";
+import { SIGNUP_ENABLED } from "@/lib/auth/signup";
 import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
 import { Masthead } from "@/shared/components/layout/Masthead";
@@ -10,21 +13,24 @@ import { Icon } from "@/shared/ui";
  *
  * ## 왜 로그인이 필요한가를 화면이 말한다
  *
- * 이 서비스는 로그인 없이도 **전부** 쓸 수 있다. 종목을 보고, 관심종목을 담고, AI
- * 판단까지 받는다. 그래서 "로그인하세요" 만 띄우면 사용자는 왜 해야 하는지 모른다.
- * 실제로 달라지는 것 하나(기기 간 동기화)를 그대로 적는다.
+ * 리서치는 로그인 없이도 **전부** 할 수 있다. 종목을 보고, 관심종목을 담고, AI 판단
+ * 까지 받는다. 그래서 "로그인하세요" 만 띄우면 사용자는 왜 해야 하는지 모른다.
+ * 실제로 달라지는 것 둘 — 기기 간 동기화, 그리고 **대시보드** — 을 그대로 적는다.
+ * 대시보드가 신원을 요구하는 유일한 화면이다 (`app/dashboard/page.tsx`).
  *
  * ## 설정된 수단만 보여 준다
  *
- * 구글 키가 없으면 구글 버튼이 없고, 메일 경로가 없으면 매직링크 칸이 없다. 둘 다
- * 없으면 이 화면은 아예 안내로 바뀐다 — 누르면 깨지는 버튼을 두지 않는다.
+ * DB 주소가 없으면 비밀번호 칸이 없고, 구글 키가 없으면 구글 버튼이 없다. 둘 다 없으면
+ * 이 화면은 아예 안내로 바뀐다 — 누르면 깨지는 버튼을 두지 않는다.
+ *
+ * 이메일 매직링크는 2026-08-18 에 걷어냈다. 비밀번호 로그인이 생기면서 같은 성격의
+ * 입구가 셋이 됐고, 그중 "비밀번호 없이 메일로" 가 가장 덜 쓰였다.
  */
 export const dynamic = "force-dynamic";
 
 const GOOGLE_ON = Boolean(
   process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
 );
-const EMAIL_ON = Boolean(process.env.EMAIL_SERVER && process.env.EMAIL_FROM);
 
 /**
  * Auth.js 가 `?error=` 로 넘기는 코드 → 사람이 읽는 문장.
@@ -43,8 +49,14 @@ const ERROR_MESSAGES: Record<string, string> = {
     "로그인이 완료되지 않았습니다. 구글 화면에서 취소했다면 다시 시도하시면 됩니다. " +
     "반복된다면 서버 로그에 원인이 남아 있습니다.",
   AccessDenied: "이 계정으로는 로그인할 수 없습니다. 다른 계정으로 시도해 보세요.",
-  Verification:
-    "이 로그인 링크는 만료되었거나 이미 사용되었습니다. 링크를 다시 받아 주세요.",
+  /**
+   * 비밀번호 로그인 실패. **하나로 합친 것이 의도다** — "없는 계정" 과 "비밀번호
+   * 틀림" 을 구분해 주면 어떤 이메일이 가입돼 있는지 알려주는 것이 된다.
+   * 인증 안 된 계정도 여기로 온다 (`auth.ts` 의 authorize).
+   */
+  CredentialsSignin:
+    "이메일 또는 비밀번호가 올바르지 않습니다. 가입 후 이메일 인증을 마치지 않았다면 " +
+    "받은 메일의 링크를 먼저 열어 주세요.",
 };
 
 const DEFAULT_ERROR = "로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.";
@@ -57,7 +69,7 @@ interface LoginPageProps {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   // 이미 로그인했으면 여기 머물 이유가 없다.
   const session = await auth();
-  if (session?.user) redirect("/watchlist");
+  if (session?.user) redirect("/dashboard");
 
   const { error } = await searchParams;
   const errorMessage = error
@@ -67,7 +79,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const caption = `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX}`;
 
   return (
-    <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
+    <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
       <Masthead caption={caption} />
 
       <section className="mx-auto flex w-full max-w-[420px] flex-col gap-5 pt-6">
@@ -88,9 +100,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           className="border-y border-line-20 py-3 text-muted-70"
           style={{ fontSize: 12.5, lineHeight: 1.65 }}
         >
-          로그인하지 않아도 이 서비스는 전부 쓸 수 있습니다. 다만 관심 종목이 지금
-          쓰는 브라우저에만 남습니다. 로그인하면 <strong>지금까지 담아 둔 목록이
-          계정으로 옮겨지고</strong>, 다른 기기에서도 같은 목록을 봅니다.
+          로그인하지 않아도 종목 조회·관심 종목·AI 판단은 전부 쓸 수 있습니다. 다만
+          관심 종목이 지금 쓰는 브라우저에만 남습니다. 로그인하면 <strong>지금까지
+          담아 둔 목록이 계정으로 옮겨지고</strong>, 다른 기기에서도 같은 목록을 보며,
+          내 현황을 한 화면에 모은 <strong>대시보드</strong>가 열립니다.
         </p>
 
         {/* 실패 안내는 버튼 **위**에 둔다 — 아래 두면 다시 누를 버튼을 지나친 뒤에야
@@ -111,38 +124,78 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </p>
         ) : null}
 
-        {!AUTH_ENABLED ? (
-          <p
-            role="status"
-            className="border border-dashed border-line-30 px-3 py-3 text-muted-70"
-            style={{ fontSize: 12.5, lineHeight: 1.6 }}
-          >
-            로그인 수단이 아직 설정되지 않았습니다. <code>front/.env.local</code> 에
-            구글 OAuth(<code>AUTH_GOOGLE_ID</code>·<code>AUTH_GOOGLE_SECRET</code>)
-            또는 메일 발송(<code>EMAIL_SERVER</code>·<code>EMAIL_FROM</code>)을 넣으면
-            이 화면에 버튼이 나타납니다.
-          </p>
-        ) : null}
-
-        {GOOGLE_ON ? (
+        {/* **비밀번호가 첫 자리다.** 계정을 관리자가 발급하는 지금, 대부분의 사람이
+            여기로 들어온다. 구글은 이미 그렇게 만든 계정을 위해 남겨 둔다. */}
+        {PASSWORD_LOGIN_ENABLED ? (
           <form
-            action={async () => {
+            action={async (formData: FormData) => {
               "use server";
-              await signIn("google", { redirectTo: "/watchlist" });
+              const email = String(formData.get("email") ?? "");
+              const password = String(formData.get("password") ?? "");
+              try {
+                await signIn("password", { email, password, redirectTo: "/dashboard" });
+              } catch (error) {
+                // 성공도 예외로 온다 — `redirectTo` 가 NEXT_REDIRECT 를 던진다.
+                // 그것까지 삼키면 로그인에 성공하고도 화면이 안 넘어간다.
+                if (error instanceof AuthError) {
+                  redirect(`/login?error=${encodeURIComponent(error.type)}`);
+                }
+                throw error;
+              }
             }}
+            className="flex flex-col gap-2"
           >
+            <label
+              htmlFor="password-email"
+              className="font-mono uppercase tracking-label text-muted-45"
+              style={{ fontSize: 10 }}
+            >
+              이메일 · 비밀번호
+            </label>
+            <input
+              id="password-email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              placeholder="you@example.com"
+              className="min-h-[var(--tap)] border border-line-control bg-field px-3.5 py-2.5"
+              style={{ fontSize: 13.5 }}
+            />
+            <input
+              id="password-password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              placeholder="비밀번호"
+              aria-label="비밀번호"
+              className="min-h-[var(--tap)] border border-line-control bg-field px-3.5 py-2.5"
+              style={{ fontSize: 13.5 }}
+            />
             <button
               type="submit"
-              className="flex min-h-[var(--tap)] w-full items-center justify-center gap-2 border-2 border-ink py-3 font-medium hover:bg-ink hover:text-on-ink"
+              className="min-h-[var(--tap)] border-2 border-ink py-2.5 font-medium hover:bg-ink hover:text-on-ink"
               style={{ fontSize: 14 }}
             >
-              <Icon name="user" size={16} />
-              구글로 계속하기
+              로그인
             </button>
+            <p className="text-muted-55" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+              계정은 관리자가 발급합니다. 받지 못했다면 담당자에게 문의해 주세요.
+              {SIGNUP_ENABLED ? (
+                <>
+                  {" "}
+                  <Link href="/signup" className="underline">
+                    회원가입
+                  </Link>
+                  <span className="text-muted-40"> (개발자 모드에서만 열립니다)</span>
+                </>
+              ) : null}
+            </p>
           </form>
         ) : null}
 
-        {GOOGLE_ON && EMAIL_ON ? (
+        {PASSWORD_LOGIN_ENABLED && GOOGLE_ON ? (
           <div className="flex items-center gap-3">
             <span className="h-px flex-1 bg-line-20" />
             <span
@@ -155,44 +208,34 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         ) : null}
 
-        {EMAIL_ON ? (
-          <form
-            action={async (formData: FormData) => {
-              "use server";
-              await signIn("nodemailer", {
-                email: String(formData.get("email") ?? ""),
-                redirectTo: "/watchlist",
-              });
-            }}
-            className="flex flex-col gap-2"
+        {!AUTH_ENABLED ? (
+          <p
+            role="status"
+            className="border border-dashed border-line-30 px-3 py-3 text-muted-70"
+            style={{ fontSize: 12.5, lineHeight: 1.6 }}
           >
-            <label
-              htmlFor="email"
-              className="font-mono uppercase tracking-label text-muted-45"
-              style={{ fontSize: 10 }}
-            >
-              이메일로 링크 받기
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="you@example.com"
-              className="min-h-[var(--tap)] border border-line-control bg-field px-3.5 py-2.5"
-              style={{ fontSize: 13.5 }}
-            />
+            로그인 수단이 아직 설정되지 않았습니다. <code>front/.env.local</code> 에
+            DB 주소(<code>AUTH_DATABASE_URL</code> — 비밀번호 로그인) 또는 구글
+            OAuth(<code>AUTH_GOOGLE_ID</code>·<code>AUTH_GOOGLE_SECRET</code>)를 넣으면
+            이 화면에 입력 칸이 나타납니다.
+          </p>
+        ) : null}
+
+        {GOOGLE_ON ? (
+          <form
+            action={async () => {
+              "use server";
+              await signIn("google", { redirectTo: "/dashboard" });
+            }}
+          >
             <button
               type="submit"
-              className="min-h-[var(--tap)] border border-ink py-2.5 font-medium hover:bg-ink hover:text-on-ink"
-              style={{ fontSize: 13.5 }}
+              className="flex min-h-[var(--tap)] w-full items-center justify-center gap-2 border-2 border-ink py-3 font-medium hover:bg-ink hover:text-on-ink"
+              style={{ fontSize: 14 }}
             >
-              로그인 링크 보내기
+              <Icon name="user" size={16} />
+              구글로 계속하기
             </button>
-            <p className="text-muted-55" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
-              비밀번호가 없습니다. 메일로 온 링크를 누르면 로그인됩니다.
-            </p>
           </form>
         ) : null}
       </section>

@@ -1,3 +1,4 @@
+import { currentUser } from "@/auth";
 import {
   getScreener,
   parseScreenerQuery,
@@ -50,6 +51,7 @@ interface ScreenerPageProps {
 export default async function ScreenerPage({ searchParams }: ScreenerPageProps) {
   const query = parseScreenerQuery(await searchParams);
   const result = await getScreener(query);
+  const signedIn = Boolean(await currentUser());
 
   const caption = result.asOf
     ? `${masthead(`${result.asOf}T06:30:00Z`)} · 지표 기준일`
@@ -57,20 +59,25 @@ export default async function ScreenerPage({ searchParams }: ScreenerPageProps) 
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
+      <main className="mx-auto flex w-full max-w-shell flex-col gap-4 px-4 pb-28 pt-[26px] md:px-8 md:pb-[30px]">
         {/* 랭킹 탭과 같은 이유로 검색 필드를 비운다 — 두 탭의 제호 구성이 다르면
             탭을 옮길 때마다 줄이 흔들린다 (app/stocks/page.tsx 주석). */}
         <Masthead
           caption={caption}
           action={
             <>
-              <Link
-                href="/watchlist"
-                className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
-                style={{ fontSize: 13 }}
-              >
-                관심 종목
-              </Link>
+              {/* 담아 둔 종목을 여는 곳은 대시보드 하나다. 로그인해야 열리므로
+                  안 한 사람에게는 두지 않는다 — 누르면 로그인으로 튕기는 미끼가 된다.
+                  로그인 자체는 바로 옆 AccountMenu 가 안내한다. */}
+              {signedIn ? (
+                <Link
+                  href="/dashboard"
+                  className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
+                  style={{ fontSize: 13 }}
+                >
+                  대시보드
+                </Link>
+              ) : null}
               <AccountMenu />
             </>
           }

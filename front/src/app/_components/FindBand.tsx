@@ -45,10 +45,10 @@ const ENTRIES: Entry[] = [
     hint: "등락률 상위 — 오늘 시장이 주목한 종목",
   },
   {
-    href: "/watchlist",
+    href: "/dashboard",
     icon: "star",
-    title: "관심 종목 만들기",
-    hint: "검색에서 ⇥ 로 담아 두고 한눈에 봅니다",
+    title: "내 종목 대시보드",
+    hint: "담아 둔 종목·시장·AI 판단을 한 화면에서 (로그인 필요)",
   },
 ];
 
