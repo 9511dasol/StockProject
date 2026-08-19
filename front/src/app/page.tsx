@@ -5,6 +5,7 @@ import {
   IndexCards,
   MoverList,
   MoversTabs,
+  TopByCap,
 } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import { SampleFrame } from "@/shared/components/feedback";
@@ -15,6 +16,7 @@ import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
 import Link from "next/link";
 import { FindBand } from "./_components/FindBand";
+import { RecentStocks } from "./_components/RecentStocks";
 
 /**
  * 요청 시 렌더한다. 데이터 캐시는 fetch 단위의 `revalidate: 60` 이 담당하므로
@@ -65,7 +67,18 @@ export default async function MarketHomePage() {
             지수보다 먼저 온다. 지수는 읽는 정보고 이 밴드는 하는 일이다. */}
         <FindBand />
 
+        {/* 지수 8카드 — 앞 넷은 "시장이 지금 어디에 있나", 뒤 넷(반도체·나스닥100·
+            유가·금)은 **왜 그렇게 움직였나**를 설명하는 축이다. 뒤 넷에만 한 줄
+            해설이 붙는다 (`getMarketOverview` 의 CARD_NOTES). */}
         <IndexCards indices={market.indices} />
+
+        {/* 담아 둔 종목 이전 단계 — 방금 보던 종목으로 돌아가는 길. 요청을 만들지
+            않는다(localStorage). 담은 것이 없으면 섹션째 안 그린다. */}
+        <RecentStocks />
+
+        {/* 등락률(오늘 얼마나 움직였나)과 겹치지 않는 **규모 축**. 위 진입 밴드의
+            "큰 회사부터" 타일이 링크만 주던 자리를 결과로 채운다. */}
+        <TopByCap rows={market.topByCap} scope={market.topByCapScope} />
 
         {/* 전체 폭을 쓴다. 예전에는 우측 328px 레일(업종 등락·오늘의 뉴스)이 있어
             `xl:grid-cols-[1fr_328px]` 였는데, 그 둘을 걷어낸 뒤로는 레일에 API 메모

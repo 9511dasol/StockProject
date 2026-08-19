@@ -18,6 +18,7 @@ export { IndexCards } from "./components/IndexCards";
 export { CalendarList } from "./components/CalendarList";
 export { MoverList } from "./components/MoverList";
 export { MoversTabs } from "./components/MoversTabs";
+export { TopByCap } from "./components/TopByCap";
 
 /** 종목 탐색(/stocks) — 필터 바와 표만 내보낸다 (components/browse/index.ts) */
 export {

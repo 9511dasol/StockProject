@@ -41,6 +41,8 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // 자동완성·비밀번호 관리자·확장 프로그램이 쏘는 합성 keydown 에는 key 가 없다.
+      if (typeof event.key !== "string") return;
       if (event.key.toLowerCase() !== "k") return;
       if (!event.metaKey && !event.ctrlKey) return;
       event.preventDefault();

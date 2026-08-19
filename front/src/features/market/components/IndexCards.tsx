@@ -52,6 +52,18 @@ export function IndexCards({ indices }: { indices: MarketIndex[] }) {
             h={58}
             area
           />
+
+          {/* 왜 이 지표를 보는지. 설명이 필요한 카드에만 붙는다 (`MarketIndex.note`).
+              `mt-auto` 로 바닥에 붙여, 해설이 있는 카드와 없는 카드의 스파크라인
+              높이가 어긋나지 않게 한다. */}
+          {index.note ? (
+            <p
+              className="mt-auto border-t border-line-16 pt-2 leading-[1.5] text-muted-55"
+              style={{ fontSize: 10.5 }}
+            >
+              {index.note}
+            </p>
+          ) : null}
         </article>
       ))}
     </section>

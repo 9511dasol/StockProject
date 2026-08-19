@@ -62,23 +62,36 @@ type BoardLayout = "split" | "table";
  * 보기(nav+상세)와 관리하는 보기(표)** 를 나눴다. 표 보기는 전체 폭 8열이고, 알림
  * 조건 편집·보유 확인은 거기서 한다 — 합치면서 잃은 기능이 없다.
  *
- * ## 시장 타일은 왜 오른쪽 칸이 아니라 아래인가
+ * ## 왼쪽은 뷰포트에 붙은 전체 높이 사이드바다 — 앱 셸
  *
- * `tiles` 를 상세 옆(3열)이나 상세 아래(오른쪽 칸 안)에 두는 대신 **두 열 아래
- * 전체 폭**에 깐다. 오른쪽 칸 안에 넣으면 1012px 로 좁아지는데 지수 4카드·등락 2열은
- * 넓을수록 읽기 쉽고, 무엇보다 그렇게 두면 **모바일에서 사라진다** — 분할 격자가
- * `hidden md:grid` 라서다. 아래에 두면 폭도 얻고 모든 폭에서 보인다.
+ * `fixed inset-y-0 left-0 w-[320px]`. **중앙 정렬 컨테이너 밖**이라 화면 왼쪽 끝과
+ * 사이드바 사이에 여백이 없다. 앞서 두 번은 `max-w-shell` 안쪽의 2열 격자였고, 그래서
+ * 넓은 화면에서 사이드바 왼쪽이 비어 있었다 — "아예 왼쪽으로" 가 아니었던 이유다.
+ *
+ * **제호는 여기 없다.** 상단 바의 기준 시각 **위**에 있다(`Masthead`) — 나머지 화면과
+ * 같은 자리다. 한때 사이드바 머리에 뒀는데 320px 에 24px 제호가 안 들어가 오른쪽 본문
+ * 위로 삐져나갔고, 무엇보다 서비스명이 화면마다 다른 자리에 있으면 안 된다.
+ *
+ * 머리(제목·버튼·필터)는 붙박이고 **목록만 스크롤한다** — 통째로 스크롤시키면
+ * 종목을 고르러 내려간 사이 그룹 탭과 정렬이 화면 밖으로 나간다.
+ *
+ * 본문은 `md:pl-[320px]` 로 밀어 준다. 사이드바가 `fixed` 라 문서 흐름에서 자리를
+ * 차지하지 않으므로, 밀지 않으면 본문 왼쪽이 그 아래로 들어간다. **표 보기는
+ * 사이드바를 접으므로 밀지 않는다.**
  */
 export function DashboardBoard({
   initial,
   detail,
   tiles,
+  topBar,
 }: {
   initial: Watchlist;
   /** 오른쪽 상세 칸 — 레이아웃이 넘겨주는 자식 라우트(서버 컴포넌트) */
   detail: React.ReactNode;
-  /** 상세 아래 전체 폭에 깔리는 시장 타일 */
+  /** 본문 맨 아래에 깔리는 시장 타일 */
   tiles: React.ReactNode;
+  /** 상단 바 — 제호 + 기준 시각 + 검색·테마·계정 (`Masthead`) */
+  topBar: React.ReactNode;
 }) {
   const [group, setGroup] = useState(ALL_GROUP);
   const [sort, setSort] = useState<SortKey>("order");
@@ -183,8 +196,12 @@ export function DashboardBoard({
   // 아니면 핸들 대신 체크박스가 뜬다 — 옮길 수 없는 핸들을 보여주지 않는다.
   const reorderable = reordering && sort === "order";
 
-  return (
-    <div className="flex flex-col gap-5">
+  /**
+   * 제목 줄과 필터 — **사이드바가 없는 배치**(모바일 · 표 보기)에서만 이 형태로 쓴다.
+   * 분할 보기에서는 같은 내용이 `variant="rail"` 로 사이드바 안에 들어간다.
+   */
+  const pageHead = (
+    <>
       {/* 집계는 서버가 준 최신 목록에서 읽는다. `initial` 은 첫 렌더 스냅샷이라
           종목을 담거나 뺀 뒤에는 낡은 숫자다 — 화면에 남으면 목록과 헤더가 어긋난다. */}
       <WatchlistHeader
@@ -198,7 +215,6 @@ export function DashboardBoard({
         onAdd={() => setNotice("종목 추가는 ⌘K 검색에서 ⇥ 로 할 수 있습니다.")}
         onAnalyze={analyze}
       />
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <GroupTabs
           groups={store.watchlist.groups}
@@ -214,168 +230,249 @@ export function DashboardBoard({
           />
         </div>
       </div>
+    </>
+  );
 
-      {reordering && sort !== "order" ? (
-        <p
-          role="status"
-          className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
-          style={{ fontSize: 12 }}
+  /**
+   * 모바일 묶음 — 제목 줄 + 2단 카드.
+   *
+   * 분할이 성립하지 않는 폭이라 사이드바가 없고, 카드를 누르면 `/stocks/[code]`
+   * 전체 화면으로 간다 (`WatchCard`). 두 보기 어느 쪽이든 모바일은 이것 하나다.
+   */
+  const mobileStack = (
+    <div className="flex flex-col gap-4 md:hidden">
+      {pageHead}
+      <div className="flex flex-col">
+        {visible.length === 0 ? (
+          <EmptyState group={group} />
+        ) : (
+          visible.map((item) => (
+            <WatchCard
+              key={item.code}
+              item={item}
+              reordering={reorderable}
+              selected={selected.includes(item.code)}
+              aiStatus={aiStatus(item.code)}
+              onSelect={(next) => toggleSelect(item.code, next)}
+              onToggleAlert={() =>
+                patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
+              }
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/**
+       * 왼쪽 사이드바 — **뷰포트 왼쪽 끝에 붙고 전체 높이를 쓴다.**
+       *
+       * `fixed inset-y-0 left-0` 이라 중앙 정렬 컨테이너 밖이다. 그래서 넓은 화면에서
+       * 사이드바 왼쪽에 여백이 생기지 않는다 — 앞선 두 번의 시도가 `max-w-shell`
+       * 안쪽 격자였던 탓에 화면 왼쪽 끝과 사이드바 사이가 비어 있었고, 그게 "아예
+       * 왼쪽으로" 가 아니었던 이유다.
+       *
+       * 제호가 이 안 맨 위에 있다. 앱 셸에서 서비스명은 사이드바 머리에 놓이고,
+       * 오른쪽 상단 바는 지금 화면의 상태(기준 시각)와 전역 컨트롤만 든다.
+       *
+       * 머리(제호·제목·버튼·필터)는 붙박이고 **목록만 스크롤한다.** 통째로 스크롤하면
+       * 종목을 고르러 내려간 사이 그룹 탭과 정렬이 화면 밖으로 나간다.
+       */}
+      {boardLayout === "split" ? (
+        <aside
+          aria-label="관심 종목"
+          className="hidden md:fixed md:inset-y-0 md:left-0 md:z-20 md:flex md:w-[320px] md:flex-col md:border-r-2 md:border-ink md:bg-surface"
         >
-          정렬이 걸려 있는 동안에는 순서를 바꿀 수 없습니다. 정렬을 &lsquo;직접
-          정렬&rsquo;로 두면 드래그 핸들이 나타납니다.
-        </p>
-      ) : null}
+          <div className="flex flex-none flex-col gap-3 border-b border-line-25 px-4 pb-3 pt-5">
+            {/* **제호는 여기 없다.** 상단 바의 기준 시각 위에 있다 (`layout.tsx` 의
+                `Masthead`). 한때 이 자리에 뒀는데, 320px 에 24px 제호가 안 들어가
+                오른쪽 본문 위로 삐져나갔고(2026-08-18) 무엇보다 서비스명이 화면마다
+                다른 자리에 있으면 안 된다 — 나머지 화면은 전부 상단 왼쪽이다. */}
+            <WatchlistHeader
+              variant="rail"
+              itemCount={store.watchlist.totalCount}
+              groupCount={store.watchlist.groupCount}
+              activeAlerts={store.watchlist.activeAlerts}
+              reordering={reordering}
+              selectedCount={selected.length}
+              analyzing={bulk.remaining > 0}
+              onToggleReorder={() => setReordering((v) => !v)}
+              onAdd={() => setNotice("종목 추가는 ⌘K 검색에서 ⇥ 로 할 수 있습니다.")}
+              onAnalyze={analyze}
+            />
 
-      {notice ? (
-        <p
-          role="status"
-          className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
-          style={{ fontSize: 12 }}
-        >
-          {notice}
-        </p>
-      ) : null}
-
-      {/* 저장 실패는 반드시 말한다. 화면만 바뀐 채 조용히 끝나면 새로고침 한 번에
-          되돌아가고, 사용자는 자기가 무엇을 잃었는지도 모른다. */}
-      {store.error ? (
-        <p
-          role="alert"
-          className="border border-dashed border-up px-3 py-2 text-up"
-          style={{ fontSize: 12 }}
-        >
-          {store.error}
-        </p>
-      ) : null}
-
-      {/* 상한에 걸려 빠진 종목이 있으면 반드시 밝힌다. 20개를 골랐는데 10개만 도는
-          것을 말없이 하면 사용자는 그걸 고장으로 읽는다. */}
-      {bulk.skipped > 0 ? (
-        <p
-          role="status"
-          className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
-          style={{ fontSize: 12 }}
-        >
-          한 번에 {MAX_BULK_SYMBOLS}종목까지 분석합니다 — {bulk.skipped}종목은 이번에
-          제외했습니다. 종목당 AI 호출이 4회라 둔 상한입니다. 남은 종목은 분석이 끝난
-          뒤 다시 눌러 주세요.
-        </p>
-      ) : null}
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={onDragEnd}
-      >
-        <SortableContext items={codes} strategy={verticalListSortingStrategy}>
-          {boardLayout === "split" ? (
-            /* 좌측 nav + 상세.
-               `hidden md:grid` 라 모바일에서는 상세가 화면에 없다. 다만 HTML 은
-               내려간다 — 서버는 뷰포트를 모르므로 CSS 로만 가릴 수 있다. 대신
-               상세 조회는 대부분 Next 데이터 캐시 HIT 이라(장중 60초/장외 900초)
-               비용이 상류로 나가지는 않는다. */
-            <div className="hidden gap-6 md:grid md:grid-cols-[340px_1fr] md:items-start">
-              {/* `nav` 다 — 이 목록의 일은 "어느 종목을 볼지 고르는 것" 이고, 행
-                  전체가 링크다. 표가 아니므로 `role="table"` 을 씌우지 않는다:
-                  스크린리더에 "표 6행 7열" 이라고 알려 봐야 셀이 없다. */}
-              <nav aria-label="담아 둔 종목" className="flex flex-col">
-                {visible.length === 0 ? (
-                  <EmptyState group={group} />
-                ) : (
-                  visible.map((item) => (
-                    <WatchRowCompact
-                      key={item.code}
-                      item={item}
-                      href={`/dashboard/${item.code}`}
-                      active={item.code === activeCode}
-                      reordering={reorderable}
-                      selected={selected.includes(item.code)}
-                      aiStatus={aiStatus(item.code)}
-                      onSelect={(next) => toggleSelect(item.code, next)}
-                    />
-                  ))
-                )}
-              </nav>
-
-              <div className="min-w-0">{detail}</div>
+            {/* 320px 이라 정렬 줄과 보기 토글이 한 줄에 겨우 든다. 넘치면 접힌다. */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <LayoutToggle value={boardLayout} onChange={setBoardLayout} />
+              <SortControl
+                value={sort}
+                totalReturnPercent={store.watchlist.totalReturnPercent}
+                onChange={setSort}
+              />
             </div>
-          ) : (
-            /* 표 보기 — 예전 화면 그대로. CSS 그리드라 표 구조가 없어 ARIA 로 알려준다 */
-            <div
-              role="table"
-              aria-label="관심 종목"
-              aria-rowcount={visible.length + 1}
-              className="hidden md:block"
-            >
-              <TableHeader />
-              {visible.length === 0 ? (
-                <EmptyState group={group} />
-              ) : (
-                visible.map((item) => (
-                  <WatchRow
-                    key={item.code}
-                    item={item}
-                    reordering={reorderable}
-                    selected={selected.includes(item.code)}
-                    aiStatus={aiStatus(item.code)}
-                    onSelect={(next) => toggleSelect(item.code, next)}
-                    onToggleAlert={() =>
-                      patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
-                    }
-                    onChangeCondition={(condition) =>
-                      patchAlert(item, { ...item.alert, condition })
-                    }
-                  />
-                ))
-              )}
-            </div>
-          )}
 
-          {/* 모바일 2단 카드 — 분할이 성립하지 않는 폭이라 목록만 둔다.
-              행을 누르면 `/stocks/[code]` 전체 화면으로 간다 (WatchCard). */}
-          <div className="md:hidden">
+            <GroupTabs
+              groups={store.watchlist.groups}
+              active={group}
+              onChange={setGroup}
+            />
+          </div>
+
+          {/* `min-h-0` 이 없으면 flex 아이템의 기본 최소 높이 때문에 목록이 사이드바를
+              밀어내고, 스크롤이 여기가 아니라 페이지에 생긴다. `overscroll-contain` 은
+              목록 끝에서 페이지로 스크롤이 넘어가는 것을 막는다. */}
+          <nav
+            aria-label="담아 둔 종목"
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2 pb-5"
+          >
             {visible.length === 0 ? (
               <EmptyState group={group} />
             ) : (
               visible.map((item) => (
-                <WatchCard
+                <WatchRowCompact
                   key={item.code}
                   item={item}
+                  href={`/dashboard/${item.code}`}
+                  active={item.code === activeCode}
                   reordering={reorderable}
                   selected={selected.includes(item.code)}
                   aiStatus={aiStatus(item.code)}
                   onSelect={(next) => toggleSelect(item.code, next)}
-                  onToggleAlert={() =>
-                    patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
-                  }
                 />
               ))
             )}
-          </div>
-        </SortableContext>
-      </DndContext>
-
-      {/* 시장 타일 — 두 열 **아래**, 전체 폭. 오른쪽 칸 안에 넣으면 1012px 로 좁아지고
-          `hidden md:grid` 안이라 모바일에서 통째로 사라진다 (컴포넌트 주석). */}
-      {tiles}
-
-      {selected.length > 0 ? (
-        <BulkActionBar
-          count={selected.length}
-          analyzing={bulk.remaining > 0}
-          remaining={bulk.remaining}
-          // 그룹 이동·알림 일괄 설정은 저장소는 생겼지만 **어느 그룹으로 옮길지
-          // 고르는 UI** 가 아직 없다. 값을 물어보지 않고 임의로 정하느니 남겨 둔다.
-          onMoveGroup={() => setNotice("옮길 그룹을 고르는 화면이 아직 없습니다.")}
-          onBulkAlert={() =>
-            setNotice("알림 조건을 한 번에 입력하는 화면이 아직 없습니다.")
-          }
-          onDelete={() => {
-            for (const code of selected) store.remove(code);
-            setSelected([]);
-          }}
-        />
+          </nav>
+        </aside>
       ) : null}
+
+      {/* 본문 — 사이드바가 fixed 라 그만큼 밀어 줘야 겹치지 않는다.
+          표 보기는 사이드바를 접으므로 밀지 않는다. */}
+      <div className={boardLayout === "split" ? "md:pl-[320px]" : undefined}>
+        <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-40 pt-[26px] md:px-8 md:pb-[30px]">
+          {topBar}
+
+          {reordering && sort !== "order" ? (
+            <p
+              role="status"
+              className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
+              style={{ fontSize: 12 }}
+            >
+              정렬이 걸려 있는 동안에는 순서를 바꿀 수 없습니다. 정렬을 &lsquo;직접
+              정렬&rsquo;로 두면 드래그 핸들이 나타납니다.
+            </p>
+          ) : null}
+
+          {notice ? (
+            <p
+              role="status"
+              className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
+              style={{ fontSize: 12 }}
+            >
+              {notice}
+            </p>
+          ) : null}
+
+          {/* 저장 실패는 반드시 말한다. 화면만 바뀐 채 조용히 끝나면 새로고침 한 번에
+              되돌아가고, 사용자는 자기가 무엇을 잃었는지도 모른다. */}
+          {store.error ? (
+            <p
+              role="alert"
+              className="border border-dashed border-up px-3 py-2 text-up"
+              style={{ fontSize: 12 }}
+            >
+              {store.error}
+            </p>
+          ) : null}
+
+          {/* 상한에 걸려 빠진 종목이 있으면 반드시 밝힌다. 20개를 골랐는데 10개만 도는
+              것을 말없이 하면 사용자는 그걸 고장으로 읽는다. */}
+          {bulk.skipped > 0 ? (
+            <p
+              role="status"
+              className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
+              style={{ fontSize: 12 }}
+            >
+              한 번에 {MAX_BULK_SYMBOLS}종목까지 분석합니다 — {bulk.skipped}종목은
+              이번에 제외했습니다. 종목당 AI 호출이 4회라 둔 상한입니다. 남은 종목은
+              분석이 끝난 뒤 다시 눌러 주세요.
+            </p>
+          ) : null}
+
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={onDragEnd}
+          >
+            <SortableContext items={codes} strategy={verticalListSortingStrategy}>
+              {mobileStack}
+
+              {boardLayout === "split" ? (
+                /* 상세는 모바일에 없다. HTML 은 내려가지만 — 서버는 뷰포트를 모른다 —
+                   조회는 대부분 Next 데이터 캐시 HIT 이라 상류로 나가지 않는다. */
+                <div className="hidden md:block">{detail}</div>
+              ) : (
+                /* 표 보기 — 사이드바를 접고 전체 폭 8열. CSS 그리드라 표 구조가 없어
+                   ARIA 로 알려준다. 제목 줄도 이때는 본문 위로 돌아온다. */
+                <div className="hidden flex-col gap-5 md:flex">
+                  {pageHead}
+                  <div
+                    role="table"
+                    aria-label="관심 종목"
+                    aria-rowcount={visible.length + 1}
+                  >
+                    <TableHeader />
+                    {visible.length === 0 ? (
+                      <EmptyState group={group} />
+                    ) : (
+                      visible.map((item) => (
+                        <WatchRow
+                          key={item.code}
+                          item={item}
+                          reordering={reorderable}
+                          selected={selected.includes(item.code)}
+                          aiStatus={aiStatus(item.code)}
+                          onSelect={(next) => toggleSelect(item.code, next)}
+                          onToggleAlert={() =>
+                            patchAlert(item, {
+                              ...item.alert,
+                              enabled: !item.alert.enabled,
+                            })
+                          }
+                          onChangeCondition={(condition) =>
+                            patchAlert(item, { ...item.alert, condition })
+                          }
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </SortableContext>
+          </DndContext>
+
+          {selected.length > 0 ? (
+            <BulkActionBar
+              count={selected.length}
+              analyzing={bulk.remaining > 0}
+              remaining={bulk.remaining}
+              // 그룹 이동·알림 일괄 설정은 저장소는 생겼지만 **어느 그룹으로 옮길지
+              // 고르는 UI** 가 아직 없다. 값을 물어보지 않고 임의로 정하느니 남겨 둔다.
+              onMoveGroup={() => setNotice("옮길 그룹을 고르는 화면이 아직 없습니다.")}
+              onBulkAlert={() =>
+                setNotice("알림 조건을 한 번에 입력하는 화면이 아직 없습니다.")
+              }
+              onDelete={() => {
+                for (const code of selected) store.remove(code);
+                setSelected([]);
+              }}
+            />
+          ) : null}
+
+          {tiles}
+        </main>
+      </div>
 
       {/* 모바일 하단 고정 액션 2개.
           bottom-0 이 아니라 --tabbar-h 만큼 띄운다 — MobileTabBar 도 bottom-0 을
@@ -407,7 +504,7 @@ export function DashboardBoard({
           {bulk.remaining > 0 ? `분석 중 ${bulk.remaining}` : "전체 AI 분석"}
         </button>
       </div>
-    </div>
+    </>
   );
 }
 

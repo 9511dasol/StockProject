@@ -78,7 +78,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
 
   const select = useCallback(
     (item: Suggestion) => {
-      pushRecent(item.code);
+      pushRecent(item.code, item.name);
       onClose();
       router.push(`/stocks/${item.code}`);
     },
@@ -92,7 +92,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
    */
   const runAi = useCallback(
     (item: Suggestion) => {
-      pushRecent(item.code);
+      pushRecent(item.code, item.name);
       onClose();
       router.push(`/stocks/${item.code}?ai=1`);
     },

@@ -26,18 +26,47 @@ export interface WireMarketOverview {
   updated_at: string;
 }
 
-/** 카드 우상단 캡션. 백엔드는 행 단위 라벨을 주지 않는다. */
-const CAPTIONS: Record<string, string> = {
-  KOSPI: "코스피",
-  KOSDAQ: "코스닥",
-  "S&P 500": "미국",
-  "USD/KRW": "환율",
+/**
+ * 카드 우상단 캡션과 한 줄 해설. **백엔드는 행 단위 라벨을 주지 않는다** —
+ * 이건 화면이 읽는 사람에게 하는 말이라 프런트가 소유한다.
+ *
+ * ## 해설을 "오르면 오른다" 로 쓰지 않는다
+ *
+ * 입문자에게 지표를 늘려 놓기만 하면 숫자가 소음이 된다. 그래서 각 카드가 **왜
+ * 여기 있는지**를 한 줄로 말한다. 다만 "반도체 지수가 오르면 삼성전자도 오른다"
+ * 같은 문장은 쓰지 않는다 — 그건 예측이고, 실제로 어긋나는 날이 많다. 이 서비스의
+ * 자세("근거를 보여주되 예측하지 않는다")대로 **무엇과 같이 보는 지표인가**까지만
+ * 적는다.
+ */
+const CARD_NOTES: Record<string, { label: string; note?: string }> = {
+  KOSPI: { label: "코스피" },
+  KOSDAQ: { label: "코스닥" },
+  "S&P 500": { label: "미국" },
+  "USD/KRW": { label: "환율" },
+  반도체: {
+    label: "미국",
+    note: "미국 반도체주 지수 — 국내 반도체 종목과 같이 봅니다",
+  },
+  "나스닥 100": {
+    label: "미국",
+    note: "미국 기술주 중심 — S&P 500 과 갈릴 때가 정보입니다",
+  },
+  WTI유: {
+    label: "원자재",
+    note: "국제 유가 — 정유·화학·항공의 원가와 매출에 닿습니다",
+  },
+  금: {
+    label: "원자재",
+    note: "위험 회피 자금이 향하는 자산으로 알려져 있습니다",
+  },
 };
 
 export function toMarketIndex(row: WireMarketRow): MarketIndex {
+  const card = CARD_NOTES[row.name];
   return {
     name: row.name,
-    label: CAPTIONS[row.name] ?? "",
+    label: card?.label ?? "",
+    note: card?.note,
     value: row.value,
     change: row.change ?? 0,
     changePercent: row.change_percent ?? 0,

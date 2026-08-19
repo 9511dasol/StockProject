@@ -108,6 +108,10 @@ export default async function StockDetailPage({
 
   const detail = result.detail;
 
+  // 홈 카테고리는 8종이 됐다(반도체·나스닥100·유가·금이 붙었다). 292px 레일에 8행은
+  // 많아 **앞 넷만** 쓴다 — 해설이 붙은 뒤 넷은 홈에서 카드로 읽는 것이 제자리다.
+  const railIndices = market.indices.slice(0, 4);
+
   return (
     <AdviceProvider
       initialOpen={query.ai === "1"}
@@ -118,7 +122,7 @@ export default async function StockDetailPage({
         editorial={
           <EditorialView
             detail={detail}
-            indices={market.indices}
+            indices={railIndices}
             watched={watchlist.items.some(
               (item) => item.code === detail.ref.code,
             )}
@@ -127,7 +131,7 @@ export default async function StockDetailPage({
         console={
           <ConsoleView
             detail={detail}
-            indices={market.indices}
+            indices={railIndices}
             watchlist={watchlist.items}
             universeCount={watchlist.totalCount}
             universeSource="KRX"

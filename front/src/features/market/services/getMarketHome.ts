@@ -4,6 +4,10 @@ import type { MarketHome } from "../model/types";
 import { getCalendar } from "./getCalendar";
 import { getMarketOverview } from "./getMarketOverview";
 import { getMovers } from "./getMovers";
+import { getStockRanking } from "./getStockRanking";
+
+/** 홈에 몇 줄을 보여줄지. 읽고 지나가는 자리라 다섯이면 충분하다. */
+const TOP_BY_CAP_ROWS = 5;
 
 /**
  * 홈 한 화면 분량.
@@ -22,16 +26,21 @@ import { getMovers } from "./getMovers";
 export async function getMarketHome(): Promise<MarketHome> {
   if (USE_MOCK) return MOCK_MARKET_HOME;
 
-  const [overview, movers, calendar] = await Promise.all([
+  const [overview, movers, calendar, ranking] = await Promise.all([
     getMarketOverview("home"),
     getMovers(),
     getCalendar(),
+    // 시가총액 상위 요약. 탐색 화면과 같은 엔드포인트를 **5행만** 잘라 쓴다 —
+    // `limit` 를 줄여 보내므로 상류 부담이 늘지 않는다.
+    getStockRanking({ sort: "market_cap", board: "ALL", limit: TOP_BY_CAP_ROWS }),
   ]);
 
   return {
     ...MOCK_MARKET_HOME,
     moversAreSample: movers === null,
     indices: overview.indices,
+    topByCap: ranking.rows,
+    topByCapScope: ranking.scope,
     gainers: movers?.gainers ?? MOCK_MARKET_HOME.gainers,
     losers: movers?.losers ?? MOCK_MARKET_HOME.losers,
     moversScope: movers?.scope ?? MOCK_MARKET_HOME.moversScope,
