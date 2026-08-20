@@ -74,7 +74,6 @@ export default async function StockBrowsePage({
                   로그인 자체는 바로 옆 AccountMenu 가 안내한다. */}
               {signedIn ? (
                 <Link
-                  href="/dashboard"
                   href="/dashboard" 
                   className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
                   style={{ fontSize: 13 }}
