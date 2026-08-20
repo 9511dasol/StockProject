@@ -1,7 +1,6 @@
 import type { ScreenerQuery } from "../../model/screener";
 import { hasAnyCondition } from "../../model/screener";
 import type { ScreenerResult } from "../../services/getScreener";
-import { ResultSummary } from "../table";
 import { ScreenerCard } from "./ScreenerCard";
 import { ScreenerHeadRow } from "./ScreenerHeadRow";
 import { ScreenerRow } from "./ScreenerRow";
@@ -47,7 +46,6 @@ export function ScreenerTable({ result, query }: ScreenerTableProps) {
         ))}
       </ol>
 
-      <ResultSummary shown={result.rows.length} total={result.total} />
     </>
   );
 }

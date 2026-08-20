@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState, useTransition } from "react";
+import { bff } from "@/lib/http/browser";
 import { toWatchlist, type WireWatchlist } from "../services/wire";
 import type { AlertRule, Holding, Watchlist } from "../model/types";
 
@@ -29,6 +30,8 @@ export interface WatchlistMutations {
   error: string | null;
   add: (symbol: string, group?: string) => void;
   remove: (code: string) => void;
+  /** 선택 삭제. 한 건씩 부르는 것과 결과가 다르다 — 아래 구현 주석 참고 */
+  removeMany: (codes: string[]) => void;
   reorder: (codes: string[], optimistic: Watchlist) => void;
   patch: (
     code: string,
@@ -42,6 +45,20 @@ interface Request {
   body?: unknown;
 }
 
+/**
+ * 변경 API 는 넷 다 **목록 전체**를 돌려준다(위 주석). 메서드만 다르고 나머지가
+ * 같으므로 여기서 한 번에 고른다.
+ */
+const SEND: Record<
+  Request["method"],
+  (path: string, body?: unknown) => Promise<WireWatchlist | null>
+> = {
+  POST: (path, body) => bff.post<WireWatchlist>(path, body),
+  PUT: (path, body) => bff.put<WireWatchlist>(path, body),
+  PATCH: (path, body) => bff.patch<WireWatchlist>(path, body),
+  DELETE: (path) => bff.delete<WireWatchlist>(path),
+};
+
 export function useWatchlistMutations(initial: Watchlist): WatchlistMutations {
   const [watchlist, setWatchlist] = useState(initial);
   const [error, setError] = useState<string | null>(null);
@@ -54,19 +71,13 @@ export function useWatchlistMutations(initial: Watchlist): WatchlistMutations {
       setError(null);
       startTransition(async () => {
         try {
-          const response = await fetch(path, {
-            method,
-            headers: body ? { "Content-Type": "application/json" } : undefined,
-            body: body ? JSON.stringify(body) : undefined,
-          });
-          if (!response.ok) {
-            const detail = (await response.json().catch(() => null)) as
-              | { error?: string }
-              | null;
-            throw new Error(detail?.error || "변경을 저장하지 못했습니다.");
-          }
+          // 실패 몸통(`{ error: "..." }`)을 풀어 ApiError 로 던지는 일은 클라이언트가
+          // 한다 — 브라우저에서 BFF 를 부르는 모든 곳이 같은 실패 계약을 쓴다
+          // (`lib/http/browser.ts`).
+          const wire = await SEND[method](path, body);
+          if (!wire) throw new Error("변경을 저장하지 못했습니다.");
 
-          const next = toWatchlist((await response.json()) as WireWatchlist);
+          const next = toWatchlist(wire);
           setWatchlist(next);
           setConfirmed(next);
         } catch (cause) {
@@ -90,6 +101,42 @@ export function useWatchlistMutations(initial: Watchlist): WatchlistMutations {
     (code: string) => send({ path: `/api/watchlist/${code}`, method: "DELETE" }),
     [send],
   );
+
+  /**
+   * 여러 건을 **순서대로** 지운다.
+   *
+   * 호출부가 `remove()` 를 루프로 돌리면 요청 N 개가 동시에 나가는데, 각 응답이
+   * 자기 시점의 **목록 전체**를 싣고 온다. 그러면 화면에 남는 것은 "마지막으로
+   * 도착한 응답" 이지 "전부 지운 뒤의 목록" 이 아니다 — 세 개를 지웠는데 두 개가
+   * 남아 보이는 창이 실제로 생긴다. 순차로 돌면 마지막 응답이 곧 최종 상태다.
+   *
+   * 백엔드에 일괄 삭제 엔드포인트가 생기면 이 함수만 그쪽으로 바꾼다.
+   */
+  const removeMany = useCallback((codes: string[]) => {
+    if (codes.length === 0) return;
+    setError(null);
+    startTransition(async () => {
+      let latest: Watchlist | null = null;
+      try {
+        for (const code of codes) {
+          const wire = await bff.delete<WireWatchlist>(`/api/watchlist/${code}`);
+          if (wire) latest = toWatchlist(wire);
+        }
+      } catch (cause) {
+        setError(
+          cause instanceof Error ? cause.message : "삭제하지 못했습니다.",
+        );
+      } finally {
+        // 중간에 실패해도 **거기까지 지워진 것은 반영한다.** 실패했다고 옛 목록을
+        // 그대로 두면, 이미 서버에서 사라진 종목이 화면에 남아 다시 지우려다
+        // 404 를 만난다.
+        if (latest) {
+          setWatchlist(latest);
+          setConfirmed(latest);
+        }
+      }
+    });
+  }, []);
 
   const reorder = useCallback(
     (codes: string[], optimistic: Watchlist) => {
@@ -123,5 +170,5 @@ export function useWatchlistMutations(initial: Watchlist): WatchlistMutations {
     [send],
   );
 
-  return { watchlist, pending, error, add, remove, reorder, patch };
+  return { watchlist, pending, error, add, remove, removeMany, reorder, patch };
 }

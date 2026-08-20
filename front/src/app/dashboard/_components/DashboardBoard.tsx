@@ -18,7 +18,11 @@ import {
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Icon } from "@/shared/ui";
-import { MAX_BULK_SYMBOLS, useBulkAdvice } from "@/features/advice";
+import { useBulkAdvice } from "@/features/advice";
+import { useSearch } from "@/features/search";
+import { BoardNotices } from "./BoardNotices";
+import { WatchlistRail } from "./WatchlistRail";
+import { EmptyState, LayoutToggle, type BoardLayout } from "./BoardControls";
 import {
   ALL_GROUP,
   BulkActionBar,
@@ -37,9 +41,6 @@ import {
   type WatchItem,
   type Watchlist,
 } from "@/features/watchlist";
-
-/** 데스크탑 보기 — nav+상세 분할 / 표(전체 폭) */
-type BoardLayout = "split" | "table";
 
 /**
  * 대시보드의 상태 소유자 — 좌측 종목 nav 와 그 컨트롤.
@@ -99,6 +100,8 @@ export function DashboardBoard({
   const [reordering, setReordering] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [boardLayout, setBoardLayout] = useState<BoardLayout>("split");
+  // "종목 추가" 버튼은 검색 팔레트를 직접 연다 — ⌘K 를 안내만 하던 자리였다.
+  const search = useSearch();
 
   // 목록은 더 이상 로컬 state 가 아니다. 변경 API 가 매번 **목록 전체**를 돌려주므로
   // 서버가 확인해 준 것을 그대로 그린다 — 그룹 집계·알림 수·평가손익 같은 파생값을
@@ -212,7 +215,7 @@ export function DashboardBoard({
         selectedCount={selected.length}
         analyzing={bulk.remaining > 0}
         onToggleReorder={() => setReordering((v) => !v)}
-        onAdd={() => setNotice("종목 추가는 ⌘K 검색에서 ⇥ 로 할 수 있습니다.")}
+        onAdd={search.open}
         onAnalyze={analyze}
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -244,7 +247,7 @@ export function DashboardBoard({
       {pageHead}
       <div className="flex flex-col">
         {visible.length === 0 ? (
-          <EmptyState group={group} />
+          <EmptyState group={group} onAdd={search.open} />
         ) : (
           visible.map((item) => (
             <WatchCard
@@ -257,6 +260,7 @@ export function DashboardBoard({
               onToggleAlert={() =>
                 patchAlert(item, { ...item.alert, enabled: !item.alert.enabled })
               }
+              onChangeHolding={(holding) => store.patch(item.code, { holding })}
             />
           ))
         )}
@@ -266,85 +270,58 @@ export function DashboardBoard({
 
   return (
     <>
-      {/**
-       * 왼쪽 사이드바 — **뷰포트 왼쪽 끝에 붙고 전체 높이를 쓴다.**
-       *
-       * `fixed inset-y-0 left-0` 이라 중앙 정렬 컨테이너 밖이다. 그래서 넓은 화면에서
-       * 사이드바 왼쪽에 여백이 생기지 않는다 — 앞선 두 번의 시도가 `max-w-shell`
-       * 안쪽 격자였던 탓에 화면 왼쪽 끝과 사이드바 사이가 비어 있었고, 그게 "아예
-       * 왼쪽으로" 가 아니었던 이유다.
-       *
-       * 제호가 이 안 맨 위에 있다. 앱 셸에서 서비스명은 사이드바 머리에 놓이고,
-       * 오른쪽 상단 바는 지금 화면의 상태(기준 시각)와 전역 컨트롤만 든다.
-       *
-       * 머리(제호·제목·버튼·필터)는 붙박이고 **목록만 스크롤한다.** 통째로 스크롤하면
-       * 종목을 고르러 내려간 사이 그룹 탭과 정렬이 화면 밖으로 나간다.
-       */}
       {boardLayout === "split" ? (
-        <aside
-          aria-label="관심 종목"
-          className="hidden md:fixed md:inset-y-0 md:left-0 md:z-20 md:flex md:w-[320px] md:flex-col md:border-r-2 md:border-ink md:bg-surface"
-        >
-          <div className="flex flex-none flex-col gap-3 border-b border-line-25 px-4 pb-3 pt-5">
-            {/* **제호는 여기 없다.** 상단 바의 기준 시각 위에 있다 (`layout.tsx` 의
-                `Masthead`). 한때 이 자리에 뒀는데, 320px 에 24px 제호가 안 들어가
-                오른쪽 본문 위로 삐져나갔고(2026-08-18) 무엇보다 서비스명이 화면마다
-                다른 자리에 있으면 안 된다 — 나머지 화면은 전부 상단 왼쪽이다. */}
-            <WatchlistHeader
-              variant="rail"
-              itemCount={store.watchlist.totalCount}
-              groupCount={store.watchlist.groupCount}
-              activeAlerts={store.watchlist.activeAlerts}
-              reordering={reordering}
-              selectedCount={selected.length}
-              analyzing={bulk.remaining > 0}
-              onToggleReorder={() => setReordering((v) => !v)}
-              onAdd={() => setNotice("종목 추가는 ⌘K 검색에서 ⇥ 로 할 수 있습니다.")}
-              onAnalyze={analyze}
-            />
-
-            {/* 320px 이라 정렬 줄과 보기 토글이 한 줄에 겨우 든다. 넘치면 접힌다. */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <LayoutToggle value={boardLayout} onChange={setBoardLayout} />
-              <SortControl
-                value={sort}
-                totalReturnPercent={store.watchlist.totalReturnPercent}
-                onChange={setSort}
+        <WatchlistRail
+          head={
+            <>
+              <WatchlistHeader
+                variant="rail"
+                itemCount={store.watchlist.totalCount}
+                groupCount={store.watchlist.groupCount}
+                activeAlerts={store.watchlist.activeAlerts}
+                reordering={reordering}
+                selectedCount={selected.length}
+                analyzing={bulk.remaining > 0}
+                onToggleReorder={() => setReordering((v) => !v)}
+                onAdd={search.open}
+                onAnalyze={analyze}
               />
-            </div>
 
-            <GroupTabs
-              groups={store.watchlist.groups}
-              active={group}
-              onChange={setGroup}
-            />
-          </div>
-
-          {/* `min-h-0` 이 없으면 flex 아이템의 기본 최소 높이 때문에 목록이 사이드바를
-              밀어내고, 스크롤이 여기가 아니라 페이지에 생긴다. `overscroll-contain` 은
-              목록 끝에서 페이지로 스크롤이 넘어가는 것을 막는다. */}
-          <nav
-            aria-label="담아 둔 종목"
-            className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-2 pb-5"
-          >
-            {visible.length === 0 ? (
-              <EmptyState group={group} />
-            ) : (
-              visible.map((item) => (
-                <WatchRowCompact
-                  key={item.code}
-                  item={item}
-                  href={`/dashboard/${item.code}`}
-                  active={item.code === activeCode}
-                  reordering={reorderable}
-                  selected={selected.includes(item.code)}
-                  aiStatus={aiStatus(item.code)}
-                  onSelect={(next) => toggleSelect(item.code, next)}
+              {/* 320px 이라 정렬 줄과 보기 토글이 한 줄에 겨우 든다. 넘치면 접힌다. */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <LayoutToggle value={boardLayout} onChange={setBoardLayout} />
+                <SortControl
+                  value={sort}
+                  totalReturnPercent={store.watchlist.totalReturnPercent}
+                  onChange={setSort}
                 />
-              ))
-            )}
-          </nav>
-        </aside>
+              </div>
+
+              <GroupTabs
+                groups={store.watchlist.groups}
+                active={group}
+                onChange={setGroup}
+              />
+            </>
+          }
+        >
+          {visible.length === 0 ? (
+            <EmptyState group={group} onAdd={search.open} />
+          ) : (
+            visible.map((item) => (
+              <WatchRowCompact
+                key={item.code}
+                item={item}
+                href={`/dashboard/${item.code}`}
+                active={item.code === activeCode}
+                reordering={reorderable}
+                selected={selected.includes(item.code)}
+                aiStatus={aiStatus(item.code)}
+                onSelect={(next) => toggleSelect(item.code, next)}
+              />
+            ))
+          )}
+        </WatchlistRail>
       ) : null}
 
       {/* 본문 — 사이드바가 fixed 라 그만큼 밀어 줘야 겹치지 않는다.
@@ -353,52 +330,12 @@ export function DashboardBoard({
         <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-40 pt-[26px] md:px-8 md:pb-[30px]">
           {topBar}
 
-          {reordering && sort !== "order" ? (
-            <p
-              role="status"
-              className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
-              style={{ fontSize: 12 }}
-            >
-              정렬이 걸려 있는 동안에는 순서를 바꿀 수 없습니다. 정렬을 &lsquo;직접
-              정렬&rsquo;로 두면 드래그 핸들이 나타납니다.
-            </p>
-          ) : null}
-
-          {notice ? (
-            <p
-              role="status"
-              className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
-              style={{ fontSize: 12 }}
-            >
-              {notice}
-            </p>
-          ) : null}
-
-          {/* 저장 실패는 반드시 말한다. 화면만 바뀐 채 조용히 끝나면 새로고침 한 번에
-              되돌아가고, 사용자는 자기가 무엇을 잃었는지도 모른다. */}
-          {store.error ? (
-            <p
-              role="alert"
-              className="border border-dashed border-up px-3 py-2 text-up"
-              style={{ fontSize: 12 }}
-            >
-              {store.error}
-            </p>
-          ) : null}
-
-          {/* 상한에 걸려 빠진 종목이 있으면 반드시 밝힌다. 20개를 골랐는데 10개만 도는
-              것을 말없이 하면 사용자는 그걸 고장으로 읽는다. */}
-          {bulk.skipped > 0 ? (
-            <p
-              role="status"
-              className="border border-dashed border-line-30 px-3 py-2 text-muted-70"
-              style={{ fontSize: 12 }}
-            >
-              한 번에 {MAX_BULK_SYMBOLS}종목까지 분석합니다 — {bulk.skipped}종목은
-              이번에 제외했습니다. 종목당 AI 호출이 4회라 둔 상한입니다. 남은 종목은
-              분석이 끝난 뒤 다시 눌러 주세요.
-            </p>
-          ) : null}
+          <BoardNotices
+            reorderBlocked={reordering && sort !== "order"}
+            notice={notice}
+            error={store.error}
+            skipped={bulk.skipped}
+          />
 
           <DndContext
             sensors={sensors}
@@ -424,7 +361,7 @@ export function DashboardBoard({
                   >
                     <TableHeader />
                     {visible.length === 0 ? (
-                      <EmptyState group={group} />
+                      <EmptyState group={group} onAdd={search.open} />
                     ) : (
                       visible.map((item) => (
                         <WatchRow
@@ -442,6 +379,9 @@ export function DashboardBoard({
                           }
                           onChangeCondition={(condition) =>
                             patchAlert(item, { ...item.alert, condition })
+                          }
+                          onChangeHolding={(holding) =>
+                            store.patch(item.code, { holding })
                           }
                         />
                       ))
@@ -463,10 +403,13 @@ export function DashboardBoard({
               onBulkAlert={() =>
                 setNotice("알림 조건을 한 번에 입력하는 화면이 아직 없습니다.")
               }
+              // 루프로 `remove()` 를 부르지 않는다 — 동시에 나간 응답들이 각자
+              // 자기 시점의 목록을 싣고 와 마지막 도착분이 이긴다(훅 주석).
               onDelete={() => {
-                for (const code of selected) store.remove(code);
+                store.removeMany(selected);
                 setSelected([]);
               }}
+              onCancelAnalysis={bulk.cancel}
             />
           ) : null}
 
@@ -483,85 +426,41 @@ export function DashboardBoard({
       >
         <button
           type="button"
-          onClick={() => setNotice("종목 추가는 ⌘K 검색에서 ⇥ 로 할 수 있습니다.")}
+          onClick={search.open}
           className="flex min-h-[var(--tap)] flex-1 items-center justify-center gap-1.5 border border-line-30 py-3 font-medium"
           style={{ fontSize: 13 }}
         >
           <Icon name="plus" size={15} />
           종목 추가
         </button>
-        <button
-          type="button"
-          onClick={() =>
-            bulk.start(
-              visible.map((item) => ({ code: item.code, symbol: item.symbol })),
-            )
-          }
-          disabled={bulk.remaining > 0}
-          className="min-h-[var(--tap)] flex-1 bg-ink py-3 font-medium text-on-ink disabled:bg-line-30 disabled:text-muted-50"
-          style={{ fontSize: 13 }}
-        >
-          {bulk.remaining > 0 ? `분석 중 ${bulk.remaining}` : "전체 AI 분석"}
-        </button>
+        {/* 돌고 있으면 같은 버튼이 **멈춤**이 된다. 예전에는 비활성으로 두어
+            "분석 중 7" 만 보여줬는데, 훅에는 `cancel()` 이 있었는데도 부르는 곳이
+            없어서 사용자는 시작한 것을 멈출 방법이 없었다 — 종목 10개면 모델
+            호출 40회다. */}
+        {bulk.remaining > 0 ? (
+          <button
+            type="button"
+            onClick={bulk.cancel}
+            className="min-h-[var(--tap)] flex-1 border border-down py-3 font-medium text-down"
+            style={{ fontSize: 13 }}
+          >
+            분석 멈추기 ({bulk.remaining})
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              bulk.start(
+                visible.map((item) => ({ code: item.code, symbol: item.symbol })),
+              )
+            }
+            className="min-h-[var(--tap)] flex-1 bg-ink py-3 font-medium text-on-ink"
+            style={{ fontSize: 13 }}
+          >
+            전체 AI 분석
+          </button>
+        )}
       </div>
     </>
-  );
-}
-
-/**
- * 데스크탑 보기 전환. 모바일에는 분할이 없으므로 이 컨트롤도 없다.
- *
- * URL 이 아니라 클라이언트 상태다 — 정렬·그룹과 달리 **공유할 가치가 없는**
- * 개인 취향이고, URL 에 실으면 상세 라우트마다 물고 다녀야 한다.
- */
-function LayoutToggle({
-  value,
-  onChange,
-}: {
-  value: BoardLayout;
-  onChange: (next: BoardLayout) => void;
-}) {
-  const options: { key: BoardLayout; label: string }[] = [
-    { key: "split", label: "분할" },
-    { key: "table", label: "표" },
-  ];
-
-  return (
-    <div className="hidden border border-line-25 md:flex" role="group" aria-label="보기">
-      {options.map((option) => (
-        <button
-          key={option.key}
-          type="button"
-          aria-pressed={value === option.key}
-          onClick={() => onChange(option.key)}
-          className={`px-2.5 py-1 font-medium ${
-            value === option.key
-              ? "bg-ink text-on-ink"
-              : "text-muted-60 hover:bg-surface-hover"
-          }`}
-          style={{ fontSize: 11.5 }}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function EmptyState({ group }: { group: string }) {
-  return (
-    <div className="flex flex-col items-center gap-2 border-b border-dotted border-line-22 py-12">
-      <p
-        className="font-mono uppercase tracking-label text-muted-35"
-        style={{ fontSize: 10.5 }}
-      >
-        empty
-      </p>
-      <p className="text-muted-60" style={{ fontSize: 12.5 }}>
-        {group === ALL_GROUP
-          ? "관심 종목이 없습니다. ⌘K 검색에서 ⇥ 로 추가하세요."
-          : `${group} 그룹에 종목이 없습니다.`}
-      </p>
-    </div>
   );
 }

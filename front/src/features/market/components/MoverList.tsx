@@ -49,7 +49,7 @@ export function MoverList({
                 className="num w-[14px] flex-none text-muted-35"
                 style={{ fontSize: 12 }}
               >
-                {index}
+                {index + 1}
               </span>
               <span className="flex flex-1 flex-col gap-0.5">
                 <span

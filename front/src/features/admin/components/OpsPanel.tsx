@@ -1,5 +1,5 @@
-import { stamp } from "@/lib/format";
-import { Icon } from "@/shared/ui";
+import { count as fmtCount, stamp } from "@/lib/format";
+import { Notice } from "@/shared/components/feedback";
 import { batchLabel, type BatchStatus, type OpsSnapshot } from "../model/types";
 
 export interface OpsPanelProps {
@@ -68,15 +68,10 @@ export function OpsPanel({ ops }: OpsPanelProps) {
 
       {/* 꺼져 있는 자물쇠는 **경고로** 보여야 한다. 조용히 열려 있는 것이 가장 나쁘다 */}
       {!ops.adviceLocked ? (
-        <p
-          role="status"
-          className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
-          style={{ fontSize: 12.5, lineHeight: 1.6 }}
-        >
-          <Icon name="bell" size={15} className="mt-0.5 flex-none text-muted-45" />
+        <Notice tone="alert">
           AI 판단 엔드포인트가 잠겨 있지 않습니다. 외부에 노출된 서버라면{" "}
           <code>ADVICE_API_KEY</code> 를 백엔드와 프런트에 같은 값으로 넣으세요.
-        </p>
+        </Notice>
       ) : null}
     </section>
   );
@@ -108,7 +103,7 @@ function Coverage({ label, done, total }: { label: string; done: number; total: 
         <span style={{ fontSize: 12.5 }}>{label}</span>
         <span className="num text-muted-60" style={{ fontSize: 11.5 }}>
           {total > 0
-            ? `${done.toLocaleString("ko-KR")} / ${total.toLocaleString("ko-KR")} · ${percent}%`
+            ? `${fmtCount(done)} / ${fmtCount(total)} · ${percent}%`
             : "모집단 없음"}
         </span>
       </div>

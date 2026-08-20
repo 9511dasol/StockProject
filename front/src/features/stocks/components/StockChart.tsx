@@ -13,7 +13,8 @@ import {
   type Time,
 } from "lightweight-charts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { compact } from "@/lib/format";
+import { compact, price as fmtPrice } from "@/lib/format";
+import type { Currency } from "@/shared/types";
 import { useTheme } from "@/shared/theme";
 import {
   MAX_BARS,
@@ -88,11 +89,20 @@ const EMPTY_TOOLTIP: Tooltip = {
 
 export function StockChart({
   candles,
+  currency = "KRW",
   height = 344,
   heightClassName,
   initialPreset = "3M",
 }: {
   candles: Candle[];
+  /**
+   * 축·툴팁의 가격 서식을 정한다.
+   *
+   * 예전에는 통화를 받지 않고 `maximumFractionDigits: 0` 으로 못박아, **해외
+   * 종목의 $123.45 가 축에도 툴팁에도 "123" 으로 찍혔다.** 이 컴포넌트는
+   * NASDAQ·NYSE 종목에도 쓰인다.
+   */
+  currency?: Currency;
   height?: number;
   /**
    * 반응형 높이를 Tailwind 로 줄 때 쓴다 (예: `"h-[220px] md:h-[344px]"`).
@@ -109,7 +119,29 @@ export function StockChart({
   const hostRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  /**
+   * 켜고 끌 수 있는 계열들. **다시 만들지 않고 `visible` 만 바꾼다** — 재생성하면
+   * 확대 위치와 크로스헤어가 초기화돼, 지표 하나 껐다고 보던 구간을 잃는다.
+   */
+  const layersRef = useRef<{
+    line: ISeriesApi<"Line"> | null;
+    ma: ISeriesApi<"Line">[];
+    band: ISeriesApi<"Area">[];
+    volume: ISeriesApi<"Histogram"> | null;
+  }>({ line: null, ma: [], band: [], volume: null });
+
   const [preset, setPreset] = useState<RangePresetKey>(initialPreset);
+  /**
+   * 기본은 **라인**이다.
+   *
+   * 리서치에서 반복 확인된 것 — 초보에게는 캔들 자체가 진입 장벽이고, 잘 되는 앱은
+   * 쉬운 기본 화면에 고급 도구를 접어 둔다(progressive disclosure). 캔들은 한 번
+   * 누르면 나오고, 그 선택은 이 세션 동안 유지된다.
+   */
+  const [chartType, setChartType] = useState<"line" | "candle">("line");
+  const [showMa, setShowMa] = useState(true);
+  const [showBand, setShowBand] = useState(false);
+  const [showVolume, setShowVolume] = useState(true);
   const [tooltip, setTooltip] = useState<Tooltip>(EMPTY_TOOLTIP);
   // 툴팁을 컨테이너 안에 가두기 위한 실측 폭. 상수로 두면 좁은 폭에서 잘린다.
   const [hostWidth, setHostWidth] = useState(DEFAULT_WIDTH);
@@ -173,8 +205,9 @@ export function StockChart({
       handleScroll: true,
       handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true },
       localization: {
-        priceFormatter: (value: number) =>
-          new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(value),
+        // 서식은 `lib/format` 이 소유한다 — 여기서 Intl 을 직접 부르면 통화
+        // 규칙이 화면마다 갈린다 (number.ts 첫 줄).
+        priceFormatter: (value: number) => fmtPrice(value, currency),
       },
     });
     chartRef.current = chart;
@@ -214,6 +247,17 @@ export function StockChart({
     });
     candleSeries.setData(toCandlePoints(rows));
     candleSeriesRef.current = candleSeries;
+
+    // 종가 라인 — 캔들과 **동시에 만들어 두고** 하나만 보여준다. 전환할 때마다
+    // 시리즈를 만들고 지우면 그 사이 차트가 한 번 비고, 확대 위치도 흔들린다.
+    const lineSeries = chart.addSeries(LineSeries, {
+      color: t.ma20,
+      lineWidth: 2,
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: true,
+    });
+    lineSeries.setData(toLinePoints(rows, (c) => c.close));
 
     // MA20 은 --ink(본문 글자색)를 쓰지 않는다. 계열 색과 글자 색이 같은 토큰을
     // 공유하면 테마를 손볼 때 한쪽 의도만 반영돼 다른 쪽이 조용히 끌려간다.
@@ -260,6 +304,14 @@ export function StockChart({
     );
     volume.setData(toVolumePoints(rows, `${t.up}4d`, `${t.down}4d`));
     chart.panes()[VOLUME_PANE]?.setHeight(Math.round(height * VOLUME_PANE_RATIO));
+
+    // 토글이 만질 계열들을 모아 둔다. 아래 별도 effect 가 `visible` 만 바꾼다.
+    layersRef.current = {
+      line: lineSeries,
+      ma: [ma20, ma60],
+      band: [bandUpper, bandLower],
+      volume,
+    };
 
     // 크로스헤어 툴팁 — 라이브러리 기본 툴팁이 없어 직접 그린다.
     const onCrosshair = (param: MouseEventParams) => {
@@ -324,15 +376,38 @@ export function StockChart({
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
+      layersRef.current = { line: null, ma: [], band: [], volume: null };
     };
-    // preset 은 아래 별도 effect 가 처리한다 — 여기 넣으면 차트를 통째로 재생성한다.
-    // theme 은 반대로 재생성이 맞다: 모든 시리즈 색이 CSS 변수에서 온다.
-  }, [rows, byDate, height, applyRange, theme]);
+    // preset·지표 토글은 아래 별도 effect 들이 처리한다 — 여기 넣으면 차트를 통째로
+    // 재생성해 확대 위치가 초기화된다. theme 은 반대로 재생성이 맞다: 모든 시리즈
+    // 색이 CSS 변수에서 온다. currency 는 `priceFormatter` 가 물고 있어 필요하지만,
+    // 한 종목 안에서는 바뀌지 않으므로 실제로 재생성을 유발하지 않는다.
+  }, [rows, byDate, height, applyRange, theme, currency]);
 
   useEffect(() => {
     barsRef.current = RANGE_PRESETS.find((p) => p.key === preset)?.bars ?? 66;
     applyRange(barsRef.current);
   }, [preset, applyRange]);
+
+  /**
+   * 보기 설정을 계열 `visible` 로 반영한다.
+   *
+   * 차트를 다시 만들지 않는 것이 핵심이다 — 재생성은 테마가 바뀔 때만이고
+   * (색이 전부 CSS 변수라 그때는 다시 만드는 게 맞다), 지표를 켜고 끄는 것은
+   * 같은 차트에서 보이기만 바꾸면 된다.
+   *
+   * 라인 모드에서는 교차 마커도 함께 감춘다. 마커는 캔들 시리즈에 붙어 있어
+   * 캔들을 숨기면 같이 사라지는데, 그 편이 의도와도 맞는다 — 라인은 "간단히
+   * 흐름만" 보는 모드다.
+   */
+  useEffect(() => {
+    const layers = layersRef.current;
+    candleSeriesRef.current?.applyOptions({ visible: chartType === "candle" });
+    layers.line?.applyOptions({ visible: chartType === "line" });
+    for (const series of layers.ma) series.applyOptions({ visible: showMa });
+    for (const series of layers.band) series.applyOptions({ visible: showBand });
+    layers.volume?.applyOptions({ visible: showVolume });
+  }, [chartType, showMa, showBand, showVolume, rows, theme]);
 
   if (rows.length === 0) {
     return (
@@ -351,6 +426,80 @@ export function StockChart({
     // 모바일: 프리셋을 차트 위 흐름에 둔다 (겹치면 44px 버튼이 캔들을 덮는다).
     // 데스크탑: 스펙대로 차트 우상단에 겹쳐 얹는다.
     <div className="relative flex flex-col gap-2 md:block">
+      {/**
+       * 보기 설정 — 캔들/라인과 지표 켜기.
+       *
+       * 프리셋(기간)과 **다른 줄**에 둔다. 기간은 차트 우상단에 겹쳐 얹히는데,
+       * 여기까지 그 자리에 넣으면 좁은 폭에서 칩이 캔들을 덮는다. 이쪽은 왼쪽
+       * 흐름에 남겨 기간과 시각적으로 갈라 놓는다.
+       */}
+      <div
+        className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 md:px-0"
+        style={{ fontSize: 10.5 }}
+      >
+        <span className="flex" role="group" aria-label="차트 종류">
+          {(
+            [
+              { key: "line", label: "라인" },
+              { key: "candle", label: "캔들" },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              onClick={() => setChartType(option.key)}
+              aria-pressed={chartType === option.key}
+              className={`flex min-h-[var(--tap)] items-center px-2 py-1 font-mono font-medium md:min-h-0 ${
+                chartType === option.key
+                  ? "bg-ink text-on-ink"
+                  : "border border-line-14 text-muted-60 hover:text-ink"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </span>
+
+        {/* 칩이 **범례를 겸한다.** 예전에는 차트 위에 색 견본만 있는 정적 범례가
+            따로 있었는데(`ChartLegend`), 지표를 끌 수 있게 된 순간 그 줄이
+            거짓말을 하기 시작한다 — 볼린저밴드는 기본이 꺼짐인데 범례에는 늘
+            떠 있게 된다. 색과 스위치를 한 자리에 두면 어긋날 수가 없다. */}
+        <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <Toggle
+            on={showMa}
+            onClick={() => setShowMa((v) => !v)}
+            swatch={
+              <span className="flex flex-col gap-[2px]">
+                <span className="block h-[2px] w-[11px] bg-ma20" />
+                <span className="block h-[2px] w-[11px] bg-ma60" />
+              </span>
+            }
+          >
+            MA20/60
+          </Toggle>
+          <Toggle
+            on={showBand}
+            onClick={() => setShowBand((v) => !v)}
+            swatch={
+              <span className="block h-[9px] w-[11px] bg-[var(--bb-band)]" />
+            }
+          >
+            볼린저밴드
+          </Toggle>
+          <Toggle on={showVolume} onClick={() => setShowVolume((v) => !v)}>
+            거래량
+          </Toggle>
+        </span>
+
+        {/* 교차 마커는 캔들에만 붙는다 (라인 모드에서는 캔들과 함께 숨겨진다). */}
+        {chartType === "candle" ? (
+          <span className="flex items-center gap-[5px] font-mono text-muted-45">
+            <span className="dot block h-[9px] w-[9px] border-[1.5px] border-up" />
+            골든/데드크로스
+          </span>
+        ) : null}
+      </div>
+
       <div className="flex justify-end px-4 md:absolute md:right-0 md:top-0 md:z-10 md:px-0">
         {RANGE_PRESETS.map((item) => (
           <button
@@ -392,18 +541,61 @@ export function StockChart({
           }}
         >
           <span className="num">{tooltip.date}</span>
+          {/* 축과 같은 서식을 쓴다. `toLocaleString` 을 직접 부르던 동안에는
+              해외 종목의 소수점이 여기서도 잘려 나갔다. */}
           <span className="num">
-            시 {tooltip.open.toLocaleString("ko-KR")} · 고{" "}
-            {tooltip.high.toLocaleString("ko-KR")}
+            시 {fmtPrice(tooltip.open, currency)} · 고{" "}
+            {fmtPrice(tooltip.high, currency)}
           </span>
           <span className="num">
-            저 {tooltip.low.toLocaleString("ko-KR")} · 종{" "}
-            {tooltip.close.toLocaleString("ko-KR")}
+            저 {fmtPrice(tooltip.low, currency)} · 종{" "}
+            {fmtPrice(tooltip.close, currency)}
           </span>
           <span className="num text-on-ink-75">거래량 {compact(tooltip.volume)}</span>
         </div>
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * 지표 켜기/끄기 칩.
+ *
+ * 체크박스가 아니라 `aria-pressed` 버튼이다 — 폼에 제출되는 값이 아니라 화면
+ * 상태를 바꾸는 동작이고, 이 저장소의 다른 토글(뷰·테마)도 같은 형태다.
+ * 색만으로 상태를 말하지 않도록 켜진 것은 배경이 반전된다.
+ */
+function Toggle({
+  on,
+  onClick,
+  swatch,
+  children,
+}: {
+  on: boolean;
+  onClick: () => void;
+  /** 이 지표의 색 견본. 칩이 범례를 겸하므로 여기 함께 들어간다 */
+  swatch?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={`flex min-h-[var(--tap)] items-center gap-[5px] border px-2 py-1 font-mono md:min-h-0 ${
+        on
+          ? "border-ink bg-ink text-on-ink"
+          : "border-line-14 text-muted-45 hover:text-ink"
+      }`}
+    >
+      {/* 꺼진 지표의 견본은 흐리게 — 색만 남기면 켜진 것과 구분되지 않는다 */}
+      {swatch ? (
+        <span aria-hidden className={on ? undefined : "opacity-40"}>
+          {swatch}
+        </span>
+      ) : null}
+      {children}
+    </button>
   );
 }

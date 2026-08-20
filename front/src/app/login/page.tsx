@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, AUTH_ENABLED, PASSWORD_LOGIN_ENABLED, signIn } from "@/auth";
 import { SIGNUP_ENABLED } from "@/lib/auth/signup";
-import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
+import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
+import { Notice } from "@/shared/components/feedback";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { Icon } from "@/shared/ui";
 
@@ -26,7 +27,7 @@ import { Icon } from "@/shared/ui";
  * 이메일 매직링크는 2026-08-18 에 걷어냈다. 비밀번호 로그인이 생기면서 같은 성격의
  * 입구가 셋이 됐고, 그중 "비밀번호 없이 메일로" 가 가장 덜 쓰였다.
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const GOOGLE_ON = Boolean(
   process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET,
@@ -76,7 +77,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     ? (ERROR_MESSAGES[error] ?? DEFAULT_ERROR)
     : null;
 
-  const caption = `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX}`;
+  const caption = `${masthead(new Date().toISOString())} · ${marketCaptionSuffix()}`;
 
   return (
     <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
@@ -110,18 +111,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             읽게 되고, 모바일에서는 화면 밖일 수도 있다. role="alert" 로 스크린리더가
             페이지 도착과 함께 읽는다. */}
         {errorMessage ? (
-          <p
-            role="alert"
-            className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
-            style={{ fontSize: 12.5, lineHeight: 1.6 }}
-          >
-            {/* 전용 '오류 색' 을 만들지 않는다. 이 팔레트에서 빨강·파랑은 등락 방향이
-                소유하고(`lib/format/direction`), 앰버는 AI 액션이다. 여기서 그 셋 중
-                하나를 빌리면 화면 전체의 색 규약이 흐려진다 — 실선 테두리와 글리프로
-                충분히 구분되고, 바로 아래 안내(점선)와도 다르게 읽힌다. */}
-            <Icon name="bell" size={15} className="mt-0.5 flex-none text-muted-45" />
-            {errorMessage}
-          </p>
+          <Notice tone="alert">{errorMessage}</Notice>
         ) : null}
 
         {/* **비밀번호가 첫 자리다.** 계정을 관리자가 발급하는 지금, 대부분의 사람이
@@ -209,16 +199,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         ) : null}
 
         {!AUTH_ENABLED ? (
-          <p
-            role="status"
-            className="border border-dashed border-line-30 px-3 py-3 text-muted-70"
-            style={{ fontSize: 12.5, lineHeight: 1.6 }}
-          >
+          <Notice>
             로그인 수단이 아직 설정되지 않았습니다. <code>front/.env.local</code> 에
             DB 주소(<code>AUTH_DATABASE_URL</code> — 비밀번호 로그인) 또는 구글
             OAuth(<code>AUTH_GOOGLE_ID</code>·<code>AUTH_GOOGLE_SECRET</code>)를 넣으면
             이 화면에 입력 칸이 나타납니다.
-          </p>
+          </Notice>
         ) : null}
 
         {GOOGLE_ON ? (

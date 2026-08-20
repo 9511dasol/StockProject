@@ -1,5 +1,6 @@
 "use client";
 
+import { bff } from "@/lib/http/browser";
 import { Icon } from "@/shared/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -58,15 +59,11 @@ export function WatchToggle({
     setFailed(false);
 
     try {
-      const response = next
-        ? await fetch("/api/watchlist", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ symbol }),
-          })
-        : await fetch(`/api/watchlist/${code}`, { method: "DELETE" });
-
-      if (!response.ok) throw new Error(String(response.status));
+      // 브라우저에서 BFF 를 부르는 다른 곳과 같은 클라이언트를 쓴다 — 예전에는
+      // 여기만 맨 fetch 에 `String(response.status)` 를 던져서, 같은 실패에도
+      // 화면마다 다른 문장이 나왔다 (`lib/http/browser.ts`).
+      if (next) await bff.post("/api/watchlist", { symbol });
+      else await bff.delete(`/api/watchlist/${code}`);
 
       // 서버가 들고 있는 목록·개수와 맞춘다. 낙관적 상태만 두면 같은 화면의
       // 다른 숫자(콘솔 레일의 종목 수 등)와 어긋난 채로 남는다.
@@ -93,9 +90,11 @@ export function WatchToggle({
       // 여기에 글자 라벨(데스크탑)과 aria-pressed 가 더해진다.
       aria-label={label}
       title={failed ? `${label}에 실패했습니다. 다시 눌러 보세요.` : label}
+      // 실패는 `border-down` 이다 — 이 팔레트에서 빨강(`--up`)은 상승 전용이라
+      // 실패 표시에 쓰면 잘된 일처럼 읽힌다 (OpsPanel · BatchRow 주석과 같은 규칙).
       className={`flex flex-none items-center gap-1.5 whitespace-nowrap border font-medium disabled:opacity-50 ${base} ${
         on ? "border-ink bg-ink text-on-ink" : ""
-      } ${failed ? "border-negative" : ""}`}
+      } ${failed ? "border-down" : ""}`}
       style={{ fontSize: 13 }}
     >
       <Icon name={on ? "star-filled" : "star"} size={14} />

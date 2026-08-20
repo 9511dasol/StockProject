@@ -1,3 +1,5 @@
+import { directionColorClass } from "@/lib/format";
+
 /**
  * 라벨 / 값 2열 행. 투자 지표 · 시장 개요 · AI 근거에서 쓴다.
  *
@@ -17,8 +19,9 @@ export function StatRow({
   labelSize?: number;
   valueSize?: number;
 }) {
-  const valueColor =
-    accent === "up" ? "text-up" : accent === "down" ? "text-down" : "text-ink";
+  // accent 가 없으면 등락값이 아니라 그냥 지표다 — 보합(`text-muted-60`)이 아니라
+  // 평범한 본문 색이 맞다. 색 분기 자체는 `lib/format/direction` 이 소유한다.
+  const valueColor = accent ? directionColorClass(accent) : "text-ink";
   return (
     <div className="flex items-baseline justify-between gap-2">
       <span className="text-muted-60" style={{ fontSize: labelSize }}>

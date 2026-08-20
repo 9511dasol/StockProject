@@ -230,6 +230,18 @@ export function screenerHref(
   return query ? `${SCREENER_PATH}?${query}` : SCREENER_PATH;
 }
 
+/**
+ * 조건은 그대로 두고 페이지만 바꾸는 링크. 페이지네이션이 쓴다.
+ *
+ * 위 `screenerHref` 가 페이지를 싣지 않으므로, **조건을 하나라도 바꾸면 1페이지로
+ * 돌아간다** — 의도한 동작이다 (`model/paging` 주석).
+ */
+export function screenerPageHref(current: ScreenerQuery, page: number): string {
+  const base = screenerHref(current, {});
+  if (page <= 1) return base;
+  return base.includes("?") ? `${base}&page=${page}` : `${base}?page=${page}`;
+}
+
 /** 조건 칩 하나가 필요로 하는 것 전부. 모양은 `model/filters` 가 소유한다. */
 export type ScreenerFilterOption<Value extends string> = FilterOption<Value>;
 

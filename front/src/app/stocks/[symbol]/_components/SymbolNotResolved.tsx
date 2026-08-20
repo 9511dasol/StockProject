@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { decimal, percent as fmtPercent, price as fmtPrice, deltaColorClass } from "@/lib/format";
-import { resolveCandidates } from "@/features/search";
+import { resolveCandidates } from "@/features/search/server";
 import { Chip } from "@/shared/ui";
 
 /**
@@ -12,8 +12,10 @@ import { Chip } from "@/shared/ui";
  *
  * 후보 조회는 features/search 소유라 app 계층인 여기서 두 도메인을 조합한다.
  */
-export function SymbolNotResolved({ query }: { query: string }) {
-  const candidates = resolveCandidates(query);
+export async function SymbolNotResolved({ query }: { query: string }) {
+  // 후보는 이제 실제 종목이다 — 백엔드 자동완성을 거친다(`resolveCandidates`).
+  // 서버 컴포넌트라 그대로 await 한다.
+  const candidates = await resolveCandidates(query);
 
   return (
     <section className="flex flex-col gap-4 border-t border-line-20 pt-5">

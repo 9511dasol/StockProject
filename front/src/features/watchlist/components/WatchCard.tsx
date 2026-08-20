@@ -5,8 +5,14 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { decimal, price as fmtPrice } from "@/lib/format";
 import { Delta, Icon, Sparkline } from "@/shared/ui";
-import { returnPercent, type RowAiStatus, type WatchItem } from "../model/types";
+import {
+  returnPercent,
+  type Holding,
+  type RowAiStatus,
+  type WatchItem,
+} from "../model/types";
 import { AlertToggle } from "./AlertToggle";
+import { HoldingCell } from "./HoldingCell";
 import { VerdictCell } from "./VerdictCell";
 
 /**
@@ -20,6 +26,7 @@ export function WatchCard({
   aiStatus,
   onSelect,
   onToggleAlert,
+  onChangeHolding,
 }: {
   item: WatchItem;
   reordering: boolean;
@@ -27,6 +34,7 @@ export function WatchCard({
   aiStatus?: RowAiStatus;
   onSelect: (next: boolean) => void;
   onToggleAlert: () => void;
+  onChangeHolding: (next: Holding | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.code, disabled: !reordering });
@@ -98,23 +106,20 @@ export function WatchCard({
             카드 높이와 요소 위치가 제각각이었다. 두 줄로 고정한다:
             (a) 보유·평가손익 ↔ AI 판단, (b) 알림 토글 + 조건 칩. */}
         <div className="flex items-center justify-between gap-3">
-          <span className="num min-w-0 truncate text-muted-70" style={{ fontSize: 11.5 }}>
-            {item.holding ? (
-              <>
-                {item.holding.quantity}주 ·{" "}
-                {overseas
-                  ? `$${decimal(item.holding.avgPrice, 2)}`
-                  : fmtPrice(item.holding.avgPrice)}
-              </>
-            ) : (
-              <span className="text-muted-40">관심만</span>
-            )}
+          {/* 데스크탑 표와 같은 편집 셀이다. 모바일에는 표 보기가 없어서, 여기에
+              두지 않으면 폰에서는 보유·평단을 넣을 방법이 아예 없다. */}
+          <span className="min-w-0 flex-1">
+            <HoldingCell
+              holding={item.holding}
+              overseas={overseas}
+              gain={gain}
+              label={item.name}
+              onChange={onChangeHolding}
+              align="start"
+            />
           </span>
 
           <span className="flex flex-none items-center gap-3">
-            {item.holding ? (
-              <Delta changePercent={gain ?? 0} arrow={false} size={11.5} />
-            ) : null}
             <VerdictCell
               verdict={item.verdict}
               changePercent={item.changePercent}

@@ -1,6 +1,5 @@
-import type { SearchScope } from "@/features/search/model/match";
-import type { SearchMode } from "@/features/search/model/types";
-import { searchSuggestions } from "@/features/search/services/searchSuggestions";
+import type { SearchMode } from "@/features/search";
+import { searchSuggestions, type SearchScope } from "@/features/search/server";
 
 const SCOPES: SearchScope[] = ["all", "name", "code", "ticker"];
 const MODES: SearchMode[] = ["name", "initials", "code"];
@@ -27,7 +26,15 @@ const MAX_RECENT = 5;
 /** 최근 검색으로 받아들이는 모양. 6자리 코드가 아닌 것은 조회하지 않는다. */
 const CODE = /^\d{6}$/;
 
-export const dynamic = "force-dynamic";
+/**
+ * 요청마다 실행하되(검색어가 매번 다르다) **fetch 캐시는 살려 둔다.**
+ *
+ * `force-dynamic` 이 아닌 이유는 페이지 쪽과 같다 — 그 설정은 이 라우트의 모든
+ * fetch 를 `no-store` 로 강제해서, `searchSuggestions` 가 붙여 둔
+ * `force-cache` + revalidate(5분)를 통째로 무력화한다. 그러면 흔한 접두어가
+ * 사용자 수만큼 백엔드 검색이 된다.
+ */
+export const revalidate = 0;
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;

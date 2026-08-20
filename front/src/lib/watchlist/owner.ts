@@ -1,13 +1,18 @@
 import { cookies } from "next/headers";
-import { auth } from "@/auth";
-import { isOwnerKey, OWNER_COOKIE, userOwnerKey } from "./anon-cookie";
+import { isOwnerKey, OWNER_COOKIE } from "./anon-cookie";
 
 /**
- * 이 요청이 볼 관심종목의 주인을 정한다.
+ * 익명 소유자 쿠키를 **읽는** 쪽.
  *
- * 쿠키를 만들고 알아보는 원시 부분은 `anon-cookie.ts` 에 있다 — 그 파일은 NextAuth 를
- * import 하지 않아 Edge 런타임(`proxy.ts`)에서도 쓸 수 있다. 여기는 **세션을 보는
- * 쪽**이라 Node 런타임 전용이다.
+ * 쿠키를 만들고 알아보는 원시 부분은 `anon-cookie.ts` 에 있다 — 그 파일은
+ * `next/headers` 조차 모르므로 Edge 런타임(`proxy.ts`)에서도 쓸 수 있다.
+ *
+ * ## 세션은 여기서 보지 않는다
+ *
+ * 예전에는 이 파일이 `@/auth` 를 import 해 "로그인이면 계정, 아니면 브라우저" 를
+ * 판단했다. 그러면 `lib/` 이 NextAuth 에 묶여 "프레임워크 무관 어댑터" 계약이
+ * 깨진다(CONVENTIONS 3). 그 판단은 `app/_data/owner.ts` 로 올렸다 — 신원과
+ * 도메인을 엮는 조립은 app 계층의 몫이다.
  */
 
 export { createOwnerKey, isOwnerKey, OWNER_COOKIE, userOwnerKey } from "./anon-cookie";
@@ -26,21 +31,3 @@ export async function readAnonOwnerKey(): Promise<string> {
   return isOwnerKey(value) ? value : "";
 }
 
-/**
- * 이 요청이 볼 관심종목의 주인.
- *
- * **로그인했으면 계정, 아니면 브라우저.** 이 함수 하나가 그 규칙의 유일한 출처라
- * 화면·BFF 어디서도 "로그인했나" 를 다시 판단하지 않는다. 백엔드는 둘을 구분조차
- * 하지 않는다 — `owner_key` 가 불투명한 문자열이기 때문이다(9회차 설계).
- *
- * 로그인 상태에서 익명 쿠키는 그대로 남겨 둔다. 지우면 로그아웃했을 때 예전 목록을
- * 볼 수 없는데, 승계는 **이동**이라 그때 익명 쪽은 이미 비어 있다 — 쿠키만 남고
- * 목록은 계정에 있는 상태가 맞다.
- */
-export async function readOwnerKey(): Promise<string> {
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (userId) return userOwnerKey(userId);
-
-  return readAnonOwnerKey();
-}

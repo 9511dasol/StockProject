@@ -1,12 +1,19 @@
 import { currentUser } from "@/auth";
 import {
   getStockRanking,
+  lastReachablePage,
+  offsetOf,
+  Pagination,
+  parsePage,
   parseRankingQuery,
+  rankingPageHref,
   RankingFilterBar,
   RankingTable,
+  RANKING_MAX_OFFSET,
+  RANKING_PAGE_SIZE,
 } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
-import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
+import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
 import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Masthead } from "@/shared/components/layout/Masthead";
@@ -20,13 +27,15 @@ import { BrowseTabs } from "./_components/BrowseTabs";
  *
  * 홈과 같은 이유로 요청 시 렌더한다 — 정적 프리렌더로 두면 `next build` 가 빌드
  * 머신에서 백엔드에 접속해야 하고, 성공해도 빌드 시점 시세가 이미지에 구워진다.
- * 실제 백엔드 호출 빈도는 fetch 의 revalidate(장중 60초/장외 900초)가 정한다.
+ * `revalidate = 0` 을 쓴다(`force-dynamic` 이 아니다) — 라우트는 항상 동적으로
+ * 렌더하되, fetch 단위의 `force-cache`+revalidate(장중 60초/장외 900초)는
+ * 그대로 유지되어 실제 백엔드 호출 빈도를 정한다.
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /** Next 16 은 searchParams 를 Promise 로 준다 — 페이지에서 await 한다. */
 interface StockBrowsePageProps {
-  searchParams: Promise<{ sort?: string; board?: string }>;
+  searchParams: Promise<{ sort?: string; board?: string; page?: string }>;
 }
 
 /**
@@ -44,13 +53,29 @@ interface StockBrowsePageProps {
 export default async function StockBrowsePage({
   searchParams,
 }: StockBrowsePageProps) {
-  const query = parseRankingQuery(await searchParams);
-  const ranking = await getStockRanking(query);
-  const signedIn = Boolean(await currentUser());
+  const params = await searchParams;
+  const query = parseRankingQuery(params);
+  const page = parsePage(params.page);
+
+  // 랭킹 조회와 세션 확인은 서로를 기다릴 이유가 없다 — 직렬로 두면 제호의 링크
+  // 하나를 정하려고 세션을 푸는 동안 200행 조회가 시작조차 못 한다.
+  const [ranking, user] = await Promise.all([
+    getStockRanking({
+      ...query,
+      offset: offsetOf(page, RANKING_PAGE_SIZE, RANKING_MAX_OFFSET),
+    }),
+    currentUser(),
+  ]);
+  const signedIn = Boolean(user);
+  const lastPage = lastReachablePage(
+    ranking.total,
+    RANKING_PAGE_SIZE,
+    RANKING_MAX_OFFSET,
+  );
 
   const caption = ranking.asOf
-    ? `${masthead(`${ranking.asOf}T06:30:00Z`)} ·${MARKET_CAPTION_SUFFIX}`
-    : MARKET_CAPTION_SUFFIX;
+    ? `${masthead(`${ranking.asOf}T06:30:00Z`)} · ${marketCaptionSuffix()}`
+    : marketCaptionSuffix();
 
   return (
     <>
@@ -92,10 +117,13 @@ export default async function StockBrowsePage({
 
         <RankingFilterBar query={query} />
 
-        <RankingTable
-          rows={ranking.rows}
+        <RankingTable rows={ranking.rows} sort={query.sort} />
+
+        <Pagination
+          page={page}
+          lastPage={lastPage}
           total={ranking.total}
-          sort={query.sort}
+          hrefFor={(next) => rankingPageHref(query, next)}
         />
       </main>
 

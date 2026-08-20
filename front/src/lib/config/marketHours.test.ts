@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   isMarketOpen,
+  marketCaptionSuffix,
   marketRevalidate,
+  QUOTE_DELAY_NOTE,
   REVALIDATE_MARKET_CLOSED,
   REVALIDATE_MARKET_OPEN,
   toSeoulClock,
@@ -76,5 +78,39 @@ describe("marketRevalidate — 장중 60초 / 장외 900초", () => {
     assert.equal(marketRevalidate(utc("2026-07-27T00:00:00Z")), 60); //  09:00
     assert.equal(marketRevalidate(utc("2026-07-27T06:39:00Z")), 60); //  15:39
     assert.equal(marketRevalidate(utc("2026-07-27T06:40:00Z")), 900); // 15:40
+  });
+});
+
+describe("marketCaptionSuffix — 장중/장 마감을 실제 KST 시각과 함께 말한다", () => {
+  test("장중이면 '장중'과 그 시각을 싣는다", () => {
+    // 2026-07-27T03:30:00Z = 월 12:30 KST
+    assert.equal(
+      marketCaptionSuffix(utc("2026-07-27T03:30:00Z")),
+      `장중 · 12:30 기준 · ${QUOTE_DELAY_NOTE}`,
+    );
+  });
+
+  test("장외면 '장 마감'과 그 시각을 싣는다 — 고정 문자열을 박아 두지 않는다", () => {
+    // 2026-07-27T11:00:00Z = 월 20:00 KST
+    assert.equal(
+      marketCaptionSuffix(utc("2026-07-27T11:00:00Z")),
+      `장 마감 · 20:00 기준 · ${QUOTE_DELAY_NOTE}`,
+    );
+  });
+
+  test("주말도 장 마감이다", () => {
+    // 2026-08-01T03:00:00Z = 토 12:00 KST
+    assert.equal(
+      marketCaptionSuffix(utc("2026-08-01T03:00:00Z")),
+      `장 마감 · 12:00 기준 · ${QUOTE_DELAY_NOTE}`,
+    );
+  });
+
+  test("자정 부근에서 시·분이 두 자리로 패딩된다", () => {
+    // 2026-07-27T15:05:00Z = 화 00:05 KST
+    assert.equal(
+      marketCaptionSuffix(utc("2026-07-27T15:05:00Z")),
+      `장 마감 · 00:05 기준 · ${QUOTE_DELAY_NOTE}`,
+    );
   });
 });

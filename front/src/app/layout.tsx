@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SearchProvider } from "@/features/search";
 import { SessionProvider } from "@/shared/auth/SessionProvider";
+import { Footer } from "@/shared/components/layout/Footer";
 import { QueryProvider } from "@/shared/query";
 import { ThemeProvider } from "@/shared/theme";
 import { getServerTheme } from "@/shared/theme/server";
@@ -38,6 +39,10 @@ export default async function RootLayout({
             </ThemeProvider>
           </QueryProvider>
         </SessionProvider>
+
+        {/* 데이터 출처·시세 지연·투자 판단 면책 — 모든 화면 공통, 본문 다음에 한 번.
+            `body` 가 flex-col 이라 `mt-auto` 로 짧은 화면에서도 바닥에 붙는다. */}
+        <Footer />
       </body>
     </html>
   );

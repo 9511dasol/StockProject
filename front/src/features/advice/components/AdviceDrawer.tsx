@@ -20,7 +20,7 @@ import { PersonalVerdictCard } from "./PersonalVerdictCard";
  */
 export function AdviceDrawer({ symbol }: { symbol: string }) {
   const { open, fallback, setOpen } = useAdvice();
-  const { stage, agents, decision, error, running, retry } = useAiAdvice({
+  const { stage, agents, decision, error, running, retry, cancel } = useAiAdvice({
     symbol,
     enabled: open,
     fallback,
@@ -87,12 +87,27 @@ export function AdviceDrawer({ symbol }: { symbol: string }) {
         // 모바일 시트는 화면 아래 끝까지 내려오므로 홈 인디케이터만큼 더 띄운다.
         style={{ paddingBottom: "calc(1rem + var(--safe-b))" }}
       >
-        <p
-          className="font-mono text-muted-45"
-          style={{ fontSize: 10, lineHeight: 1.6 }}
-        >
-          AI 분석은 여러 번의 조회를 포함해 시간이 걸립니다.
-        </p>
+        {/* 돌고 있는 동안에는 멈출 수 있어야 한다 — 종목당 모델 호출이 여러 번이라
+            잘못 연 분석을 끝까지 기다리게 하면 시간도 비용도 사용자가 떠안는다.
+            멈춤은 상류까지 닿는다 (`useAiAdvice.cancel` 주석). */}
+        <div className="flex items-baseline justify-between gap-3">
+          <p
+            className="font-mono text-muted-45"
+            style={{ fontSize: 10, lineHeight: 1.6 }}
+          >
+            AI 분석은 여러 번의 조회를 포함해 시간이 걸립니다.
+          </p>
+          {running ? (
+            <button
+              type="button"
+              onClick={cancel}
+              className="flex-none border border-line-30 px-2.5 py-1 font-medium text-muted-70 hover:border-ink hover:text-ink"
+              style={{ fontSize: 11.5 }}
+            >
+              분석 멈추기
+            </button>
+          ) : null}
+        </div>
 
         {agents.map((opinion, index) => (
           <AgentCard key={opinion.agent} opinion={opinion} index={index} />

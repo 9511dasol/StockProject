@@ -1,4 +1,10 @@
-export { getWatchlist } from "./services/getWatchlist";
+/**
+ * 관심종목 feature 의 공개 경계 — **브라우저에 실려도 되는 것만.**
+ *
+ * 서버 전용 조회(`getWatchlist`)는 여기 없다. `./server.ts` 에 있고, 그 파일 주석에
+ * 왜 갈랐는지 적어 두었다 — 요약하면 클라이언트 컴포넌트가 이 배럴을 부르는 것만으로
+ * 서버 API 계층(axios)이 번들에 실렸기 때문이다.
+ */
 export {
   useWatchlistMutations,
   type WatchlistMutations,

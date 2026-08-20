@@ -23,4 +23,3 @@
  */
 export { FilterChip, type FilterChipProps } from "./FilterChip";
 export { HeadCell, type HeadCellProps } from "./HeadCell";
-export { ResultSummary, type ResultSummaryProps } from "./ResultSummary";

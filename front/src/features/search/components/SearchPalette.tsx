@@ -6,10 +6,10 @@ import { Skeleton } from "@/shared/components/feedback";
 import { Wordmark } from "@/shared/components/layout/Wordmark";
 import { Icon } from "@/shared/ui";
 import { useTheme } from "@/shared/theme";
-import { useWatchlist } from "@/store/watchlist";
 import { useListedCompaniesStatus } from "../hooks/useListedCompaniesStatus";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSuggestions } from "../hooks/useSuggestions";
+import { useWatchlistStatus } from "../hooks/useWatchlistStatus";
 import { parseQuery } from "../model/match";
 import type { Suggestion } from "../model/types";
 import { DelayBanner } from "./DelayBanner";
@@ -41,7 +41,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
   const parsed = useMemo(() => parseQuery(query), [query]);
   const { result, loading } = useSuggestions({ parsed, recentCodes });
   const status = useListedCompaniesStatus();
-  const { codes: watched, toggle: toggleWatch } = useWatchlist();
+  const { codes: watched, toggle: toggleWatch } = useWatchlistStatus();
 
   /** 그룹을 가로질러 ↑↓ 로 이동하기 위한 평탄화 목록 */
   const flat = useMemo(
@@ -148,7 +148,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
         // ⇥ 는 관심 추가에 배정돼 있다. 동시에 포커스가 팔레트 밖으로
         // 나가지 않게 하는 트랩 역할도 한다.
         event.preventDefault();
-        if (flat[active]) toggleWatch(flat[active].item.code);
+        if (flat[active]) toggleWatch(flat[active].item);
         inputRef.current?.focus();
         break;
       case "Escape":

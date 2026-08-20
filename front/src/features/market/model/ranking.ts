@@ -94,7 +94,13 @@ export function parseRankingQuery(params: {
   return { sort: parseSort(params.sort), board: parseBoard(params.board) };
 }
 
-/** 필터 칩이 거는 링크. 현재 조건에서 한 축만 바꾼다. */
+/**
+ * 필터 칩이 거는 링크. 현재 조건에서 한 축만 바꾼다.
+ *
+ * **페이지는 싣지 않는다.** 조건을 바꾸면 1페이지로 돌아가는 것이 맞다 — 3페이지에서
+ * 시장을 코스닥으로 바꿨는데 3페이지에 남으면 사용자는 자기가 어디를 보고 있는지
+ * 알 수 없다 (`model/paging` 주석).
+ */
 export function rankingHref(
   current: RankingQuery,
   patch: Partial<RankingQuery>,
@@ -108,6 +114,13 @@ export function rankingHref(
 
   const query = params.toString();
   return query ? `/stocks?${query}` : "/stocks";
+}
+
+/** 조건은 그대로 두고 페이지만 바꾸는 링크. 페이지네이션이 쓴다. */
+export function rankingPageHref(current: RankingQuery, page: number): string {
+  const base = rankingHref(current, {});
+  if (page <= 1) return base;
+  return base.includes("?") ? `${base}&page=${page}` : `${base}?page=${page}`;
 }
 
 /** 시장 축 칩 목록 (전체·코스피·코스닥). */

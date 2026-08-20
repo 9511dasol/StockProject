@@ -1,14 +1,15 @@
 import { fetchUsers, UserTable } from "@/features/admin";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/password";
 import { ApiError } from "@/lib/api";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdmin } from "@/app/_data/admin";
 import { Icon } from "@/shared/ui";
+import { Notice } from "@/shared/components/feedback";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminUnavailable } from "../_components/AdminUnavailable";
 import { createAccountAction } from "../_actions";
 
 /** 관리자 · 회원 관리. 현황과 같은 이유로 캐시하지 않는다. */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface AdminUsersPageProps {
   searchParams: Promise<{
@@ -42,14 +43,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
   return (
     <AdminShell actor={actor} current="users">
       {done && DONE_MESSAGES[done] ? (
-        <p
-          role="status"
-          className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
-          style={{ fontSize: 12.5, lineHeight: 1.6 }}
-        >
-          <Icon name="check" size={15} className="mt-0.5 flex-none text-muted-45" />
-          {DONE_MESSAGES[done]}
-        </p>
+        <Notice tone="success">{DONE_MESSAGES[done]}</Notice>
       ) : null}
 
       {created && password ? (
@@ -75,14 +69,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
       ) : null}
 
       {actionError ? (
-        <p
-          role="alert"
-          className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
-          style={{ fontSize: 12.5, lineHeight: 1.6 }}
-        >
-          <Icon name="bell" size={15} className="mt-0.5 flex-none text-muted-45" />
-          {actionError}
-        </p>
+        <Notice tone="alert">{actionError}</Notice>
       ) : null}
 
       {/* 계정 발급. 공개 가입이 닫혀 있으므로(개발자 모드 전용) **배포에서 계정이

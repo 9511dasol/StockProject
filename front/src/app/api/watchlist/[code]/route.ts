@@ -1,31 +1,15 @@
-import { apiSend, ApiError } from "@/lib/api";
-import { readOwnerKey } from "@/lib/watchlist/owner";
+import { apiSend } from "@/lib/api";
+import { readOwnerKey } from "@/app/_data/owner";
 import { NextResponse } from "next/server";
+import { toResponse, unauthorized } from "../_helpers";
 
 /** 관심종목 BFF — 개별 종목 제거·수정. */
 
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /** Next 16 은 동적 세그먼트를 Promise 로 준다 — 라우트 핸들러도 await 한다. */
 interface RouteContext {
   params: Promise<{ code: string }>;
-}
-
-function unauthorized() {
-  return NextResponse.json(
-    { error: "소유자 식별자가 없습니다. 새로고침해 주세요." },
-    { status: 401 },
-  );
-}
-
-function toResponse(error: unknown) {
-  if (error instanceof ApiError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
-  }
-  return NextResponse.json(
-    { error: "관심종목 서버에 연결하지 못했습니다." },
-    { status: 502 },
-  );
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {

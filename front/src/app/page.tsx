@@ -9,7 +9,7 @@ import {
 } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import { SampleFrame } from "@/shared/components/feedback";
-import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
+import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
 import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Masthead } from "@/shared/components/layout/Masthead";
@@ -19,20 +19,26 @@ import { FindBand } from "./_components/FindBand";
 import { RecentStocks } from "./_components/RecentStocks";
 
 /**
- * 요청 시 렌더한다. 데이터 캐시는 fetch 단위의 `revalidate: 60` 이 담당하므로
- * (lib/config/env.ts) 실제 백엔드 호출은 여전히 60초에 한 번이다.
+ * 요청 시 렌더한다. `revalidate = 0` 은 라우트를 항상 동적 렌더로 강제하되
+ * `cache: "force-cache"` 로 명시한 fetch(`apiGetCached`)는 그대로 캐시된다 —
+ * 실제 백엔드 호출 빈도는 fetch 단위의 revalidate(장중 60초/장외 900초,
+ * `lib/config/marketHours.ts`)가 정한다.
+ *
+ * `force-dynamic` 은 쓰지 않는다 — 라우트의 모든 fetch를 `no-store` 로 강제해
+ * `force-cache` 로 받은 fetch까지 무력화한다(Next 16
+ * `caching-without-cache-components.md` 문서).
  *
  * 정적 프리렌더로 두면 `next build` 가 빌드 머신에서 백엔드에 접속해야 한다 —
  * CI·도커 빌드에서 백엔드가 없으면 빌드 자체가 실패하고, 성공하더라도 빌드
  * 시점의 시세가 이미지에 구워진다.
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function MarketHomePage() {
   const [market, user] = await Promise.all([getMarketHome(), currentUser()]);
   const signedIn = Boolean(user);
 
-  const caption = `${masthead(market.asOf)} · ${MARKET_CAPTION_SUFFIX}`;
+  const caption = `${masthead(market.asOf)} · ${marketCaptionSuffix()}`;
 
   return (
     <>

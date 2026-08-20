@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useSyncExternalStore } from "react";
 import { useRecentSearches, type SuggestionResponse } from "@/features/search";
+import { bff } from "@/lib/http/browser";
 import { SectionLabel } from "@/shared/ui";
 
 /**
@@ -73,11 +74,12 @@ export function RecentStocks() {
     if (!unknownKey) return;
     const controller = new AbortController();
 
-    fetch(`/api/stocks/suggestions?recent=${encodeURIComponent(unknownKey)}`, {
-      signal: controller.signal,
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: SuggestionResponse | null) => {
+    bff
+      .get<SuggestionResponse>("/api/stocks/suggestions", {
+        query: { recent: unknownKey },
+        signal: controller.signal,
+      })
+      .then((data) => {
         const items = data?.groups.find((group) => group.key === "recent")?.items;
         if (!items?.length) return;
         learnNames(Object.fromEntries(items.map((item) => [item.code, item.name])));

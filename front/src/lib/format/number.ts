@@ -30,6 +30,18 @@ export function ratio(value: number, digits = 2): string {
   return `${value.toFixed(digits)}x`;
 }
 
+/**
+ * 2,842 — 건수·종목 수처럼 **단위가 없는 정수**.
+ *
+ * `price()` 로 대신 쓰지 않는다. 결과 문자열이 같아도 뜻이 다르고, 통화 서식이
+ * 바뀌면(해외 종목 소수 2자리 등) 종목 수까지 따라 바뀐다. 이 함수가 없어서
+ * 목록 요약과 스크리너 캡션이 `toLocaleString` 을 직접 부르고 있었다 — 이 파일
+ * 첫 줄이 하지 말라고 적어 둔 바로 그것이다.
+ */
+export function count(value: number): string {
+  return KRW.format(Math.round(value));
+}
+
 /** 12.4M / 843.2K / 1.2B — 거래량·차트 축 */
 export function compact(value: number): string {
   const abs = Math.abs(value);

@@ -1,3 +1,4 @@
+import { directionColorClass } from "@/lib/format";
 import type { Metric } from "../../model/types";
 import { CONSOLE_LABEL } from "./tokens";
 
@@ -16,13 +17,12 @@ export function MetricGrid({ metrics }: { metrics: Metric[] }) {
           >
             {metric.label}
           </span>
+          {/* 색 분기는 `lib/format/direction` 이 소유한다 — 여기서 삼항으로 다시
+              쓰면 색 반전 토글이 생겼을 때 이 화면만 옛 색으로 남는다.
+              accent 가 없으면 등락값이 아니므로 평범한 본문 색이다 (`StatRow` 와 같다). */}
           <span
             className={`num font-medium ${
-              metric.accent === "up"
-                ? "text-up"
-                : metric.accent === "down"
-                  ? "text-down"
-                  : "text-ink"
+              metric.accent ? directionColorClass(metric.accent) : "text-ink"
             }`}
             style={{ fontSize: 15 }}
           >

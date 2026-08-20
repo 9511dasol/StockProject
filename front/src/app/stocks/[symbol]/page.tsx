@@ -2,10 +2,10 @@ import { AdviceDrawer, AdviceProvider } from "@/features/advice";
 import { getMarketOverview } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import { getStockDetail } from "@/features/stocks";
-import { getWatchlist } from "@/features/watchlist";
+import { getWatchlist } from "@/features/watchlist/server";
 import { API_BASE_URL } from "@/lib/config/env";
 import { isResolvableSymbol } from "@/lib/stocks/symbol";
-import { readOwnerKey } from "@/lib/watchlist/owner";
+import { readOwnerKey } from "@/app/_data/owner";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import type { Metadata } from "next";
 import { BackendUnreachable } from "./_components/BackendUnreachable";
@@ -61,13 +61,16 @@ export default async function StockDetailPage({
   // 여러 도메인을 페이지에서 조합한다 — features 끼리는 직접 import 하지 않는다.
   // 이 fetch 들은 뷰(2a/2b)와 무관하게 한 번만 일어난다: 뷰 전환은 클라이언트에서
   // 표시만 바꾸므로 서버로 다시 오지 않는다.
+  //
   // 관심종목은 소유자별 데이터라 쿠키의 신원이 필요하다. proxy.ts 가 렌더보다
   // 먼저 굽고, 여기서는 읽어서 넘기기만 한다 (app/dashboard/layout.tsx 와 같은 형태).
-  const ownerKey = await readOwnerKey();
+  // **`readOwnerKey()` 를 앞에서 따로 await 하지 않는다** — 그것은 세션을 푸는
+  // 일이라 시세·시장 조회와 아무 관계가 없는데, 앞에 세우면 그 둘이 세션 해독이
+  // 끝날 때까지 시작조차 못 한다. 관심종목 체인만 그 뒤에 잇는다.
   const [result, market, watchlist] = await Promise.all([
     getStockDetail(symbol),
     getMarketOverview("home"),
-    getWatchlist(ownerKey),
+    readOwnerKey().then(getWatchlist),
   ]);
 
   // 정규화 실패는 404 가 아니라 '후보 고르기'로 받는다 (와이어프레임 1d).

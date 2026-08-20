@@ -100,7 +100,7 @@ export function ConsoleView({
               </span>
             </div>
 
-            <ConsoleChart candles={detail.candles} />
+            <ConsoleChart candles={detail.candles} currency={detail.quote.currency} />
             <MetricGrid metrics={detail.metrics} />
             <ConsoleFooter notes={detail.apiNotes} />
           </main>

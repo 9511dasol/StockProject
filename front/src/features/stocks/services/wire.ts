@@ -1,6 +1,12 @@
 // 백엔드 응답(snake_case) 타입과 도메인 타입 변환.
 // 화면은 이 파일을 보지 않는다 — services 안에서만 쓴다.
+//
+// 표시 문자열을 만드는 자리가 몇 군데 있는데(지표 6행), 그 포맷은 **여기서 새로
+// 만들지 않고 `lib/format` 을 부른다.** 예전에는 퍼센트·배율 서식을 이 파일이
+// 그대로 다시 구현하고 있어서(`percent()` 와 글자까지 같은 코드), 자릿수나 부호
+// 규칙을 바꾸면 화면 대부분은 따라오는데 이 6행만 옛 서식으로 남았다.
 
+import { direction, percent, ratio, unsignedPercent } from "@/lib/format";
 import type { Currency, Market } from "@/shared/types";
 import type {
   AnalystReport,
@@ -178,8 +184,9 @@ export function toQuote(
   };
 }
 
+/** 값이 없으면 행 자체를 만들지 않으므로 null 을 그대로 통과시킨다. */
 const PERCENT = (value: number | null): string | null =>
-  value === null ? null : `${value > 0 ? "+" : value < 0 ? "-" : ""}${Math.abs(value).toFixed(2)}%`;
+  value === null ? null : percent(value);
 
 /**
  * 투자 지표 6행. 값의 타입이 제각각(퍼센트·배율·문자열)이라 표시 문자열로 만든다.
@@ -190,11 +197,10 @@ export function toMetrics(metrics: WireStockMetrics | null): Metric[] {
   const rows: Metric[] = [];
   const push = (label: string, value: string | null, source: number | null) => {
     if (value === null) return;
-    rows.push({
-      label,
-      value,
-      accent: source === null || source === 0 ? undefined : source > 0 ? "up" : "down",
-    });
+    // 부호 → 방향 판정도 `lib/format` 이 소유한다. 보합(0)과 값 없음은 둘 다
+    // 색을 입히지 않는다 — 0%에 상승색이 붙으면 오르지 않은 것이 오른 것처럼 읽힌다.
+    const d = source === null ? "flat" : direction(source);
+    rows.push({ label, value, accent: d === "flat" ? undefined : d });
   };
 
   push("20일 수익률", PERCENT(metrics.return_20d_pct), metrics.return_20d_pct);
@@ -207,7 +213,7 @@ export function toMetrics(metrics: WireStockMetrics | null): Metric[] {
   if (metrics.volume_ratio_20d !== null) {
     rows.push({
       label: "거래량 배율",
-      value: `${metrics.volume_ratio_20d.toFixed(2)}x`,
+      value: ratio(metrics.volume_ratio_20d),
       accent: metrics.volume_ratio_20d > 1 ? "up" : undefined,
     });
   }
@@ -220,7 +226,9 @@ export function toMetrics(metrics: WireStockMetrics | null): Metric[] {
   if (metrics.volatility_20d_pct !== null) {
     rows.push({
       label: "변동성 20D",
-      value: `${metrics.volatility_20d_pct.toFixed(1)}%`,
+      // 변동성은 '수준'이라 부호를 붙이지 않는다 — `percent()` 가 아니라
+      // `unsignedPercent()` 인 이유다 (number.ts 주석).
+      value: unsignedPercent(metrics.volatility_20d_pct, 1),
     });
   }
   return rows;

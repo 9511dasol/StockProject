@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { markEmailVerified } from "@/lib/auth/accounts";
 import { consumeVerificationToken, SIGNUP_ENABLED } from "@/lib/auth/signup";
-import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
+import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { Icon } from "@/shared/ui";
@@ -21,7 +21,7 @@ import { Icon } from "@/shared/ui";
  * 그 대가를 받아들인 이유는 개발자 모드 전용 기능이고, 대안(폼 + POST)이 메일에서
  * 한 단계를 더 요구하기 때문이다. 공개 가입을 열 때 다시 볼 자리다.
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface VerifyPageProps {
   searchParams: Promise<{ email?: string; token?: string }>;
@@ -31,7 +31,7 @@ export default async function VerifyPage({ searchParams }: VerifyPageProps) {
   if (!SIGNUP_ENABLED) notFound();
 
   const { email, token } = await searchParams;
-  const caption = `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX}`;
+  const caption = `${masthead(new Date().toISOString())} · ${marketCaptionSuffix()}`;
 
   // 토큰을 먼저 소모하고, 그다음 계정을 인증 표시한다. 순서가 반대면 토큰 소모에
   // 실패했을 때 이미 인증된 계정이 남는다.

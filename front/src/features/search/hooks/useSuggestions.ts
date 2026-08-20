@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { bffApi } from "@/lib/http/browser";
+import { bff } from "@/lib/http/browser";
 import { useDebouncedValue } from "@/shared/hooks/useDebouncedValue";
 import { queryKeys } from "@/shared/query";
 import type { ParsedQuery } from "../model/match";
@@ -42,17 +42,12 @@ export function useSuggestions({
 
   const { data, isFetching } = useQuery({
     queryKey: queryKeys.suggestions(debounced, scope, mode, recentKey),
-    queryFn: async ({ signal }) => {
-      const { data } = await bffApi.get<SuggestionResponse>(
-        "/api/stocks/suggestions",
-        {
-          // axios 가 직렬화하므로 URLSearchParams 를 직접 만들 필요가 없다.
-          params: { q: debounced, scope, mode, recent: recentKey || undefined },
-          signal,
-        },
-      );
-      return data;
-    },
+    queryFn: ({ signal }) =>
+      bff.get<SuggestionResponse>("/api/stocks/suggestions", {
+        // 클라이언트가 직렬화한다 — undefined·빈 값은 알아서 빠진다.
+        query: { q: debounced, scope, mode, recent: recentKey || undefined },
+        signal,
+      }),
     staleTime: 5 * 60_000,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,

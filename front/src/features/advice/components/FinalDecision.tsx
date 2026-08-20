@@ -1,3 +1,4 @@
+import { relative, stamp } from "@/lib/format";
 import { Icon } from "@/shared/ui";
 import type { Decision } from "../model/types";
 
@@ -17,6 +18,9 @@ export function FinalDecision({
 }) {
   const filled = filledCells(decision.confidence);
   const isFallback = decision.source === "fallback";
+  // 이 카드는 스트림이 끝난 뒤에만 그려지므로 서버 렌더를 타지 않는다 —
+  // 렌더 시각을 여기서 읽어도 하이드레이션이 어긋날 자리가 없다.
+  const now = new Date().toISOString();
 
   return (
     <section
@@ -132,10 +136,24 @@ export function FinalDecision({
         `Decision` 하나다). 예시임을 밝히는 일은 목을 **넘기는 쪽**이 `SampleFrame`
         으로 한다. 규칙 기반 폴백은 이미 위쪽 배지가 말한다.
       */}
+      {/**
+       * **이 판단이 언제 것인지 밝힌다.**
+       *
+       * 결과는 캐시된다(`model/cache.ts` 의 2층 구조). 그래서 드로어를 다시 열면
+       * 진행 바 없이 즉시 완성된 판단이 뜨는데, 그 화면만 봐서는 **방금 만든 것과
+       * 두 시간 전 것이 완전히 같아 보인다.** 금융에서 판단의 나이는 판단만큼
+       * 중요한 정보라, 서버가 준 생성 시각(`updatedAt`)을 그대로 쓴다.
+       */}
       <p
         className="font-mono border-t border-on-ink-15 pt-[9px] text-on-ink-45"
         style={{ fontSize: 10, lineHeight: 1.6 }}
       >
+        {decision.updatedAt ? (
+          <>
+            {relative(decision.updatedAt, now)} 분석 · {stamp(decision.updatedAt)}
+            <br />
+          </>
+        ) : null}
         투자 판단의 참고 자료이며 투자 권유가 아닙니다.
       </p>
     </section>

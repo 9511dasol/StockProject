@@ -1,9 +1,19 @@
-import { auth } from "@/auth";
-import { notFound } from "next/navigation";
 import type { Session } from "next-auth";
 
 /**
- * 관리자 인가 — **이 프로젝트에서 유일하게 "누가 무엇을 할 수 있는가" 를 판단하는 곳.**
+ * 관리자 인가 **규칙** — 누가 관리자인가를 판단하는 순수 정책.
+ *
+ * ## 세션을 여기서 읽지 않는다
+ *
+ * 예전에는 이 파일이 `@/auth` 를 import 해 `requireAdmin()` 까지 들고 있었다.
+ * 그러면 `lib/` 이 NextAuth(어댑터의 `pg`·`nodemailer` 포함)에 묶여
+ * "React·프레임워크 무관 어댑터" 라는 계약이 깨진다(CONVENTIONS 3: `lib/` 은
+ * 아무것도 import 하지 않는다). 실질적인 대가도 있었다 — 이 정책을 단위 테스트하려면
+ * NextAuth 를 띄워야 했다.
+ *
+ * 그래서 **세션을 받아 판단하는 부분만** 남기고, 세션을 실제로 읽는 일은
+ * `app/_data/admin.ts` 로 올렸다. 신원과 도메인을 엮는 것은 app 계층의 몫이라는
+ * 규칙(CONVENTIONS '예외적으로 허용되는 배치')을 그대로 따른다.
  *
  * ## 두 겹인데 이쪽이 진짜다
  *
@@ -65,21 +75,6 @@ export function adminActorOf(session: Session | null): AdminActor | null {
   if (!seeded && user.role !== "admin") return null;
 
   return { userId: user.id, email, viaSeed: seeded };
-}
-
-/**
- * 관리자가 아니면 **404** 로 끊는다.
- *
- * 403 이 아닌 이유: 403 은 "여기 뭔가 있는데 네 권한이 부족하다" 를 알려 준다.
- * 관리자 화면은 존재 자체를 광고할 이유가 없고, 로그인 화면으로 보내는 것도
- * 마찬가지로 "이 경로는 실재한다" 는 신호다. 없는 것처럼 보이는 편이 낫다.
- *
- * 서버에서만 부를 수 있다 (`auth()` 가 서버 전용).
- */
-export async function requireAdmin(): Promise<AdminActor> {
-  const actor = adminActorOf(await auth());
-  if (!actor) notFound();
-  return actor;
 }
 
 /**

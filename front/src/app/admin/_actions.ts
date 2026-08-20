@@ -4,7 +4,7 @@ import { deleteUser, updateRole } from "@/features/admin";
 import { createAccount, looksLikeEmail, normalizeEmail } from "@/lib/auth/accounts";
 import { passwordProblem } from "@/lib/auth/password";
 import { ApiError } from "@/lib/api";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdmin } from "@/app/_data/admin";
 import type { Role } from "@/features/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";

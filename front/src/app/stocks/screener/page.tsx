@@ -1,12 +1,19 @@
 import { currentUser } from "@/auth";
 import {
   getScreener,
+  lastReachablePage,
+  offsetOf,
+  Pagination,
+  parsePage,
   parseScreenerQuery,
+  screenerPageHref,
   ScreenerFilterBar,
   ScreenerTable,
+  SCREENER_MAX_OFFSET,
+  SCREENER_PAGE_SIZE,
 } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
-import { masthead } from "@/lib/format";
+import { count, masthead } from "@/lib/format";
 import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Masthead } from "@/shared/components/layout/Masthead";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
@@ -18,11 +25,13 @@ import { BrowseTabs } from "../_components/BrowseTabs";
  * 종목 탐색 · 조건 검색 (스크리너).
  *
  * `/stocks` 와 같은 이유로 요청 시 렌더한다 — 정적 프리렌더로 두면 `next build` 가
- * 빌드 머신에서 백엔드에 접속해야 한다. 실제 백엔드 호출 빈도는 서비스의
- * revalidate(30분)가 정한다. 지표는 하루 1회 배치가 채우므로 시세 계열의 60초와
- * 맞출 이유가 없다 (`getScreener` 주석).
+ * 빌드 머신에서 백엔드에 접속해야 한다. `revalidate = 0` 을 쓴다(`force-dynamic`
+ * 이 아니다) — 라우트는 항상 동적으로 렌더하되, fetch 단위의 `force-cache`+
+ * revalidate(30분)는 그대로 유지되어 실제 백엔드 호출 빈도를 정한다. 지표는
+ * 하루 1회 배치가 채우므로 시세 계열의 60초와 맞출 이유가 없다
+ * (`getScreener` 주석).
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 /** Next 16 은 searchParams 를 Promise 로 준다 — 페이지에서 await 한다. */
 interface ScreenerPageProps {
@@ -34,6 +43,7 @@ interface ScreenerPageProps {
     div?: string;
     roe?: string;
     sort?: string;
+    page?: string;
   }>;
 }
 
@@ -49,9 +59,23 @@ interface ScreenerPageProps {
  * components/screener 가 소유한다.
  */
 export default async function ScreenerPage({ searchParams }: ScreenerPageProps) {
-  const query = parseScreenerQuery(await searchParams);
-  const result = await getScreener(query);
-  const signedIn = Boolean(await currentUser());
+  const params = await searchParams;
+  const query = parseScreenerQuery(params);
+  const page = parsePage(params.page);
+
+  // 랭킹 화면과 같은 이유로 병렬이다 — 세션 확인은 조건 검색과 무관하다.
+  const [result, user] = await Promise.all([
+    getScreener(query, {
+      offset: offsetOf(page, SCREENER_PAGE_SIZE, SCREENER_MAX_OFFSET),
+    }),
+    currentUser(),
+  ]);
+  const signedIn = Boolean(user);
+  const lastPage = lastReachablePage(
+    result.total,
+    SCREENER_PAGE_SIZE,
+    SCREENER_MAX_OFFSET,
+  );
 
   const caption = result.asOf
     ? `${masthead(`${result.asOf}T06:30:00Z`)} · 지표 기준일`
@@ -88,7 +112,7 @@ export default async function ScreenerPage({ searchParams }: ScreenerPageProps) 
         <BrowseHeader
           scope={
             result.universeSize > 0
-              ? `상장 ${result.universeSize.toLocaleString("ko-KR")}종목 · 지표 ${result.covered.toLocaleString("ko-KR")}종목 수집`
+              ? `상장 ${count(result.universeSize)}종목 · 지표 ${count(result.covered)}종목 수집`
               : "지표 준비 중"
           }
         />
@@ -98,6 +122,13 @@ export default async function ScreenerPage({ searchParams }: ScreenerPageProps) 
         <ScreenerFilterBar query={query} />
 
         <ScreenerTable result={result} query={query} />
+
+        <Pagination
+          page={page}
+          lastPage={lastPage}
+          total={result.total}
+          hrefFor={(next) => screenerPageHref(query, next)}
+        />
       </main>
 
       <MobileTabBar current="stocks" search={<SearchTrigger variant="tab" />} />

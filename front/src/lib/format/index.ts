@@ -1,5 +1,6 @@
 export {
   compact,
+  count,
   decimal,
   delta,
   marketCapKR,
@@ -14,6 +15,7 @@ export { clock, masthead, plainDate, relative, stamp, ymd } from "./date";
 export {
   deltaColorClass,
   direction,
+  directionColorClass,
   directionGlyph,
   type Direction,
 } from "./direction";

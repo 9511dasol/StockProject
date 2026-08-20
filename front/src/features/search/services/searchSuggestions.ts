@@ -1,4 +1,4 @@
-import { apiGet } from "@/lib/api";
+import { apiGetCached } from "@/lib/api";
 import { USE_MOCK } from "@/lib/config/env";
 import {
   detectMode,
@@ -49,13 +49,38 @@ function toSuggestion(wire: WireStockSuggestion): Suggestion {
   };
 }
 
+/**
+ * 같은 검색어의 결과를 이 시간 동안 재사용한다.
+ *
+ * 이 조회는 **사용자와 무관하다** — 입력 문자열 하나로 결과가 정해지고, 상장 종목
+ * 목록은 하루 단위로도 거의 바뀌지 않는다. 캐시가 없던 동안에는 "삼성" 을 친 사람
+ * 100명이 백엔드 검색 100번이었고, 최근 검색 그룹(코드별 조회)까지 더하면 요청
+ * 하나가 최대 6건으로 팬아웃됐다. 흔한 접두어일수록 겹치는 양이 많아 효과가 크다.
+ *
+ * 5분인 이유: 신규 상장이 반영되기까지의 지연으로 받아들일 만하면서, 타이핑
+ * 세션(수십 초) 여러 개를 확실히 덮는다.
+ */
+const SUGGESTIONS_REVALIDATE = 300;
+
+/**
+ * 첫 호출은 백엔드가 상장사 목록을 데우는 중일 수 있어 느리다(그래서 화면에
+ * `DelayBanner` 가 있다). 기본 5초로는 워밍업 구간을 못 넘긴다.
+ *
+ * 타임아웃이 나도 요청 자체는 계속 진행돼 캐시를 채운다(`apiGetCached` 주석) —
+ * 이번 응답만 비고 다음 타이핑부터는 즉시 뜬다.
+ */
+const SUGGESTIONS_TIMEOUT_MS = 10_000;
+
 async function fetchSuggestions(query: string): Promise<Suggestion[]> {
   if (!query.trim()) return [];
-  return (
-    await apiGet<WireStockSuggestion[]>("/stocks/suggestions", {
-      query: { query, limit: FETCH_LIMIT },
-    })
-  ).map(toSuggestion);
+  const result = await apiGetCached<WireStockSuggestion[]>("/stocks/suggestions", {
+    query: { query, limit: FETCH_LIMIT },
+    revalidate: SUGGESTIONS_REVALIDATE,
+    timeoutMs: SUGGESTIONS_TIMEOUT_MS,
+  });
+  // 지연은 빈 결과로 degrade 한다 — 자동완성이 늦게 뜨는 것과 화면이 죽는 것은 다르다.
+  if (!result.ok) return [];
+  return result.data.map(toSuggestion);
 }
 
 /**

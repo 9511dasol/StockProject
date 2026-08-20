@@ -28,6 +28,8 @@ export interface AiAdviceState {
   running: boolean;
   /** 캐시를 건너뛰고 다시 요청한다 */
   retry: () => void;
+  /** 돌고 있는 분석을 멈춘다. 진행 중이 아니면 아무 일도 하지 않는다 */
+  cancel: () => void;
 }
 
 /**
@@ -105,6 +107,23 @@ export function useAiAdvice({
     void queryClient.refetchQueries({ queryKey, exact: true });
   }, [queryClient, queryKey]);
 
+  /**
+   * 돌고 있는 분석을 멈춘다.
+   *
+   * `cancelQueries` 가 `queryFn` 에 넘긴 `signal` 을 끊고, 그 signal 은
+   * `streamAdvice` 의 fetch 까지 이어져 있다 — 브라우저가 연결을 끊으면 BFF 의
+   * `proxyStream` 이 `cancel()` 에서 업스트림을 취소한다. 즉 **취소가 상류의 LLM
+   * 호출까지 닿는다.** 진행 상태도 함께 비운다: 3/4 까지 찬 진행 바를 멈춘 채로
+   * 두면 아직 도는 것처럼 보인다.
+   *
+   * 일괄 분석에는 이미 `useBulkAdvice.cancel()` 이 있었는데 부르는 UI 가 없었다.
+   * 단건도 같은 이유로 필요하다 — 종목당 LLM 4회를 사용자가 멈출 수 없었다.
+   */
+  const cancel = useCallback(() => {
+    void queryClient.cancelQueries({ queryKey, exact: true });
+    setProgress(IDLE);
+  }, [queryClient, queryKey]);
+
   const cached = query.data ?? null;
 
   return {
@@ -117,5 +136,6 @@ export function useAiAdvice({
     error: query.error ? query.error.message : progress.error,
     running: query.isFetching,
     retry,
+    cancel,
   };
 }

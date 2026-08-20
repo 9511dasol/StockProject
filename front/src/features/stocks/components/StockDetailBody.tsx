@@ -89,7 +89,7 @@ export function StockDetailBody({
     return (
       <div className="flex min-w-0 flex-col gap-5">
         {head}
-        <ChartSection candles={detail.candles} />
+        <ChartSection candles={detail.candles} currency={detail.quote.currency} />
         {/* grid 가 아니라 flex-wrap 이다 — 밸류에이션은 재무가 없으면 통째로
             렌더되지 않으므로(ValuationRail), 2열 grid 면 그때 빈 칸이 남는다. */}
         <div className="flex flex-wrap items-start gap-4">
@@ -113,7 +113,7 @@ export function StockDetailBody({
         {/* min-w-0: 그리드 아이템의 기본 min-width:auto 가 차트·표를 밀어내
             1열에서도 가로 스크롤을 만든다 */}
         <div className="flex min-w-0 flex-col gap-3.5">
-          <ChartSection candles={detail.candles} />
+          <ChartSection candles={detail.candles} currency={detail.quote.currency} />
           {tabs}
         </div>
 

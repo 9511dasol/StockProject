@@ -30,11 +30,22 @@ export {
 
 export {
   parseRankingQuery,
+  rankingPageHref,
   RANKING_PAGE_SIZE,
   type RankingBoard,
   type RankingQuery,
   type RankingSort,
 } from "./model/ranking";
+
+/** 페이지네이션 — 두 탐색 화면이 같은 규칙을 쓴다 */
+export { Pagination } from "./components/table/Pagination";
+export {
+  lastReachablePage,
+  offsetOf,
+  parsePage,
+  RANKING_MAX_OFFSET,
+  SCREENER_MAX_OFFSET,
+} from "./model/paging";
 
 /** 조건 검색(/stocks/screener) — 조건 바와 표만 내보낸다 (components/screener/index.ts) */
 export {
@@ -46,6 +57,7 @@ export {
 
 export {
   parseScreenerQuery,
+  screenerPageHref,
   SCREENER_PAGE_SIZE,
   type ScreenerQuery,
   type ScreenerSort,

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  decimal,
-  percent as fmtPercent,
-  price as fmtPrice,
-  deltaColorClass,
-} from "@/lib/format";
-import { Icon, Sparkline } from "@/shared/ui";
+import { Icon } from "@/shared/ui";
 import type { Suggestion } from "../model/types";
 import { HighlightedName } from "./HighlightedName";
 
@@ -14,6 +8,12 @@ import { HighlightedName } from "./HighlightedName";
  * 치수·타이포는 --pal-* 테마 변수에서 읽는다. 라이트(3a)와 터미널(4a)은
  * 색뿐 아니라 패딩·글자 크기·폰트 계열까지 다르기 때문에, 컴포넌트에 테마 분기를
  * 넣는 대신 변수 한 겹으로 흡수한다.
+ *
+ * **시세 칸은 두지 않는다.** 한때 가격·스파크라인을 그리는 분기가 있었지만
+ * 백엔드 자동완성 응답에는 시세가 없어(`model/types.ts` 의 주석) 목 모드 밖에서는
+ * 한 번도 렌더되지 않는 코드였다 — 자동완성 한 번에 N종목의 시세를 얻으려면
+ * 종목마다 상류를 불러야 해서 애초에 넣을 수 없는 값이다. 실제로 채울 수 있게
+ * 되면(백엔드가 응답을 넓히면) 그때 되살린다.
  */
 export function SuggestionRow({
   id,
@@ -30,8 +30,6 @@ export function SuggestionRow({
   onSelect: () => void;
   onHover: () => void;
 }) {
-  const isOverseas = item.market === "NASDAQ" || item.market === "NYSE";
-
   return (
     <div
       id={id}
@@ -95,35 +93,6 @@ export function SuggestionRow({
         {item.symbol}
       </span>
 
-      {/* 시세는 백엔드 자동완성 응답에 없다 (목 데이터에서만 채워진다) */}
-      {item.spark && item.changePercent !== undefined ? (
-        <Sparkline
-          points={item.spark}
-          changePercent={item.changePercent}
-          w={92}
-          h={26}
-        />
-      ) : null}
-
-      {item.price !== undefined && item.changePercent !== undefined ? (
-        <span
-          className="num flex flex-none flex-col items-end gap-0.5"
-          style={{ width: "var(--pal-price-w)" }}
-        >
-          <span
-            className="font-medium"
-            style={{ fontSize: "var(--pal-price-size)" }}
-          >
-            {isOverseas ? decimal(item.price, 2) : fmtPrice(item.price)}
-          </span>
-          <span
-            className={`font-medium ${deltaColorClass(item.changePercent)}`}
-            style={{ fontSize: "var(--pal-delta-size)" }}
-          >
-            {fmtPercent(item.changePercent)}
-          </span>
-        </span>
-      ) : null}
     </div>
   );
 }

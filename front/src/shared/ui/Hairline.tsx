@@ -1,26 +1,10 @@
 /**
- * 구분선. 컴포넌트에서 border 를 직접 쓰지 말고 이것을 쓴다.
+ * 리스트 행 — 하단 점선. 뉴스 행은 tone="news" (rgba .25)
  *
- * weight
- *  - "hair"   1px 헤어라인 (기본)
- *  - "rule"   1px, 조금 진함 — 섹션 구분
- *  - "strong" 2px ink — 마스트헤드 하단
+ * 같은 파일에 `Hairline`(가로 구분선) 이 있었는데 쓰는 곳이 한 곳도 없어 걷어냈다.
+ * 화면들은 구분선을 컨테이너의 `border-t` 로 직접 그리고 있고, 그쪽이 여백·색을
+ * 그 자리에서 조절하기 쉬워 실제로 그렇게 굳었다. 필요해지면 되살린다.
  */
-export function Hairline({
-  weight = "hair",
-}: {
-  weight?: "hair" | "rule" | "strong";
-}) {
-  const cls =
-    weight === "strong"
-      ? "border-0 border-t-2 border-ink"
-      : weight === "rule"
-        ? "border-0 border-t border-line-20"
-        : "border-0 border-t border-line-14";
-  return <hr className={cls} />;
-}
-
-/** 리스트 행 — 하단 점선. 뉴스 행은 tone="news" (rgba .25) */
 export function DottedRow({
   children,
   tone = "default",

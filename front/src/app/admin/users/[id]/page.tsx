@@ -1,14 +1,15 @@
 import { fetchUser, fetchUsers, RoleBadge } from "@/features/admin";
 import { ApiError } from "@/lib/api";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdmin } from "@/app/_data/admin";
 import { Icon } from "@/shared/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { changeRoleAction, deleteUserAction } from "../../_actions";
+import { Notice } from "@/shared/components/feedback";
 import { AdminShell } from "../../_components/AdminShell";
 import { AdminUnavailable } from "../../_components/AdminUnavailable";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface AdminUserPageProps {
   params: Promise<{ id: string }>;
@@ -88,7 +89,7 @@ export default async function AdminUserDetailPage({
 
       {query.error ? <Notice tone="alert">{query.error}</Notice> : null}
       {query.done && DONE_MESSAGES[query.done] ? (
-        <Notice tone="done">{DONE_MESSAGES[query.done]}</Notice>
+        <Notice tone="success">{DONE_MESSAGES[query.done]}</Notice>
       ) : null}
 
       <section className="flex flex-col gap-1.5 border-b border-line-20 pb-4">
@@ -208,22 +209,5 @@ function Field({ label, value }: { label: string; value: string }) {
       <dt className="text-muted-45">{label}</dt>
       <dd>{value}</dd>
     </span>
-  );
-}
-
-function Notice({ tone, children }: { tone: "alert" | "done"; children: React.ReactNode }) {
-  return (
-    <p
-      role={tone === "alert" ? "alert" : "status"}
-      className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
-      style={{ fontSize: 12.5, lineHeight: 1.6 }}
-    >
-      <Icon
-        name={tone === "alert" ? "bell" : "check"}
-        size={15}
-        className="mt-0.5 flex-none text-muted-45"
-      />
-      {children}
-    </p>
   );
 }

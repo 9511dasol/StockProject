@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { resolveCandidates } from "@/features/search";
+import { getStockRanking } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import {
   NotFoundScreen,
@@ -52,17 +52,28 @@ const DESTINATIONS: readonly NotFoundDestination[] = [
   },
 ];
 
-export default function NotFound() {
-  // 후보 조회는 features/search 소유다. 여기(app 계층)에서 search·shared 를
-  // 조합하고, shared 는 features 를 모른 채 자기 타입만 받는다.
-  const suggestions: NotFoundSuggestion[] = resolveCandidates("", 5).map(
-    (item) => ({
-      name: item.name,
-      code: item.code,
-      symbol: item.symbol,
-      market: item.market,
-    }),
-  );
+export default async function NotFound() {
+  /**
+   * 여기에는 "후보" 라는 것이 없다 — 사용자가 무엇을 찾으려 했는지 모르는 화면이다
+   * (그 값을 아는 쪽은 `/stocks/[symbol]` 의 `SymbolNotResolved` 다).
+   *
+   * 예전에는 빈 질의로 `resolveCandidates("")` 를 불러 **하드코딩된 목 종목**을
+   * 띄웠다. 지금은 시가총액 상위를 쓴다 — 뜻이 있는 목록이고 실데이터이며, 조회는
+   * 장중 60초/장외 900초 캐시라 404 를 훑는 크롤러가 와도 상류 호출이 늘지 않는다.
+   *
+   * 조합은 app 계층의 일이다 — `shared` 는 features 를 모른 채 자기 타입만 받는다.
+   */
+  const ranking = await getStockRanking({
+    sort: "market_cap",
+    board: "ALL",
+    limit: 5,
+  });
+  const suggestions: NotFoundSuggestion[] = ranking.rows.map((row) => ({
+    name: row.name,
+    code: row.code,
+    symbol: `${row.code}${row.board === "KOSDAQ" ? ".KQ" : ".KS"}`,
+    market: row.board,
+  }));
 
   return (
     <>
@@ -93,7 +104,7 @@ export default function NotFound() {
           primaryAction={{ href: "/", label: "시장 현황으로" }}
           destinations={DESTINATIONS}
           suggestions={suggestions}
-          suggestionsNote="mock_universe"
+          suggestionsNote="시가총액 상위"
           note="route_not_matched · app/not-found.tsx"
         />
       </main>

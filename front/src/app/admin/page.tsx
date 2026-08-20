@@ -1,6 +1,6 @@
 import { AuditList, fetchAudit, fetchOps, OpsPanel } from "@/features/admin";
 import { ApiError } from "@/lib/api";
-import { requireAdmin } from "@/lib/auth/admin";
+import { requireAdmin } from "@/app/_data/admin";
 import { AdminShell } from "./_components/AdminShell";
 import { AdminUnavailable } from "./_components/AdminUnavailable";
 
@@ -13,7 +13,7 @@ import { AdminUnavailable } from "./_components/AdminUnavailable";
  * **캐시하지 않는다.** 운영 현황은 지금 이 순간의 상태여야 하고, 관리자 화면은
  * 호출 빈도가 낮아 캐시로 아낄 것이 없다.
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AdminOpsPage() {
   // 가드가 **가장 먼저** 온다. 이 줄 아래의 모든 것은 관리자만 볼 수 있다.

@@ -69,12 +69,33 @@ function toParams(query?: RequestOptions["query"]) {
 }
 
 /**
+ * 캐시 조회의 옵션. **`headers` 와 `signal` 이 없는 것이 의도다.**
+ *
+ * `RequestOptions` 를 그대로 쓰면 `headers` 를 타입상 받아 놓고 아래 구현이
+ * 조용히 버린다. 그 조합이 특히 위험한 이유는 Next 데이터 캐시의 키가 **URL**
+ * 이기 때문이다 — `headers: { "X-Owner-Key": … }` 로 사용자를 구분하는 호출이
+ * 하나라도 생기면, 헤더는 무시된 채 URL 만 같아서 **한 사람의 데이터가 다른
+ * 사람에게 캐시로 서빙된다.** 지금은 `getWatchlist` 가 주석만으로 그것을 피하고
+ * 있는데(그래서 그쪽은 `apiGet` 을 쓴다), 규약이 아니라 타입이 막아야 한다.
+ *
+ * `signal` 을 뺀 이유는 다르다 — 아래 구현이 일부러 signal 을 쓰지 않는다(취소하면
+ * 캐시가 채워지지 않는다). 받을 수 있는 것처럼 두면 호출부가 취소를 기대한다.
+ */
+export interface CachedRequestOptions {
+  query?: RequestOptions["query"];
+  timeoutMs?: number;
+  revalidate: number;
+}
+
+/**
  * 서버 컴포넌트 전용. Next 데이터 캐시를 타므로 `revalidate` 초 동안 같은 URL 은
  * 백엔드를 다시 치지 않는다. **여기만 네이티브 fetch 를 쓴다.**
+ *
+ * 사용자별 데이터에는 쓰지 않는다 — `CachedRequestOptions` 주석 참고.
  */
 export async function apiGetCached<T>(
   path: string,
-  options: RequestOptions & { revalidate: number },
+  options: CachedRequestOptions,
 ): Promise<CachedResult<T>> {
   const { query, revalidate, timeoutMs = CACHED_GET_TIMEOUT_MS } = options;
 

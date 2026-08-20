@@ -79,8 +79,10 @@ export async function getStockRanking(options: {
   sort: RankingSort;
   board: RankingBoard;
   limit?: number;
+  /** 페이지네이션. 백엔드 상한은 2000 이다 (`model/paging`) */
+  offset?: number;
 }): Promise<StockRanking> {
-  const { sort, board, limit = RANKING_PAGE_SIZE } = options;
+  const { sort, board, limit = RANKING_PAGE_SIZE, offset = 0 } = options;
 
   if (USE_MOCK) {
     // 목 모드에서는 홈 등락 상위를 빌려 목록 모양만 보여준다.
@@ -105,7 +107,7 @@ export async function getStockRanking(options: {
   let result;
   try {
     result = await apiGetCached<WireMarketRanking>("/markets/ranking", {
-      query: { sort, board, limit },
+      query: { sort, board, limit, offset },
       // 시세 계열 — 장중 60초 / 장외 900초.
       revalidate: marketRevalidate(),
     });

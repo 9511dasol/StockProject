@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { bffApi } from "@/lib/http/browser";
+import { bff } from "@/lib/http/browser";
 import { queryKeys } from "@/shared/query";
 import type { ListedCompaniesStatus } from "../model/types";
 
@@ -26,15 +26,13 @@ export function useListedCompaniesStatus() {
 
   const { data } = useQuery({
     queryKey: queryKeys.listedCompanies(forced),
-    queryFn: async ({ signal }) => {
-      const { status, data } = await bffApi.get<ListedCompaniesStatus | "">(
-        "/api/stocks/listed-companies",
-        { params: { source: forced || undefined }, signal },
-      );
-      // 204 = 백엔드 상태 조회 실패. 배너를 숨길 뿐 검색은 그대로 동작한다.
-      if (status === 204 || !data) return null;
-      return data;
-    },
+    // 204(백엔드 상태 조회 실패)는 클라이언트가 null 로 돌려준다 — 배너를 숨길 뿐
+    // 검색은 그대로 동작한다.
+    queryFn: ({ signal }) =>
+      bff.get<ListedCompaniesStatus>("/api/stocks/listed-companies", {
+        query: { source: forced || undefined },
+        signal,
+      }),
     refetchInterval: (query) => (query.state.data?.ready ? false : POLL_MS),
     // 준비 완료 후에는 5분 동안 다시 묻지 않는다.
     staleTime: (query) => (query.state.data?.ready ? 5 * 60_000 : 0),

@@ -3,10 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth/password";
 import { SIGNUP_ENABLED } from "@/lib/auth/signup";
-import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
+import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
+import { Notice } from "@/shared/components/feedback";
 import { Masthead } from "@/shared/components/layout/Masthead";
-import { Icon } from "@/shared/ui";
 import { signUpAction } from "./_actions";
 
 /**
@@ -21,7 +21,7 @@ import { signUpAction } from "./_actions";
  * 가입 즉시 로그인되지 않는다. 인증 메일의 링크를 열어야 `emailVerified` 가 채워지고,
  * 그전에는 `auth.ts` 의 authorize 가 거절한다.
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 interface SignupPageProps {
   searchParams: Promise<{ error?: string; sent?: string }>;
@@ -34,7 +34,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   if (session?.user) redirect("/dashboard");
 
   const { error, sent } = await searchParams;
-  const caption = `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX}`;
+  const caption = `${masthead(new Date().toISOString())} · ${marketCaptionSuffix()}`;
 
   return (
     <main className="mx-auto flex w-full max-w-shell flex-col gap-5 px-4 pb-[30px] pt-[26px] md:px-8">
@@ -64,26 +64,14 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
         </p>
 
         {sent ? (
-          <p
-            role="status"
-            className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
-            style={{ fontSize: 12.5, lineHeight: 1.6 }}
-          >
-            <Icon name="check" size={15} className="mt-0.5 flex-none text-muted-45" />
+          <Notice tone="success">
             인증 메일을 보냈습니다. 링크를 열면 가입이 끝납니다. 메일이 오지 않으면
             개발 서버 콘솔에 같은 주소가 찍혀 있습니다.
-          </p>
+          </Notice>
         ) : null}
 
         {error ? (
-          <p
-            role="alert"
-            className="flex items-start gap-2 border border-line-35 px-3 py-3 text-muted-70"
-            style={{ fontSize: 12.5, lineHeight: 1.6 }}
-          >
-            <Icon name="bell" size={15} className="mt-0.5 flex-none text-muted-45" />
-            {error}
-          </p>
+          <Notice tone="alert">{error}</Notice>
         ) : null}
 
         <form action={signUpAction} className="flex flex-col gap-2">

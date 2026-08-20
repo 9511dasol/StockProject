@@ -18,14 +18,26 @@ export function directionGlyph(value: number): string {
 }
 
 /**
+ * 방향 → 색 클래스. `inverted` 는 반전 배경(bg-ink) 위에서 쓴다.
+ *
+ * 숫자를 손에 들고 있으면 `deltaColorClass` 를 쓴다. 이 함수는 **이미 방향으로
+ * 좁혀진 값**(백엔드가 `accent: "up" | "down"` 으로 내려주는 지표 등)을 위한
+ * 입구다 — 그런 자리가 `accent === "up" ? "text-up" : ...` 삼항을 각자 다시
+ * 쓰면서 이 파일이 색 분기의 유일한 소유자라는 약속이 두 군데서 깨져 있었다
+ * (`StatRow` · 콘솔 `MetricGrid`). 게다가 둘의 보합 처리가 서로 달랐다.
+ */
+export function directionColorClass(d: Direction, inverted = false): string {
+  if (d === "flat") return inverted ? "text-on-ink-75" : "text-muted-60";
+  if (inverted) return d === "up" ? "text-up-on-ink" : "text-down-on-ink";
+  return d === "up" ? "text-up" : "text-down";
+}
+
+/**
  * 등락 색 클래스. `inverted` 는 반전 배경(bg-ink) 위에서 쓴다.
  * Delta·StatRow 프리미티브 안에서만 호출한다.
  */
 export function deltaColorClass(value: number, inverted = false): string {
-  const d = direction(value);
-  if (d === "flat") return inverted ? "text-on-ink-75" : "text-muted-60";
-  if (inverted) return d === "up" ? "text-up-on-ink" : "text-down-on-ink";
-  return d === "up" ? "text-up" : "text-down";
+  return directionColorClass(direction(value), inverted);
 }
 
 // 등락 **배경** 색(deltaBgClass)은 업종 등락 막대가 유일한 사용처였고 그 블록을

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@/auth";
 import { SearchTrigger } from "@/features/search";
 import { USE_MOCK } from "@/lib/config/env";
-import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
+import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
 import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { MobileTabBar } from "@/shared/components/layout/MobileTabBar";
@@ -60,8 +60,16 @@ import { MarketTiles, MarketTilesSkeleton } from "./_components/MarketTiles";
  * 관심종목을 여는 화면이 여기 하나로 합쳐졌다(`/watchlist` 는 여기로 보낸다).
  * 신원이 없으면 `/login` 으로 보낸다 — 앞단의 [proxy.ts](../../proxy.ts) 가 세션
  * 쿠키 없는 요청을 307 로 먼저 끊고, 여기는 쿠키가 유효하지 않은 경우를 받는 문이다.
+ *
+ * ## `revalidate = 0` (`force-dynamic` 이 아니다)
+ *
+ * 이 화면은 세션을 읽으므로 어차피 요청마다 동적으로 렌더된다. `force-dynamic` 은
+ * 라우트의 모든 fetch를 `no-store` 로 강제해 시장 데이터의 `force-cache`+
+ * revalidate(장중 60초/장외 900초, `lib/config/marketHours.ts`)까지 무력화한다.
+ * `revalidate = 0` 은 동적 렌더는 강제하되 그 캐시는 그대로 둔다(Next 16
+ * `caching-without-cache-components.md` 문서).
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function DashboardLayout({
   children,
@@ -72,8 +80,8 @@ export default async function DashboardLayout({
   if (!user) redirect("/login");
 
   const caption = USE_MOCK
-    ? `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX} · 예시 데이터`
-    : `${masthead(new Date().toISOString())} · ${MARKET_CAPTION_SUFFIX}`;
+    ? `${masthead(new Date().toISOString())} · ${marketCaptionSuffix()} · 예시 데이터`
+    : `${masthead(new Date().toISOString())} · ${marketCaptionSuffix()}`;
 
   return (
     <>

@@ -5,10 +5,16 @@ import { CSS } from "@dnd-kit/utilities";
 import Link from "next/link";
 import { decimal, price as fmtPrice } from "@/lib/format";
 import { Delta, Icon, Sparkline } from "@/shared/ui";
-import { returnPercent, type RowAiStatus, type WatchItem } from "../model/types";
+import {
+  returnPercent,
+  type Holding,
+  type RowAiStatus,
+  type WatchItem,
+} from "../model/types";
 import { AlertCondition } from "./AlertCondition";
 import { AlertToggle } from "./AlertToggle";
 import { WATCH_GRID } from "./grid";
+import { HoldingCell } from "./HoldingCell";
 import { VerdictCell } from "./VerdictCell";
 
 export function WatchRow({
@@ -19,6 +25,7 @@ export function WatchRow({
   onSelect,
   onToggleAlert,
   onChangeCondition,
+  onChangeHolding,
 }: {
   item: WatchItem;
   reordering: boolean;
@@ -27,6 +34,7 @@ export function WatchRow({
   onSelect: (next: boolean) => void;
   onToggleAlert: () => void;
   onChangeCondition: (next: string) => void;
+  onChangeHolding: (next: Holding | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.code, disabled: !reordering });
@@ -113,23 +121,13 @@ export function WatchRow({
       </span>
 
       <span role="cell" className="flex flex-col items-end gap-0.5">
-        {item.holding ? (
-          <>
-            <span className="num text-muted-70" style={{ fontSize: 12 }}>
-              {item.holding.quantity}주 ·{" "}
-              {overseas
-                ? `$${decimal(item.holding.avgPrice, 2)}`
-                : fmtPrice(item.holding.avgPrice)}
-            </span>
-            <Delta changePercent={gain ?? 0} arrow={false} size={12} />
-          </>
-        ) : (
-          // 보유 없음은 '－ · －' 두 줄로 자리를 채우지 않는다 — 빈 자리에
-          // 대시를 채워 넣으면 값이 있는 행과 무게가 같아져 표가 시끄러워진다.
-          <span className="text-muted-40" style={{ fontSize: 11.5 }}>
-            관심만
-          </span>
-        )}
+        <HoldingCell
+          holding={item.holding}
+          overseas={overseas}
+          gain={gain}
+          label={item.name}
+          onChange={onChangeHolding}
+        />
       </span>
 
       <span role="cell" className="flex min-w-0 items-center gap-[9px] pl-[18px]">

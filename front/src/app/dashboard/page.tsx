@@ -9,8 +9,11 @@ import { DashboardDetail } from "./_components/DashboardDetail";
  * 여기서 그냥 그리면 주소는 `/dashboard` 로 남는다.
  *
  * 목록 조회는 레이아웃과 공유한다 — `loadWatchlist` 가 요청 단위로 캐시한다.
+ *
+ * `revalidate = 0` 을 쓴다(`force-dynamic` 이 아니다) — 레이아웃과 같은 이유로,
+ * 동적 렌더는 강제하되 시장 데이터의 fetch 캐시는 무력화하지 않는다.
  */
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function DashboardDefaultPage({
   searchParams,

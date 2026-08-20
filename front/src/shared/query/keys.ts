@@ -9,4 +9,5 @@ export const queryKeys = {
     ["suggestions", query, scope, mode, recent] as const,
   listedCompanies: (source: string | null) =>
     ["listed-companies", source] as const,
+  watchlistCodes: () => ["watchlist-codes"] as const,
 } as const;

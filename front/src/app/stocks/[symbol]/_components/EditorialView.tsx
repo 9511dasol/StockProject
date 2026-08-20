@@ -3,7 +3,7 @@ import { MarketOverviewList, type MarketIndex } from "@/features/market";
 import { SearchTrigger } from "@/features/search";
 import { StockDetailBody, type StockDetail } from "@/features/stocks";
 import { WatchToggle } from "@/features/watchlist";
-import { MARKET_CAPTION_SUFFIX } from "@/lib/config/marketHours";
+import { marketCaptionSuffix } from "@/lib/config/marketHours";
 import { masthead } from "@/lib/format";
 import { AccountMenu } from "@/shared/components/layout/AccountMenu";
 import { Masthead } from "@/shared/components/layout/Masthead";
@@ -31,7 +31,7 @@ export function EditorialView({
   /** 이 종목이 이미 관심 목록에 있는가. 페이지가 목록을 이미 받아 오므로 추측하지 않는다 */
   watched: boolean;
 }) {
-  const caption = `${masthead(detail.now)} · ${MARKET_CAPTION_SUFFIX}`;
+  const caption = `${masthead(detail.now)} · ${marketCaptionSuffix()}`;
 
   return (
     <>

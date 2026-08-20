@@ -1,6 +1,7 @@
-import { apiGet, apiPost, ApiError } from "@/lib/api";
-import { readOwnerKey } from "@/lib/watchlist/owner";
+import { apiGet, apiPost } from "@/lib/api";
+import { readOwnerKey } from "@/app/_data/owner";
 import { NextResponse } from "next/server";
+import { toResponse, unauthorized } from "./_helpers";
 
 /**
  * 관심종목 BFF — 조회·추가.
@@ -10,25 +11,7 @@ import { NextResponse } from "next/server";
  * httpOnly 라 JS 가 읽지 못하고, 헤더로 옮기는 일은 이 서버 코드가 한다.
  */
 
-export const dynamic = "force-dynamic";
-
-/** 신원이 없으면 401. 빈 목록으로 얼버무리면 화면이 "비었다"와 구분하지 못한다. */
-function unauthorized() {
-  return NextResponse.json(
-    { error: "소유자 식별자가 없습니다. 새로고침해 주세요." },
-    { status: 401 },
-  );
-}
-
-function toResponse(error: unknown) {
-  if (error instanceof ApiError) {
-    return NextResponse.json({ error: error.message }, { status: error.status });
-  }
-  return NextResponse.json(
-    { error: "관심종목 서버에 연결하지 못했습니다." },
-    { status: 502 },
-  );
-}
+export const revalidate = 0;
 
 export async function GET() {
   const owner = await readOwnerKey();

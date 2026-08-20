@@ -39,5 +39,3 @@ export const AI_TIMEOUT_MS = Number(process.env.STOCK_AI_TIMEOUT_MS ?? 300_000);
  */
 export const ADVICE_API_KEY = process.env.ADVICE_API_KEY ?? "";
 
-/** 서버 컴포넌트 fetch 재검증 주기 (README 데이터 페칭 절: 짧게) */
-export const REVALIDATE_SECONDS = 60;

@@ -34,9 +34,6 @@ export const REVALIDATE_STATIC = 3600;
  */
 export const QUOTE_DELAY_NOTE = "20분 지연 시세";
 
-/** 마스트헤드 캡션 꼬리. 화면마다 따로 쓰던 "장 마감 15:30 KST" 를 여기로 합쳤다. */
-export const MARKET_CAPTION_SUFFIX = `장 마감 15:30 KST · ${QUOTE_DELAY_NOTE}`;
-
 const KST = new Intl.DateTimeFormat("en-US", {
   timeZone: "Asia/Seoul",
   weekday: "short",
@@ -73,6 +70,25 @@ export function isMarketOpen(now: Date = new Date()): boolean {
   const { weekday, minutes } = toSeoulClock(now);
   if (WEEKEND.has(weekday)) return false;
   return minutes >= OPEN_MINUTES && minutes < CLOSE_MINUTES;
+}
+
+/**
+ * 마스트헤드 캡션 꼬리 — 장중이면 "장중", 아니면 "장 마감"을 현재 KST 시각과 함께 싣는다.
+ *
+ * 예전에는 "장 마감 15:30 KST" 를 화면·시각과 무관하게 고정으로 붙였다 — 장이 열려
+ * 있는 오전 10시에 들어와도 "장 마감"이라고 말하는 셈이었다. 시세 신선도를 실제와
+ * 다르게 말하는 것이 이 화면이 저지를 수 있는 가장 큰 거짓말이라는 원칙
+ * (`QUOTE_DELAY_NOTE` 주석)을 정작 개장 여부 표시에는 지키지 못하고 있었다.
+ *
+ * `now` 는 이 함수를 부르는 서버 렌더 시각이다 — 시세 계열 fetch 의 재검증 주기가
+ * 장중 60초라 렌더 시각과 시세 시각의 차이가 실질적으로 작다.
+ */
+export function marketCaptionSuffix(now: Date = new Date()): string {
+  const { minutes } = toSeoulClock(now);
+  const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const mm = String(minutes % 60).padStart(2, "0");
+  const state = isMarketOpen(now) ? "장중" : "장 마감";
+  return `${state} · ${hh}:${mm} 기준 · ${QUOTE_DELAY_NOTE}`;
 }
 
 /**

@@ -1,6 +1,7 @@
-import { apiSend, ApiError } from "@/lib/api";
-import { readOwnerKey } from "@/lib/watchlist/owner";
+import { apiSend } from "@/lib/api";
+import { readOwnerKey } from "@/app/_data/owner";
 import { NextResponse } from "next/server";
+import { toResponse, unauthorized } from "../_helpers";
 
 /**
  * 관심종목 BFF — 순서 변경.
@@ -12,16 +13,11 @@ import { NextResponse } from "next/server";
  * `order` 가 6자리 코드와 겹칠 일은 없다 — 코드는 숫자 6자리 고정이다.
  */
 
-export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function PUT(request: Request) {
   const owner = await readOwnerKey();
-  if (!owner) {
-    return NextResponse.json(
-      { error: "소유자 식별자가 없습니다. 새로고침해 주세요." },
-      { status: 401 },
-    );
-  }
+  if (!owner) return unauthorized();
 
   const { codes = [] } = (await request.json().catch(() => ({}))) as {
     codes?: string[];
@@ -40,12 +36,6 @@ export async function PUT(request: Request) {
       ),
     );
   } catch (error) {
-    if (error instanceof ApiError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    return NextResponse.json(
-      { error: "관심종목 서버에 연결하지 못했습니다." },
-      { status: 502 },
-    );
+    return toResponse(error);
   }
 }
