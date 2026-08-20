@@ -49,7 +49,7 @@ export default async function StockBrowsePage({
   const signedIn = Boolean(await currentUser());
 
   const caption = ranking.asOf
-    ? `${masthead(`${ranking.asOf}T06:30:00Z`)} · ${MARKET_CAPTION_SUFFIX}`
+    ? `${masthead(`${ranking.asOf}T06:30:00Z`)} ·${MARKET_CAPTION_SUFFIX}`
     : MARKET_CAPTION_SUFFIX;
 
   return (
@@ -75,6 +75,7 @@ export default async function StockBrowsePage({
               {signedIn ? (
                 <Link
                   href="/dashboard"
+                  href="/dashboard" 
                   className="hidden border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink md:block"
                   style={{ fontSize: 13 }}
                 >
