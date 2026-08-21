@@ -65,6 +65,15 @@ export interface RowAiStatus {
   /** 완료 시 판단 문구 */
   verdict?: string;
   error?: boolean;
+  /**
+   * AI 가 아니라 지표 규칙으로 내린 판단인가.
+   *
+   * **불리언인 것이 의도다.** advice 의 `DecisionSource`(llm/fallback/timeout)를
+   * 여기로 들이면 watchlist 가 advice 를 알게 되어 feature 간 직접 import 가
+   * 된다(CONVENTIONS '의존 방향'). 변환은 둘을 조립하는 app 층의 몫이고, 이 표가
+   * 알아야 할 것은 "이 한 줄을 AI 판단과 같은 무게로 읽어도 되는가" 뿐이다.
+   */
+  ruleBased?: boolean;
 }
 
 export type SortKey = "order" | "change" | "name" | "return";

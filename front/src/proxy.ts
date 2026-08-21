@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE_NAMES } from "@/lib/auth/session-cookie";
 import { createOwnerKey, isOwnerKey, OWNER_COOKIE } from "@/lib/watchlist/anon-cookie";
 
 /**
@@ -22,11 +23,9 @@ import { createOwnerKey, isOwnerKey, OWNER_COOKIE } from "@/lib/watchlist/anon-c
  * 여전히 쿠키를 못 읽어 첫 화면이 빈 목록이 된다. 요청 헤더에도 얹어 이번 렌더부터
  * 같은 신원을 보게 한다.
  */
-/**
- * NextAuth v5 의 세션 쿠키 이름. https 에서는 `__Secure-` 접두가 붙는다.
- * 둘 다 봐야 하는 이유: 개발은 http, 배포는 https 라 한쪽만 보면 한쪽에서 안 먹는다.
- */
-const SESSION_COOKIES = ["authjs.session-token", "__Secure-authjs.session-token"];
+// 세션 쿠키 이름은 `lib/auth/session-cookie` 가 갖는다 — 이름을 두 곳에 적어 두면
+// 한쪽만 고쳤을 때 이 게이트가 조용히 모두를 통과시킨다.
+const SESSION_COOKIES = SESSION_COOKIE_NAMES;
 
 /**
  * 관리자 경로에 **세션 쿠키조차 없는 요청**을 렌더 전에 끊는다.

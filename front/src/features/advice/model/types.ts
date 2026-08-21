@@ -6,6 +6,20 @@ export type Verdict = "BUY" | "WATCH" | "AVOID";
 export type AgentStatus = "done" | "fallback";
 
 /**
+ * 최종 판단이 **어떻게** 만들어졌는가. 백엔드 `app/schemas/advice.py` 의
+ * `DecisionSource` 와 1:1 이다 — 한쪽만 바뀌면 계약이 조용히 갈라진다.
+ *
+ * `"timeout"` 은 실패가 아니라 **착지 방식**이다. 백엔드가 실행 예산(기본 90초)을
+ * 넘겨 그때까지 모은 지표로 규칙 기반 판단을 냈다는 뜻이고, 화면 취급은
+ * `"fallback"` 과 같되 **이유 문장만 다르다**.
+ *
+ * 값을 늘릴 때 `=== "fallback"` 같은 리터럴 비교를 남겨 두면 안 된다 — 유니온이
+ * 넓어져도 tsc 가 아무 말을 하지 않고 조용히 false 가 된다. 화면은 조회
+ * 테이블(`FinalDecision` 의 `RULE_BASED`)로 받아 새 값이 컴파일 에러가 되게 한다.
+ */
+export type DecisionSource = "llm" | "fallback" | "timeout";
+
+/**
  * 에이전트가 근거로 인용한 문서. 백엔드 RAG 검색 결과 중 그 에이전트가 실제로
  * 인용한 것만 온다 — 검색됐지만 안 쓴 문서는 넘어오지 않는다.
  */
@@ -77,7 +91,6 @@ export interface PersonalVerdict {
 
 /**
  * 최종 판단. 백엔드 StockAdviceResponse 의 판단 부분에 대응.
- * source 는 fallback_decision(LLM 실패) 여부 — 백엔드는 agents[].status 로 알려준다.
  */
 export interface Decision {
   verdict: Verdict;
@@ -88,7 +101,7 @@ export interface Decision {
   answer: string;
   buyConditions: string[];
   riskNotes: string[];
-  source: "llm" | "fallback";
+  source: DecisionSource;
   /** 투자 성향 프로파일이 있을 때만. 위 verdict 는 **시장 판단 그대로**다 */
   personal?: PersonalVerdict;
   /** ISO */
@@ -111,6 +124,14 @@ export interface AdviceStreamEvent {
   agent?: AgentOpinion;
   decision?: Decision;
   error?: string;
+  /**
+   * 이번 실행에 허용된 시간(ms). 진행 단계 이벤트에만 실린다.
+   *
+   * 서버가 보내 주는 이유: 진행 표시가 "N초가 지나면 그때까지 모은 지표로
+   * 마무리합니다" 라고 예고하는데, 그 N 을 프런트 상수로 두면 백엔드 예산을
+   * 조이는 순간 화면이 거짓말을 한다.
+   */
+  budgetMs?: number;
 }
 
 /** 에이전트 카드의 영문 부제. 백엔드 프로필 이름 → 표시 메타 */

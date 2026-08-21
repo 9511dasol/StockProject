@@ -63,6 +63,18 @@ export function VerdictCell({
       style={{ fontSize: 11.5 }}
     >
       {label}
+      {/* 드로어에는 '규칙 기반 판단' 배지가 있는데 이 표에는 아무 표식이 없었다.
+          한 글자짜리 표식이라도 없으면 지표 판단이 AI 판단과 같은 무게로 읽힌다.
+          `title` 로 뜻을 붙여 기호만 보고 추측하지 않게 한다. */}
+      {status?.ruleBased ? (
+        <span
+          className="ml-1 font-mono text-muted-50"
+          style={{ fontSize: 9.5 }}
+          title="지표 규칙으로 내린 판단입니다. 이유는 AI 판단 패널에서 볼 수 있습니다"
+        >
+          규칙
+        </span>
+      ) : null}
     </span>
   );
 }

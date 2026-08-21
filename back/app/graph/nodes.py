@@ -29,7 +29,7 @@ from app.agents.decision import decide as run_decision
 from app.agents.decision import fallback_decision
 from app.agents.prompts import ANALYST, ECONOMIST, JOURNALIST, AgentProfile
 from app.core.config import settings
-from app.graph.state import AdviceState
+from app.graph.state import AdviceState, seconds_left
 from app.schemas.advice import AgentOpinion
 from app.schemas.stock import StockHistoryParams
 from app.services import advice_cache, fundamentals_service, rag_service, stock_service
@@ -191,6 +191,11 @@ async def retrieve(state: AdviceState) -> dict:
 
     색인은 **첫 회차에만** 한다. 질의를 고쳐 다시 검색할 때 같은 기사를 또 색인할
     이유가 없고, 그러면 재작성 한 번에 임베딩 비용이 문서 수만큼 더 나간다.
+
+    검색에 쓸 시간은 **남은 전체 예산 안에서만** 잡는다. `rag_timeout_seconds`
+    하나만 보면 재작성 루프에서 15초 × 3회 = 45초가 나갈 수 있고, 그것은 판단
+    전체 예산의 절반이다 — RAG 는 없어도 판단이 성립하는 부품인데 예산의 절반을
+    가져가는 것은 우선순위가 뒤집힌 것이다.
     """
     stock_data = state["stock_data"]
     content = state.get("content")
@@ -200,14 +205,28 @@ async def retrieve(state: AdviceState) -> dict:
     if not settings.rag_enabled:
         return {"documents": [], "retrieve_attempts": attempts + 1}
 
+    left = seconds_left(state)
+    budget = (
+        settings.rag_timeout_seconds
+        if left is None
+        else min(settings.rag_timeout_seconds, left)
+    )
+    if budget <= 0:
+        logger.info("%s 예산이 남지 않아 검색을 건너뜁니다", stock_data.symbol)
+        return {"documents": [], "retrieve_attempts": attempts + 1}
+
     try:
-        async with asyncio.timeout(settings.rag_timeout_seconds):
+        async with asyncio.timeout(budget):
             if attempts == 0 and settings.rag_ingest_on_advice and content is not None:
                 await rag_service.index_content(stock_data.symbol, content)
             documents = await rag_service.retrieve(stock_data.symbol, state["query"])
-    except (TimeoutError, Exception) as exc:  # noqa: BLE001 - RAG 실패 ≠ 판단 실패
-        if isinstance(exc, asyncio.CancelledError):
-            raise
+    except Exception as exc:  # noqa: BLE001 - RAG 실패 ≠ 판단 실패
+        # `TimeoutError` 는 `OSError` → `Exception` 하위라 여기 함께 잡힌다.
+        # `CancelledError` 는 **`Exception` 하위가 아니라서**(3.12) 이 절을 그냥
+        # 지나간다 — 바깥 실행 예산의 취소를 우리가 삼키지 않는다는 뜻이다.
+        # 예전의 `except (TimeoutError, Exception)` + isinstance 재-raise 는 같은
+        # 동작의 죽은 코드였다. **`BaseException` 으로 넓히지 말 것** — 그 순간
+        # 예산 초과가 여기서 삼켜져 그래프가 계속 돈다.
         logger.warning("%s 검색 실패 (%s) → 문서 없이 진행", stock_data.symbol, exc)
         documents = []
 

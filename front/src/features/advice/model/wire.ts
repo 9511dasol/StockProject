@@ -5,7 +5,7 @@
 // 라우트가 아니라 여기여야 하고, 라우트가 알아야 할 것은 인증·상한·SSE 프레이밍뿐이다
 // (`features/stocks/services/wire.ts` 와 같은 자리).
 
-import type { AdviceStreamEvent } from "./types";
+import type { AdviceStreamEvent, DecisionSource } from "./types";
 
 /** back/app/schemas 의 스트림 이벤트 */
 export interface WireAdviceEvent {
@@ -30,7 +30,7 @@ export interface WireAdviceEvent {
     answer: string;
     buy_conditions: string[];
     risk_notes: string[];
-    decision_source: "llm" | "fallback";
+    decision_source: DecisionSource;
     /** 투자 성향 프로파일이 있을 때만. 없으면 필드 자체가 null 로 온다 */
     personal?: {
       market_verdict: "BUY" | "WATCH" | "AVOID";
@@ -46,6 +46,8 @@ export interface WireAdviceEvent {
     updated_at: string;
   };
   error?: string | null;
+  /** 이번 실행에 허용된 시간(초). 진행 단계 이벤트에만 실린다 */
+  budget_seconds?: number | null;
 }
 
 export function toAdviceEvent(wire: WireAdviceEvent): AdviceStreamEvent {
@@ -96,5 +98,11 @@ export function toAdviceEvent(wire: WireAdviceEvent): AdviceStreamEvent {
         }
       : undefined,
     error: wire.error ?? undefined,
+    // 초 → 밀리초. 화면이 쓰는 단위로 여기서 맞춘다 — 경계를 지나는 순간
+    // 단위가 하나여야 화면 코드가 매번 곱하지 않는다.
+    budgetMs:
+      typeof wire.budget_seconds === "number"
+        ? wire.budget_seconds * 1000
+        : undefined,
   };
 }

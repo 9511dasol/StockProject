@@ -20,11 +20,18 @@ import { PersonalVerdictCard } from "./PersonalVerdictCard";
  */
 export function AdviceDrawer({ symbol }: { symbol: string }) {
   const { open, fallback, setOpen } = useAdvice();
-  const { stage, agents, decision, error, running, retry, cancel } = useAiAdvice({
-    symbol,
-    enabled: open,
-    fallback,
-  });
+  const {
+    stage,
+    agents,
+    decision,
+    error,
+    running,
+    startedAt,
+    stopped,
+    budgetMs,
+    retry,
+    cancel,
+  } = useAiAdvice({ symbol, enabled: open, fallback });
   const closeRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -80,7 +87,13 @@ export function AdviceDrawer({ symbol }: { symbol: string }) {
         </button>
       </header>
 
-      <AdviceProgress stage={stage} running={running} />
+      <AdviceProgress
+        stage={stage}
+        running={running}
+        startedAt={startedAt}
+        stopped={stopped}
+        budgetMs={budgetMs}
+      />
 
       <div
         className="flex flex-1 flex-col gap-3.5 overflow-auto px-[22px] py-4"
@@ -126,7 +139,29 @@ export function AdviceDrawer({ symbol }: { symbol: string }) {
           <PersonalVerdictCard personal={decision.personal} />
         ) : null}
 
-        {error && !decision ? (
+        {/* 멈춤은 실패가 아니다 — 본인이 알고 한 일이라 사과하지 않는다. 그래도
+            흔적은 남아야 한다: 예전에는 취소하면 화면이 '막 열린 화면' 과 완전히
+            같아져서, 무엇을 했는지도 무엇을 할 수 있는지도 알 수 없었다. */}
+        {stopped && !decision ? (
+          <div className="flex flex-col gap-3 border border-dashed border-line-30 p-3.5">
+            <p style={{ fontSize: 12.5 }}>
+              분석을 멈췄습니다. 받는 중이던 의견은 남기지 않았습니다.
+            </p>
+            <button
+              type="button"
+              onClick={retry}
+              className="border border-ink px-4 py-2 font-medium hover:bg-ink hover:text-on-ink"
+              style={{ fontSize: 12.5 }}
+            >
+              AI 분석 다시 시도
+            </button>
+          </div>
+        ) : null}
+
+        {/* 시간 초과는 여기로 오지 않는다 — 백엔드가 규칙 기반 판단(stage 4)으로
+            착지시키므로 위쪽 `FinalDecision` 이 이유까지 밝혀 그린다. 이 상자는
+            판단을 만들 수조차 없었던 경우(주가 조회 실패 등)의 자리다. */}
+        {error && !decision && !stopped ? (
           <div className="flex flex-col gap-3 border border-dashed border-line-30 p-3.5">
             <p style={{ fontSize: 12.5 }}>
               AI 분석을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.

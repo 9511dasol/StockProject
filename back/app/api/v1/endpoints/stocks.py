@@ -3,7 +3,6 @@
 라우터는 파라미터 수신과 서비스 호출만 한다 — 비즈니스 로직은 서비스 계층에 있다.
 """
 
-from collections.abc import AsyncIterator
 from datetime import date
 from typing import Annotated
 
@@ -16,6 +15,8 @@ from app.api.deps import (
     ListedCompanyRepo,
     OptionalOwnerKey,
 )
+from app.api.sse import sse_with_heartbeat
+from app.core.config import settings
 from app.schemas.advice import StockAdviceRequest, StockAdviceResponse
 from app.schemas.stock import (
     ListedCompaniesStatus,
@@ -178,19 +179,23 @@ async def stream_stock_advice(
     except advice_cache.AdviceBusyError as exc:
         raise _busy(exc) from exc
 
-    async def events() -> AsyncIterator[bytes]:
-        try:
-            async for event in advice_stream.stream_advice(
-                payload.symbol, listing=listing, profile=profile
-            ):
-                yield f"data: {event.model_dump_json()}\n\n".encode()
-        finally:
-            # 소비자가 중간에 끊어도(GeneratorExit) 반드시 반납한다. 안 그러면
-            # 사용자가 드로어를 몇 번 여닫는 것만으로 상한이 영구히 차 버린다.
-            advice_cache.release_slot()
-
+    # 프레이밍·하트비트·슬롯 반납은 전송 계층의 일이라 `api/sse.py` 가 맡는다.
+    #
+    # **여기서 직접 `async for` 하면 안 된다.** 그러면 실행 예산 타이머가 소켓
+    # 쓰기 창에서 터졌을 때 취소가 이 함수 프레임에서 터져 `TimeoutError` 로
+    # 변환되지 않고, 규칙 기반 착지(stage 4)가 통째로 유실된다. 재현한 함정이라
+    # 근거를 `api/sse.py` 파일 주석 ②에 적어 두었다.
     return StreamingResponse(
-        events(),
+        sse_with_heartbeat(
+            # 모듈 속성으로 부르는 형태를 유지한다 — 테스트가 이 속성을 갈아끼운다.
+            advice_stream.stream_advice(
+                payload.symbol, listing=listing, profile=profile
+            ),
+            heartbeat_seconds=settings.advice_heartbeat_seconds,
+            # 소비자가 중간에 끊어도 반드시 반납한다. 안 그러면 사용자가 드로어를
+            # 몇 번 여닫는 것만으로 동시 실행 상한이 영구히 차 버린다.
+            on_finish=advice_cache.release_slot,
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",

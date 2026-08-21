@@ -83,7 +83,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.core.config import settings
 from app.graph import nodes
-from app.graph.state import AdviceState
+from app.graph.state import AdviceState, is_past
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +130,16 @@ def _after_grade(state: AdviceState) -> str | list[str]:
             len(documents),
         )
         return _ANALYST_NODES
+
+    # 예산의 60% 를 넘겼으면 질의를 고치지 않는다. 재작성 한 바퀴는 LLM 1회 +
+    # 임베딩 1회 + 검색 1회이고, 그것이 끝나도 **판단 LLM 이 아직 남아 있다.**
+    # 남은 40% 로 그 둘을 다 해내는 쪽에 거는 것보다, 있는 문서로 판단까지 가서
+    # 답을 내는 편이 낫다 — 예산을 다 쓰고 규칙 기반으로 착지하면 이 종목의
+    # 문서를 하나도 못 쓴 채로 끝난다.
+    if is_past(state, "soft_deadline"):
+        logger.info("%s 예산 60%% 초과 → 질의 재작성 생략", state.get("symbol"))
+        return _ANALYST_NODES
+
     return "rewrite_query"
 
 
@@ -145,6 +155,17 @@ def _after_verify(state: AdviceState) -> str:
         return "done"
 
     if state.get("decide_attempts", 0) > nodes.MAX_DECIDE_RETRIES:
+        return "fallback"
+
+    # 예산은 **다시 만들지 말지**만 가른다. "시간이 없으니 그냥 쓰자" 로 `done` 을
+    # 돌려주면 지어낸 D번호가 화면에 나가고 캐시에까지 들어간다 — 이 함수가 있는
+    # 이유 자체가 사라진다. 시간이 없으면 규칙 기반으로 내린다.
+    if is_past(state, "soft_deadline"):
+        logger.info(
+            "%s 예산이 얼마 남지 않아 판단 재시도 대신 규칙 기반으로 내립니다 (%s)",
+            state.get("symbol"),
+            note,
+        )
         return "fallback"
 
     logger.info("%s 판단 재시도 (%s)", state.get("symbol"), note)

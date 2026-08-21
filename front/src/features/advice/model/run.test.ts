@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, test } from "node:test";
-import { ADVICE_STALE_MS, adviceQueryKey, MAX_BULK_SYMBOLS } from "./cache.ts";
+import {
+  ADVICE_BUDGET_MS,
+  ADVICE_STALE_MS,
+  ADVICE_WARN_RATIO,
+  adviceQueryKey,
+  MAX_BULK_SYMBOLS,
+} from "./cache.ts";
+import { AI_TIMEOUT_MS } from "../../../lib/config/env.ts";
 import { runAdvice } from "./run.ts";
+import { toAdviceEvent } from "./wire.ts";
 
 /**
  * AI 판단은 종목당 LLM 4회다 — 이 프로젝트에서 유일하게 돈이 나가는 경로다.
@@ -28,6 +36,21 @@ function serve(frames: unknown[], { ok = true } = {}) {
   });
   globalThis.fetch = (async () =>
     new Response(body, { status: ok ? 200 : 500 })) as typeof fetch;
+}
+
+/** 백엔드가 조용한 구간에 끼워 넣는 SSE 주석 프레임까지 섞어서 흘린다 */
+function serveWithHeartbeats(frames: unknown[]) {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const frame of frames) {
+        controller.enqueue(encoder.encode(": keep-alive\n\n"));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(frame)}\n\n`));
+      }
+      controller.enqueue(encoder.encode(": keep-alive\n\n"));
+      controller.close();
+    },
+  });
+  globalThis.fetch = (async () => new Response(body, { status: 200 })) as typeof fetch;
 }
 
 const AGENT = (name: string) => ({
@@ -113,5 +136,61 @@ describe("advice 캐시 정책", () => {
   test("일괄 분석 상한이 LLM 호출 40회 안에 있다", () => {
     // 종목당 4회. 이 숫자를 올릴 때는 그게 곧 비용이라는 것을 알고 올려야 한다.
     assert.ok(MAX_BULK_SYMBOLS * 4 <= 40);
+  });
+});
+
+describe("실행 예산 — 시간 초과는 실패가 아니라 착지다", () => {
+  test('source "timeout" 판단은 성공으로 접힌다', async () => {
+    // **이 설계 전체의 급소다.** 백엔드가 예산을 넘겨 규칙 기반으로 착지시킨
+    // stage 4 를 여기서 거부하면, 90초를 기다린 사용자에게 남는 것이 없다.
+    // `runAdvice` 는 error 를 decision 보다 먼저 보므로, 착지 이벤트에 error 가
+    // 한 글자라도 실리면 이 테스트가 깨진다 — 백엔드 계약과 짝을 이룬다.
+    serve([
+      { stage: 1 },
+      { stage: 4, decision: { ...DECISION, source: "timeout" } },
+    ]);
+
+    const result = await run();
+
+    assert.equal(result.decision.source, "timeout");
+    assert.equal(result.decision.verdict, "BUY");
+  });
+
+  test("하트비트 주석 프레임이 이벤트를 삼키지 않는다", async () => {
+    // 주석과 data 프레임이 붙어 오면 파서가 프레임 단위로 `data:` 를 보기 때문에
+    // 바로 다음 프레임이 통째로 버려질 수 있다 — 그게 stage 4 면 판단이 사라진다.
+    serveWithHeartbeats([
+      { stage: 1 },
+      { stage: 3, agent: AGENT("AI 저널리스트") },
+      { stage: 4, decision: DECISION },
+    ]);
+
+    const result = await run();
+
+    assert.equal(result.agents.length, 1);
+    assert.equal(result.decision.verdict, "BUY");
+  });
+});
+
+describe("시간 계층 — 숫자 사이의 부등식", () => {
+  test("예산은 화면이 상수로 갖지 않고 서버가 알려 준다", () => {
+    // 화면 문구의 숫자는 **이 상수가 아니라** 진행 이벤트가 실어 오는 값이다.
+    // 그래야 back/.env 의 ADVICE_BUDGET_SECONDS 를 조여도 화면이 거짓말하지 않는다.
+    assert.equal(toAdviceEvent({ stage: 1, budget_seconds: 42 }).budgetMs, 42_000);
+    assert.equal(toAdviceEvent({ stage: 1 }).budgetMs, undefined);
+    assert.ok(ADVICE_WARN_RATIO > 0 && ADVICE_WARN_RATIO < 1);
+  });
+
+  test("BFF 타임아웃이 백엔드 예산 기본값보다 넉넉하다", () => {
+    // ADVICE_BUDGET_MS 는 화면 문구용이 아니라 **이 부등식의 기준값**이다
+    // (cache.ts 주석). back/app/core/config.py 의 기본값 90초를 가정한다.
+    assert.equal(ADVICE_BUDGET_MS, 90 * 1000);
+    // 이것이 뒤집히면 규칙 기반 착지가 도착하기 **직전에** 스트림이 잘리고,
+    // 사용자는 그 자리에서 원인 불명 에러를 본다 — 이번 변경이 없애려던 화면이다.
+    //   예산(90) + 스트림 개시 전 조회(resolve_listing ≤ 20) + 여유(10)
+    assert.ok(
+      AI_TIMEOUT_MS / 1000 >= ADVICE_BUDGET_MS / 1000 + 20 + 10,
+      `AI_TIMEOUT_MS(${AI_TIMEOUT_MS}ms)가 예산 + 개시 비용보다 짧다`,
+    );
   });
 });

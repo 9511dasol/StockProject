@@ -85,7 +85,8 @@ function mockCandidates(q: string, limit: number): Suggestion[] {
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  // 하나도 안 걸리면 빈 화면 대신 대표 종목이라도 보여준다.
-  const matches = scored.slice(0, limit).map((entry) => entry.item);
-  return matches.length > 0 ? matches : MOCK_UNIVERSE.slice(0, limit);
+  // **하나도 안 걸리면 빈 손으로 돌아온다.** 예전에는 대표 종목을 그냥 얹었는데,
+  // 이 화면이 하는 말이 "이건가요?" 라서 상관없는 종목을 얹는 순간 그 문장이
+  // 거짓이 된다. 후보 0건은 호출부가 그리는 정당한 상태다 (`SymbolNotResolved`).
+  return scored.slice(0, limit).map((entry) => entry.item);
 }

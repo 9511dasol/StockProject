@@ -4,6 +4,7 @@ import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { findUserByEmail } from "@/lib/auth/accounts";
+import { SESSION_MAX_AGE_SECONDS } from "@/lib/auth/session-cookie";
 import { burnPasswordTime, verifyPassword } from "@/lib/auth/password";
 import { authPool } from "@/lib/auth/pool";
 
@@ -148,7 +149,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
    * - 사용자·계정 행은 **그대로 저장된다.** 어댑터가 있으면 `createUser`·`linkAccount`
    *   는 전략과 무관하게 돈다 — 구글 로그인이 계속 같은 계정을 만든다.
    */
-  session: { strategy: "jwt" },
+  /**
+   * 수명이 **두 겹**이다. 하나만으로는 둘 다 못 막는다.
+   *
+   *   쿠키   — 만료 시각을 아예 안 붙여 브라우저를 닫으면 사라진다
+   *            (`app/api/auth/[...nextauth]/route.ts` 가 응답에서 떼어낸다)
+   *   토큰   — 여기 `maxAge`. 브라우저를 며칠 켜 둬도 8시간이면 무효다
+   *
+   * 쿠키만 손보면 창을 안 닫는 사용자에게는 아무것도 만료되지 않고, 토큰만
+   * 짧게 잡으면 공용 PC 에서 창을 닫아도 그 시간 동안 쿠키가 남는다.
+   *
+   * 8시간인 근거는 바로 위 JWT 주석에 있다 — **서버가 세션을 즉시 무효화할 수
+   * 없다.** 로그아웃은 쿠키를 지울 뿐이고 그 전에 복사된 토큰은 만료까지 유효하다.
+   * 회수할 방법이 없으면 남은 방어는 수명뿐이라, 예전 기본값 30일은 너무 길다.
+   */
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS },
   pages: {
     signIn: "/login",
     /**

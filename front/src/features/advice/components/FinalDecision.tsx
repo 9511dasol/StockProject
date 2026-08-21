@@ -1,8 +1,28 @@
 import { relative, stamp } from "@/lib/format";
 import { Icon } from "@/shared/ui";
-import type { Decision } from "../model/types";
+import type { Decision, DecisionSource } from "../model/types";
 
 const CELLS = 5;
+
+/**
+ * 규칙 기반으로 내린 판단의 **왜**. `null` 이면 AI 판단이다.
+ *
+ * 불리언(`source === "fallback"`)이 아니라 조회 테이블인 이유가 있다. 리터럴
+ * 비교는 유니온에 값이 하나 늘어도 **tsc 가 아무 말 없이 false 로 만든다** —
+ * 그러면 신뢰도 41%짜리 지표 판단이 아무 표식 없이 AI 판단 자리에 앉는다.
+ * `Record<DecisionSource, …>` 는 네 번째 값이 생기는 순간 컴파일 에러가 난다.
+ *
+ * 배지 문구(`규칙 기반 판단`)는 **두 경우 모두 같다.** 배지는 "무엇으로
+ * 판단했는가" 에 답하고 그 답은 둘이 같다. 다른 것은 "왜 그랬는가" 뿐이다.
+ */
+const RULE_BASED: Record<DecisionSource, string | null> = {
+  llm: null,
+  fallback: "AI 의견을 받지 못해 지표 규칙으로 판단했습니다.",
+  // "AI 가 실패했다" 가 아니다 — 시간 안에 다 모으지 못했을 뿐이고, 그때까지
+  // 받은 에이전트 의견은 위 카드에 그대로 남아 있다. 그래서 "다시 시도" 도
+  // 같은 버튼이면 된다(전체 분석을 처음부터 다시 돈다).
+  timeout: "정해 둔 분석 시간을 넘겨, 그때까지 모은 지표로 판단했습니다.",
+};
 
 /** 신뢰도 72% → 5칸 중 3칸. 20%p 단위로 채운다. */
 function filledCells(confidence: number): number {
@@ -17,7 +37,7 @@ export function FinalDecision({
   onRetry: () => void;
 }) {
   const filled = filledCells(decision.confidence);
-  const isFallback = decision.source === "fallback";
+  const ruleBased = RULE_BASED[decision.source];
   // 이 카드는 스트림이 끝난 뒤에만 그려지므로 서버 렌더를 타지 않는다 —
   // 렌더 시각을 여기서 읽어도 하이드레이션이 어긋날 자리가 없다.
   const now = new Date().toISOString();
@@ -25,7 +45,7 @@ export function FinalDecision({
   return (
     <section
       className={`flex animate-fade-up-slow flex-col gap-3 bg-ink p-[18px] text-on-ink ${
-        isFallback ? "border border-dashed border-on-ink-45" : ""
+        ruleBased ? "border border-dashed border-on-ink-45" : ""
       }`}
     >
       <div className="flex items-center justify-between gap-3">
@@ -35,7 +55,7 @@ export function FinalDecision({
         >
           final decision
         </span>
-        {isFallback ? (
+        {ruleBased ? (
           <span
             className="border border-on-ink-45 px-1.5 py-0.5 font-mono uppercase tracking-label-tight text-on-ink-75"
             style={{ fontSize: 9.5 }}
@@ -105,10 +125,10 @@ export function FinalDecision({
         ))}
       </div>
 
-      {isFallback ? (
+      {ruleBased ? (
         <>
           <p className="text-on-ink-78" style={{ fontSize: 12.5 }}>
-            AI 의견을 받지 못해 지표 규칙으로 판단했습니다.
+            {ruleBased}
           </p>
           <button
             type="button"
@@ -122,7 +142,7 @@ export function FinalDecision({
             className="font-mono text-on-ink-45"
             style={{ fontSize: 9.5 }}
           >
-            fallback_decision
+            decision_source={decision.source}
           </p>
         </>
       ) : null}

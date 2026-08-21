@@ -10,7 +10,13 @@ from app.schemas.stock import StockHistory, StockMetrics
 
 Verdict = Literal["BUY", "WATCH", "AVOID"]
 AgentStatus = Literal["done", "fallback"]
-DecisionSource = Literal["llm", "fallback"]
+#: 최종 판단이 **어떻게** 만들어졌는가.
+#:
+#: `"timeout"` 은 실패가 아니라 **착지 방식**이다 — 실행 예산을 넘겨 그때까지 모은
+#: 지표로 규칙 기반 판단을 냈다는 뜻이다. `"fallback"` 과 화면 취급(점선 테두리 ·
+#: '규칙 기반 판단' 배지 · 재시도 버튼)은 같고 **이유 문장만 다르다**. 둘을 한 값으로
+#: 뭉개면 "AI 가 실패했다" 와 "시간 안에 다 못 모았다" 를 구분해 말할 수 없다.
+DecisionSource = Literal["llm", "fallback", "timeout"]
 Stance = Literal["긍정", "중립", "부정"]
 
 VERDICT_LABELS: dict[str, str] = {
@@ -157,6 +163,13 @@ class AdviceStreamEvent(BaseModel):
     agent: AgentOpinion | None = None
     decision: AdviceStreamDecision | None = None
     error: str | None = None
+    #: 이번 실행에 허용된 시간(초). 진행 단계 이벤트에만 실린다.
+    #:
+    #: **화면이 이 숫자를 손으로 적지 않게 하려고 보낸다.** 진행 표시가 "N초가
+    #: 지나면 그때까지 모은 지표로 마무리합니다" 라고 예고하는데, 그 N 을 프런트
+    #: 상수로 두면 `ADVICE_BUDGET_SECONDS` 를 조이는 순간 화면이 거짓말을 한다 —
+    #: 그것도 사용자가 가장 예민한 순간에.
+    budget_seconds: float | None = None
 
 
 def resolve_decision_label(verdict: str, fallback_label: str) -> str:

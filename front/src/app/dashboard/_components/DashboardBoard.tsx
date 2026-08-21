@@ -191,6 +191,9 @@ export function DashboardBoard({
       running: entry.running,
       verdict: entry.decision?.decisionLabel,
       error: Boolean(entry.error),
+      // 표가 `source` 를 통째로 버리고 있었다 — 신뢰도 낮은 지표 판단이 AI 판단과
+      // **똑같이** 보였다. 여기서 불리언으로 좁혀 넘긴다(변환은 app 층의 일이다).
+      ruleBased: entry.decision ? entry.decision.source !== "llm" : undefined,
     };
   }
 

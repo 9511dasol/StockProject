@@ -8,11 +8,14 @@
 만들었는지 알 수 없다 — 결과가 같기 때문이다. 그런 분기는 **호출 횟수로만 증명된다.**
 """
 
+import time
+
 import pytest
 
 from app.agents import analysts, decision
 from app.core.config import settings
 from app.graph import advice_graph, get_graph, nodes
+from app.graph.state import is_past, seconds_left
 from app.integrations import llm
 from app.schemas.advice import AnalystOutput, InvestmentDecision
 from app.schemas.rag import IngestResult, RetrievedDoc
@@ -380,3 +383,108 @@ def test_graph_topology_is_wired_as_designed() -> None:
     # 캐시 적중은 분석을 통째로 건너뛴다.
     assert ("check_cache", "replay") in edges
     assert ("replay", "__end__") in edges
+
+
+# ── 실행 예산 ───────────────────────────────────────────────────────────
+#
+# 예산은 **조건부 엣지**가 읽는다. 그래서 이 파일의 관심사다 — "시간이 얼마 남았나"
+# 가 아니라 "그래서 어느 길로 갔나" 를 본다.
+
+
+async def _run_expired(*, soft_only: bool = True) -> dict:
+    """예산 선이 이미 지난 상태로 돌린다.
+
+    `soft_only` 면 하드 데드라인은 넉넉히 둔다. 여기서 보려는 것은 조건부 엣지의
+    판단이지 바깥 타이머가 아니다 — 하드 컷은 `test_advice_stream.py` 의 몫이다.
+    """
+    now = time.monotonic()
+    return await get_graph().ainvoke(
+        {
+            "symbol": "005930",
+            "listing": None,
+            "deadline": now + 60 if soft_only else now - 1,
+            "soft_deadline": now - 1,
+        }
+    )
+
+
+def test_missing_deadline_means_no_budget() -> None:
+    """키가 없으면 **예산이 없는 것**이다.
+
+    기본값을 0 이나 현재 시각으로 두면 그래프를 직접 돌리는 테스트·스크립트가
+    "항상 예산 초과" 라는 조용한 형태로 죽는다 — 이 파일의 다른 테스트가 전부
+    그 형태로 무력화된다(`_run()` 은 예산 키를 넘기지 않는다).
+    """
+    assert seconds_left({}) is None
+    assert is_past({}) is False
+    assert is_past({}, "soft_deadline") is False
+
+
+async def test_expired_soft_budget_skips_the_query_rewrite(
+    wired: Counter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """예산이 얼마 안 남았으면 질의를 고치지 않는다.
+
+    같은 조건(문서가 계속 빈손)에서 예산이 없으면 재작성이 `MAX_REWRITES` 회
+    돈다는 것이 위 `test_rewrite_loop_stops_at_the_cap` 이다. 그 대비가 이
+    테스트의 전부다 — 재작성 한 바퀴는 LLM 1회 + 임베딩 1회인데, 그것이 끝나도
+    최종 판단 LLM 이 아직 남아 있다.
+    """
+
+    async def always_empty(symbol: str, query: str):
+        wired.retrieve += 1
+        return []
+
+    monkeypatch.setattr(rag_service, "retrieve", always_empty)
+
+    state = await _run_expired()
+
+    assert wired.rewrite == 0
+    assert wired.retrieve == 1  # 첫 검색만
+    # **그래도 판단은 나온다.** 소프트 컷이 END 로 빠지면 판단 없이 끝난다.
+    assert state["decision"] is not None
+    assert wired.analyst == 3
+
+
+async def test_expired_soft_budget_never_lets_a_bad_citation_through(
+    wired: Counter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """시간이 없어도 **지어낸 근거는 통과시키지 않는다.**
+
+    예산이 `_after_verify` 에서 `"done"` 을 만들면 없는 D번호가 화면에 나가고
+    캐시에까지 들어간다 — 그 검증이 존재하는 이유가 사라진다. 예산이 가르는 것은
+    "다시 만들지 말지" 뿐이고, 다시 안 만들기로 했으면 규칙 기반으로 내린다.
+    """
+
+    async def always_bad(system_prompt: str, user_content: str, output_model):
+        wired.decide += 1
+        return InvestmentDecision(
+            verdict="BUY",
+            decision_label="무시됨",
+            confidence=70,
+            answer="BUY. D9 에 따르면 좋다.",
+        )
+
+    monkeypatch.setattr(decision, "ask_structured", always_bad)
+
+    state = await _run_expired()
+
+    assert wired.decide == 1  # 재시도하지 않았다
+    assert state["used_fallback"] is True
+    assert "D9" not in state["decision"].answer
+
+
+async def test_expired_hard_budget_skips_retrieval_entirely(
+    wired: Counter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """예산이 이미 끝났으면 검색에 상류를 부르지 않는다.
+
+    `rag_timeout_seconds`(15초)만 보면 재작성 루프에서 45초가 나갈 수 있다.
+    남은 예산으로 clamp 하지 않으면 그것이 판단 전체 예산의 절반이다.
+    """
+    state = await _run_expired(soft_only=False)
+
+    assert wired.retrieve == 0
+    assert state["documents"] == []
+    # 검색을 건너뛰어도 판단까지는 간다 — RAG 는 없어도 성립하는 부품이다.
+    assert state["decision"] is not None

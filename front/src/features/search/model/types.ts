@@ -10,9 +10,19 @@ export type SuggestionGroupKey = "name" | "recent" | "code";
 /**
  * 자동완성 후보 한 건.
  *
- * 백엔드 StockSuggestion 은 {symbol, name, market, initial_consonants} 뿐이다.
- * nameEn / price / changePercent / spark 는 디자인이 요구하는 표시 항목이고
- * 백엔드에 없다 — 실 연결 시 suggestions 응답 확장이나 시세 병합이 필요하다.
+ * 백엔드 `StockSuggestion` 은 {symbol, name, market, initial_consonants} 뿐이다.
+ * `nameEn` 은 목에만 있는 표시 항목이라 선택 필드로 남는다.
+ *
+ * ## 시세 필드를 두지 않는다
+ *
+ * `price` · `changePercent` · `spark` 가 선택 필드로 있었고 목 데이터에만 채워졌다.
+ * 이 셋은 **실 모드에서 영영 채워지지 않는다** — 자동완성 한 번에 N종목의 시세를
+ * 얻으려면 종목마다 상류를 불러야 해서 비현실적이다.
+ *
+ * 그 사이 화면(`SymbolNotResolved`)은 값이 있으면 원화·등락색으로 그리고 있었다.
+ * 즉 **오직 가짜만 담길 수 있는 칸을 진짜 서식으로 렌더**하고 있었다. 선택 필드로
+ * 남겨 두면 다음 사람이 같은 자리를 다시 그리므로 타입에서 지운다 — 시세가 필요한
+ * 화면은 종목 상세로 가고, 그쪽은 실제 응답을 쓴다.
  */
 export interface Suggestion {
   /** 삼성전자 */
@@ -25,14 +35,6 @@ export interface Suggestion {
   market: Market;
   /** ㅅㅅㅈㅈ */
   initials: string;
-  /**
-   * 시세는 선택 항목이다. 백엔드 `/stocks/suggestions` 는 종목명·코드·시장만
-   * 돌려주고, 자동완성 한 번에 N종목의 시세를 얻으려면 종목마다 yfinance 를
-   * 불러야 해서 비현실적이다. 목 데이터에만 채워진다.
-   */
-  price?: number;
-  changePercent?: number;
-  spark?: number[];
   /** 이름에서 매칭된 구간 [시작, 끝) — 하이라이트용. 없으면 undefined */
   match?: [number, number];
 }

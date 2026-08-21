@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.db_url import is_postgres
@@ -116,6 +116,30 @@ class Settings(BaseSettings):
     # 지연이 되고, LLM 호출 총량은 그대로 나간다.
     # 프런트 일괄 분석이 3개씩 여는 것을 감안한 값이다 (useBulkAdvice MAX_CONCURRENT).
     advice_max_concurrent: int = Field(default=4, ge=1)
+    # 판단 한 건에 쓸 수 있는 **전체 시간**. 넘기면 에러가 아니라 그때까지 모은
+    # 지표로 규칙 기반 판단을 내고 끝낸다 (`services/advice_stream`).
+    #
+    # 예전에는 이 값이 없었다. 그래프 주석은 "30초 안에 끝난다" 고 적어 두었지만
+    # 강제하는 코드가 한 줄도 없었고, 실질 상한은 프런트의 5분짜리 fetch 타임아웃
+    # 하나였다 — 그동안 동시 4슬롯 중 하나가 잡혀 다른 사용자는 429 를 받았다.
+    #
+    # **90 인 이유는 근거가 얇기 때문이다.** 저장소의 유일한 실측은 29.5초인데
+    # 그것은 비스트리밍 경로의 LLM 4회 합이고(작업노트 20회차) 그래프 경로의
+    # 1회차 실측은 아직 없다. 예산이 정상 실행의 p95 에 붙으면 안전망이 아니라
+    # 조용한 품질 저하 스위치가 된다 — 넉넉히 잡고 아래 로그로 관측한 뒤 조인다.
+    # 조일 근거: `"AI 판단 스트림 %.1f초"` 로그와 `decision_source=="timeout"` 비율.
+    advice_budget_seconds: float = Field(default=90.0, gt=0)
+    # 예산의 이 지점을 넘기면 **LLM 을 한 번 더 쓰지 않는다** — 질의 재작성도,
+    # 판단 재시도도 시작하지 않는다 (`graph/advice_graph` 의 조건부 엣지).
+    # 여기 있는 이유는 아래 `_llm_must_fit_the_advice_budget` 이 이 값을 봐야 하기
+    # 때문이다. 서비스에 상수로 두면 검증이 그것을 볼 수 없다.
+    advice_soft_ratio: float = Field(default=0.6, gt=0, lt=1)
+    # SSE 주석(`: keep-alive`) 프레임 간격. 에이전트 구간은 수십 초 동안 이벤트가
+    # 없는데, 중간 프록시(nginx `proxy_read_timeout` 기본 60초)는 그것을 죽은
+    # 연결로 보고 끊는다. **이벤트가 아니라 주석**이라 프런트와의 4단계 계약을
+    # 넓히지 않는다. 부수 효과로 uvicorn 이 끊긴 클라이언트를 감지하는 상한도
+    # 이 값이 된다 — 10초마다 쓰기를 시도하기 때문이다.
+    advice_heartbeat_seconds: float = Field(default=10.0, gt=0)
     # AI 판단 엔드포인트 2개를 여는 공유 비밀키. 프런트 BFF 만 알고 있고 브라우저에는
     # 나가지 않는다. **비워 두면 인증이 꺼진다** — 로컬 개발이 키 없이 돌아야 하기
     # 때문인데, 그 상태로 외부에 노출하면 누구나 토큰을 태울 수 있으므로 기동 시
@@ -141,8 +165,22 @@ class Settings(BaseSettings):
     # 생각 토큰도 이 상한을 함께 먹는다 — 너무 낮으면 본문이 빈 채로 MAX_TOKENS 로 끝난다.
     llm_max_tokens: int = Field(default=16000, ge=1024)
     llm_effort: EffortLevel = "medium"
-    llm_timeout_seconds: float = Field(default=300.0, gt=0)
-    llm_max_retries: int = Field(default=2, ge=0)
+    # **호출 하나**의 상한이다. 판단 한 건의 상한은 `advice_budget_seconds` 다.
+    #
+    # 45 는 실측이 아니라 아래 불변식에서 역산한 값이다. 저장소의 유일한 실측은
+    # LLM 4회 합 29.5초(작업노트 20회차)라 한 호출 45초는 충분히 넉넉하다.
+    llm_timeout_seconds: float = Field(default=45.0, gt=0)
+    # **0 이다.** SDK 의 `attempts` 는 최초 요청을 포함한 총 시도 횟수이고
+    # (google-genai `HttpRetryOptions`), 타임아웃은 시도마다 따로 걸린다.
+    # 300/2 조합의 최악값은 300×3 = 900초였다.
+    #
+    # 낮추는 것으로는 부족해서 아예 껐다. **재시도가 이 파이프라인에서는 결과를
+    # 더 나쁘게 만든다**: 에이전트 호출이 타임아웃하면 `agents/analysts` 가 그것을
+    # 즉시 규칙 기반 의견으로 흡수해 1초 만에 다음 단계로 간다. 재시도를 켜 두면
+    # 그 흡수가 한 호출분만큼 미뤄지는데, 그동안 fan-in 이 나머지 두 에이전트까지
+    # 붙잡고 있어 판단 LLM 이 예산 안에 들어올 기회를 잃는다 — 즉 재시도가
+    # "의견 3건 + LLM 판단" 을 "의견 0건 + 규칙 판단" 으로 바꾼다.
+    llm_max_retries: int = Field(default=0, ge=0)
 
     # --- RAG (벡터 검색) ---
     # **대개 비워 둔다.** 주 DB 가 Postgres 라 그것을 그대로 벡터 저장소로 쓴다 —
@@ -189,6 +227,33 @@ class Settings(BaseSettings):
                 f"그대로 붙여넣으면 됩니다. 받은 스킴: {scheme or '(빈 값)'}"
             )
         return value
+
+    @model_validator(mode="after")
+    def _llm_must_fit_the_advice_budget(self) -> "Settings":
+        """한 번의 LLM 호출이 판단 전체의 예산을 먹어서는 안 된다.
+
+        **이 검사가 주석이 아니라 코드인 이유가 이 프로젝트의 역사에 있다.** 그래프
+        주석은 오래전부터 "30초 안에 끝난다" 고 적어 두었지만 강제하는 것이 없어서
+        실제로는 5분이 걸렸고, 그것을 고치는 것이 P1-15 였다. 그리고 그 수정에서
+        새로 적은 불변식(`llm_timeout_seconds < advice_budget_seconds`)도 **틀렸다** —
+        호출 하나의 실제 상한은 타임아웃이 아니라 `타임아웃 × 시도 횟수` 다.
+        같은 실수를 세 번째로 하지 않으려면 사람이 지키는 대신 기동이 지켜야 한다.
+
+        소프트 지점과 비교하는 이유: 그 선을 넘으면 그래프가 LLM 을 더 쓰지 않기로
+        하므로, 호출 하나가 거기까지 갈 수 있으면 소프트 저하가 발동할 기회 자체가
+        없다. 그러면 사용자는 90초를 기다린 끝에 **의견 0건짜리** 규칙 판단을 받는다.
+        """
+        worst = self.llm_timeout_seconds * (self.llm_max_retries + 1)
+        soft = self.advice_budget_seconds * self.advice_soft_ratio
+        if worst > soft:
+            raise ValueError(
+                "LLM 호출 하나의 최악 소요가 AI 판단 예산의 소프트 지점을 넘습니다 "
+                f"({self.llm_timeout_seconds:g}초 × 시도 {self.llm_max_retries + 1}회 "
+                f"= {worst:g}초 > {soft:g}초). "
+                "LLM_TIMEOUT_SECONDS 나 LLM_MAX_RETRIES 를 낮추거나 "
+                "ADVICE_BUDGET_SECONDS 를 올리세요."
+            )
+        return self
 
     @property
     def vector_database_dsn(self) -> str | None:

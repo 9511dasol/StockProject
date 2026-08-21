@@ -29,6 +29,7 @@ LangGraph 에서 가장 먼저 이해해야 하는 개념이다.
 """
 
 import operator
+import time
 from typing import Annotated, TypedDict
 
 from app.schemas.advice import AgentOpinion, InvestmentDecision
@@ -87,3 +88,41 @@ class AdviceState(TypedDict, total=False):
     decide_attempts: int
     #: 검증이 남긴 사유.
     verify_note: str
+
+    # --- 실행 예산 ---
+    #
+    # 노드가 아니라 **조건부 엣지**가 주로 읽는다. "이 일을 한 번 더 할 것인가" 는
+    # 순서의 문제이고, 순서는 그래프의 소유이기 때문이다.
+
+    #: `time.monotonic()` 기준 절대 시각. **없으면(None) 예산이 걸려 있지 않다.**
+    #: 그래프를 직접 돌리는 테스트·스크립트가 종전 경로 그대로 돌아야 해서
+    #: 기본값을 0 이나 현재 시각으로 두지 않는다 — 그러면 그것들이 "항상 예산
+    #: 초과" 라는 조용한 형태로 죽는다.
+    deadline: float | None
+    #: 소프트 컷 지점(기본 예산의 60%). "지금부터 LLM 을 **한 번 더** 쓸 것인가" 를
+    #: 가르는 선이다. 비율이 아니라 절대 시각으로 넣는 이유: 조건 함수가 총 예산이
+    #: 얼마였는지 다시 알 필요가 없어진다.
+    soft_deadline: float | None
+
+
+def seconds_left(state: AdviceState, key: str = "deadline") -> float | None:
+    """남은 예산(초). 키가 없으면 `None` = 예산 없음.
+
+    **`asyncio.get_running_loop().time()` 을 쓰면 안 된다.** LangGraph 는 동기
+    노드와 조건부 엣지 함수를 **워커 스레드**에서 돌리고(실측으로 확인했다),
+    거기서 `get_running_loop()` 는 `RuntimeError` 다 — 그렇게 쓰면 `_after_grade`·
+    `_after_verify`·`grade_documents`·`verify` 가 매 실행 터진다.
+    `time.monotonic()` 은 스레드와 무관하다.
+
+    그리고 이 값은 `asyncio.timeout` 의 loop 시계와 **비교되지 않는다** —
+    예산 컨텍스트 매니저가 절대형(`timeout_at`)이 아니라 상대형(`timeout`)이라
+    두 시계가 만나는 지점이 코드에 아예 없다 (`services/advice_stream`).
+    """
+    at = state.get(key)
+    return None if at is None else at - time.monotonic()
+
+
+def is_past(state: AdviceState, key: str = "deadline") -> bool:
+    """그 선을 이미 넘겼는가. 예산이 없으면 언제나 False 다."""
+    left = seconds_left(state, key)
+    return left is not None and left <= 0
